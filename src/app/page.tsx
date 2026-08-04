@@ -16,8 +16,10 @@ import {
   type Profile,
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
+import { runwayDays } from "@/lib/runway";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import SearchEditor from "@/components/SearchEditor";
+import Compare from "@/components/Compare";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
 import { signOut } from "@/app/auth/actions";
@@ -25,7 +27,7 @@ import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 
-type Tab = "today" | "feed" | "changes" | "pipeline" | "profile";
+type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
 
 interface Change {
   id: number;
@@ -47,6 +49,8 @@ interface ApiStatus {
   pagesPerSource: number;
   checksPerDay: number;
   lastCheckedAt: string | null;
+  wideQueries: boolean;
+  perPollEstimate: number;
 }
 
 const money = (n: number) => `$${n.toLocaleString()}`;
@@ -354,6 +358,14 @@ export default function Home() {
 
   useEffect(() => setFocus(0), [query, sort, priceMax, beds, baths, source]);
 
+  const finalistCount = useMemo(
+    () =>
+      listings.filter(
+        (l) => l.starred || !["inbox", "passed", "closed"].includes(l.stage)
+      ).length,
+    [listings]
+  );
+
   const counts = useMemo(
     () => ({
       active: listings.filter((l) => l.isActive).length,
@@ -411,6 +423,7 @@ export default function Home() {
               ["feed", "Listings", counts.active],
               ["changes", "What changed", changes.length],
               ["pipeline", "My pipeline", counts.pipeline],
+              ["compare", "Compare finalists", finalistCount],
               ["profile", "My details", 0],
             ] as [Tab, string, number][]
           ).map(([key, label, count]) => (
@@ -538,8 +551,19 @@ export default function Home() {
               />
             </div>
             <div className="muted" style={{ fontSize: 10 }}>
-              {api.usage.remaining} left this month · ~
-              {Math.max(1, Math.floor(api.usage.remaining / 10))} more checks
+              {api.usage.remaining} left ·{" "}
+              {(() => {
+                const d = runwayDays(
+                  api.usage.remaining,
+                  api.checksPerDay,
+                  Math.max(api.perPollEstimate ?? 5, 1)
+                );
+                return d == null
+                  ? "manual checks only"
+                  : d <= 3
+                    ? `new key needed in ${d}d`
+                    : `key lasts ~${d}d at current pace`;
+              })()}
             </div>
           </button>
         )}
@@ -770,6 +794,10 @@ export default function Home() {
           </div>
         )}
 
+        {!loading && tab === "compare" && (
+          <Compare listings={listings} onOpen={setOpen} />
+        )}
+
         {!loading && tab === "profile" && (
           <div style={{ display: "grid", gap: 16 }}>
             <SearchEditor onSaved={loadFeed} />
@@ -939,9 +967,25 @@ function ApiSettings({
     setChecks(String(status.checksPerDay));
   }, [status]);
 
-  // 4 areas x pages for Zillow and HotPads, plus 2 bed values for StreetEasy.
-  const perPoll = Number(pages) * 10;
-  const polls = status ? Math.floor(status.usage.remaining / Math.max(perPoll, 1)) : 0;
+  // Measured from this key's actual spend (server-side), scaled if the user is
+  // trying a different page depth than the one the measurement was taken at.
+  const savedPages = Math.max(status?.pagesPerSource ?? 1, 1);
+  const perPoll = Math.max(
+    1,
+    Math.round((status?.perPollEstimate ?? 5) * (Number(pages) / savedPages))
+  );
+  const polls = status ? Math.floor(status.usage.remaining / perPoll) : 0;
+
+  // Recomputed on every keystroke of the schedule dropdown — the estimate's
+  // job is to answer "what if I check more often?" before the user commits.
+  const days = runwayDays(status?.usage.remaining ?? 0, Number(checks), perPoll);
+  const replaceBy =
+    days == null
+      ? null
+      : new Date(Date.now() + days * 86_400_000).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
 
   async function save() {
     setBusy(true);
@@ -1004,13 +1048,14 @@ function ApiSettings({
           <option value="8">Every 3 hours</option>
         </select>
         <span className="muted" style={{ fontSize: 11 }}>
-          {Number(checks) === 0
-            ? "Nothing runs on its own — the feed only changes when you refresh it."
-            : `About ${Number(checks) * perPoll} requests a day, so this key lasts ` +
-              `roughly ${Math.max(1, Math.floor((status?.usage.remaining ?? 0) / Math.max(Number(checks) * perPoll, 1)))} more days.`}
+          {days == null
+            ? "Nothing runs on its own — the key only spends when you press the button, so it never expires on a schedule."
+            : days <= 3
+              ? `⚠ At this pace you'd need a fresh key by ${replaceBy} — ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}. Consider checking less often.`
+              : `At ${Number(checks) * perPoll} requests a day you'll need a fresh key around ${replaceBy} (${days} days).`}
           {status?.lastCheckedAt
             ? ` Last checked ${new Date(status.lastCheckedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
-            : " Never checked yet."}
+            : ""}
         </span>
       </label>
 

@@ -1111,3 +1111,58 @@ a.chip:hover {
 .flag-warn {
   color: var(--warn);
 }
+
+/* --- compare finalists --------------------------------------------------- */
+
+.compare {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.compare th,
+.compare td {
+  padding: 9px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.compare thead th {
+  border-bottom-width: 2px;
+}
+
+.compare tbody tr:last-child td {
+  border-bottom: none;
+  white-space: normal;
+}
+
+.compare-head {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.compare-head:hover span:first-child {
+  color: var(--accent);
+}
+
+.compare-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* One winner per row — the point of the table is where the ticks cluster. */
+.compare-best {
+  background: var(--good-soft);
+  color: var(--good);
+  font-weight: 600;
+}
+
+.compare-tick {
+  font-size: 11px;
+}

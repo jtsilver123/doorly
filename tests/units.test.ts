@@ -24,6 +24,7 @@ import {
 import { neighborhoodAt, withinAreas } from "@/lib/geo";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
+import { runwayDays } from "@/lib/runway";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
@@ -736,4 +737,23 @@ test("an unreadable poll history must not mean 'poll now'", () => {
   // defaulting to "due" on an error would spend the budget in under two days.
   const source = readFileSync("src/lib/apikey.ts", "utf8");
   assert.match(source, /if \(!read\) return \{ due: false/);
+});
+
+// --- key runway --------------------------------------------------------------
+
+test("the runway estimate reacts to the schedule", () => {
+  // 250 left, 5 requests a poll: twice a day lasts 25 days, 8x/day lasts 6.
+  assert.equal(runwayDays(250, 2, 5), 25);
+  assert.equal(runwayDays(250, 8, 5), 6);
+  // Checking more often must never *extend* the estimate.
+  const paces = [1, 2, 4, 8].map((c) => runwayDays(250, c, 5)!);
+  for (let i = 1; i < paces.length; i++) assert.ok(paces[i] <= paces[i - 1]);
+});
+
+test("manual-only has no expiry date", () => {
+  assert.equal(runwayDays(250, 0, 5), null);
+});
+
+test("an exhausted key reads as zero days, not negative", () => {
+  assert.equal(runwayDays(0, 2, 5), 0);
 });

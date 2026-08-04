@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadConfig, saveConfig, getUsage, keyHint, nextCheckDue } from "@/lib/apikey";
+import { db } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,28 @@ export async function GET() {
     getUsage(),
     nextCheckDue().catch(() => ({ due: false, lastAt: null, intervalHours: 0 })),
   ]);
+
+  // Measure what a poll actually costs rather than assuming it. Total spend on
+  // this key divided by completed polls is self-correcting: it absorbs wide
+  // vs narrow queries, extra bed values, retries — everything a formula would
+  // have to guess at. The heuristic only covers the first run.
+  let perPollEstimate = config.pagesPerSource * (config.wideQueries ? 5 : 14);
+  try {
+    const monthStart = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)
+    ).toISOString();
+    const { count } = await (await db())
+      .from("poll_runs")
+      .select("id", { count: "exact", head: true })
+      .eq("ok", true)
+      .gte("started_at", monthStart);
+    if (count && count > 0 && usage.used > 0) {
+      perPollEstimate = Math.max(1, Math.round(usage.used / count));
+    }
+  } catch {
+    // keep the heuristic
+  }
+
   return NextResponse.json({
     usage,
     hasKey: Boolean(config.realtyApiKey),
@@ -18,6 +41,8 @@ export async function GET() {
     pagesPerSource: config.pagesPerSource,
     checksPerDay: config.checksPerDay,
     lastCheckedAt: schedule.lastAt,
+    wideQueries: config.wideQueries,
+    perPollEstimate,
   });
 }
 
