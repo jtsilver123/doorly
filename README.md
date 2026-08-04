@@ -51,7 +51,7 @@ npm run dev                    # http://localhost:3000
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase publishable key |
-| `REALTYAPI_KEY` | strongly recommended | StreetEasy, Zillow and HotPads. Without it only Craigslist runs |
+| `REALTYAPI_KEY` | strongly recommended | StreetEasy, Zillow and HotPads. Without it only Craigslist runs. Can also be set in-app under **My details**, which takes precedence |
 | `CRON_SECRET` | only when deployed | Protects the scheduled poll endpoint |
 
 The schema lives in `supabase/migrations/`. Apply `0001_init.sql` then
@@ -59,6 +59,36 @@ The schema lives in `supabase/migrations/`. Apply `0001_init.sql` then
 
 Set your name, employer, income and move-in date under **My details** — those
 fill in the tour message, so filling them once is what makes outreach one tap.
+
+## The request budget
+
+The RealtyAPI free tier is **250 requests a month**, which is a real design
+constraint rather than a footnote. At three pages per source per area a single
+poll cost 30 requests — the whole month bought eight checks, one every four
+days, in a market that moves in hours.
+
+So: pages-per-source defaults to **1** (listings are sorted newest-first, so one
+page catches everything fresh), which puts a poll at ~10 requests and the month
+at ~25 checks. Usage is metered per call and shown in the sidebar; when the
+budget runs out, polls fail with a message telling you to swap keys rather than
+quietly reporting "no new listings". **Craigslist needs no key**, so it keeps
+working when the quota is gone.
+
+Paste a fresh key under **My details** → *API key & usage*. Usage is counted
+per key, so a new key starts a new count.
+
+## Keyboard
+
+The feed is built for triage, so it's drivable without the mouse:
+
+| Key | Action |
+|---|---|
+| `J` / `K` | move between listings |
+| `E` | reach out (text, email or copy-and-open, whichever applies) |
+| `S` | star |
+| `X` | pass — also trains the ranker |
+| `O` | open on the best site |
+| `↵` | open details |
 
 ## Layout
 
@@ -98,15 +128,25 @@ the logic changes.
 - **Apartments.com is not included.** It has no API on this key and hard-403s
   direct requests behind CoStar's bot protection. HotPads (Zillow-owned) is in
   as the closest substitute for that inventory.
-- **Phone numbers are rare.** Only Zillow publishes one, on a small minority of
-  listings. When there's no number the tour draft still opens Messages ready to
-  send, and **Copy** puts it on the clipboard — email is the more reliable channel.
+- **Phone numbers are rare.** Zero of 324 listings in a live sample had one;
+  only Zillow publishes them at all. Rather than show a text button that can't
+  text, the primary action adapts: *Text for tour* when there's a phone, *Email
+  for tour* when there's an address, and otherwise *Copy & open listing*, which
+  puts the draft on your clipboard and opens the site's own enquiry form. Every
+  one of those logs the contact and advances the pipeline.
 - **StreetEasy only searches by borough.** Neighborhood slugs and its own
   numeric area ids both return zero, so Homefinder queries the borough and
   narrows using the `areaName` on each listing.
 - **Craigslist has no address field.** Its listing title is used instead, so
   Craigslist rows only dedupe against other sites when the title contains a real
   street address.
+- **Images can 404.** Listing CDNs expire URLs; cards fall back to a
+  placeholder rather than showing a broken image.
+- **Neighborhoods for Zillow/HotPads come from the query, not the listing.**
+  Neither returns a neighborhood field, so results are tagged with the area they
+  were searched under. Both return coordinates, so point-in-polygon tagging
+  would let a single borough-wide query replace four neighborhood queries —
+  cutting request cost further. Not done yet.
 - **Solo mode.** There is no login: `user_id` defaults to a fixed UUID. The
   column and the RLS policies are already multi-user, so adding auth is a policy
   swap rather than a migration — see the comments in `0002_solo_mode.sql`.

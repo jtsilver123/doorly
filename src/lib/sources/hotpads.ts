@@ -1,5 +1,6 @@
 import type { Listing, SearchCriteria } from "@/types";
 import { realtyGet } from "@/lib/realtyapi";
+import { loadConfig } from "@/lib/apikey";
 import { getAreas, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
 
@@ -95,6 +96,7 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
       description: row.description ?? "",
       contactPhone: row.contact_phone ?? "",
       contactName: row.broker_name ?? row.name ?? "",
+      contactEmail: "",
       availableText: row.available_date ?? "",
     });
   }
@@ -102,9 +104,11 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
   return out;
 }
 
-const PAGES = 3;
 
 export async function fetchHotPads(c: SearchCriteria): Promise<Listing[]> {
+  // Pages per source is the main lever on the monthly request budget;
+  // sorted by newest, one page already catches everything fresh.
+  const PAGES = (await loadConfig()).pagesPerSource;
   const byId = new Map<string, Listing>();
   const bedsRange = `${c.bedMin}-${c.bedMax ?? 8}`;
 

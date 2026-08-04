@@ -6,7 +6,13 @@ import { toNum, toPrice } from "@/lib/parse";
 import { craigslistId, parseCraigslistHtml } from "@/lib/sources/craigslist";
 import { inBounds, searchKey, DEFAULT_CRITERIA } from "@/lib/criteria";
 import { train, score, features } from "@/lib/rank";
-import { draftTourMessage, smsLink, normalizePhone, DEFAULT_PROFILE } from "@/lib/outreach";
+import {
+  bestChannel,
+  draftTourMessage,
+  smsLink,
+  normalizePhone,
+  DEFAULT_PROFILE,
+} from "@/lib/outreach";
 import type { Listing, FeedListing } from "@/types";
 
 function listing(over: Partial<Listing> = {}): Listing {
@@ -34,6 +40,7 @@ function listing(over: Partial<Listing> = {}): Listing {
     description: "",
     contactPhone: "",
     contactName: "",
+    contactEmail: "",
     availableText: "",
     ...over,
   };
@@ -288,6 +295,7 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     scoreReasons: [],
     daysOnMarket: 1,
     unseenEvents: 0,
+    needsFollowUp: false,
     priceHistory: [],
     ...over,
   };
@@ -323,4 +331,67 @@ test("smsLink works with and without a recipient", () => {
   assert.match(smsLink("845-460-0910", "hi"), /^sms:\+18454600910&body=hi$/);
   // No published phone: still open Messages with the draft ready.
   assert.match(smsLink("", "hi there"), /^sms:&body=hi%20there$/);
+});
+
+// --- qualifying as a business owner ---------------------------------------
+
+test("a business owner with no salary names the gap and closes it", () => {
+  const message = draftTourMessage(feed(), {
+    ...DEFAULT_PROFILE,
+    name: "Jake",
+    employer: "BetterCampus",
+    employment: "self_employed",
+    income: "",
+    proofs: ["2025 tax return", "proof of assets", "business revenue"],
+  });
+  assert.match(message, /I own BetterCampus/);
+  // The objection is answered in the message, not left for the landlord.
+  assert.match(message, /don't draw a salary/);
+  assert.match(message, /2025 tax return, proof of assets and business revenue/);
+});
+
+test("a salaried applicant does not get the no-salary caveat", () => {
+  const message = draftTourMessage(feed(), {
+    ...DEFAULT_PROFILE,
+    employer: "Acme",
+    employment: "employed",
+    income: "$180k/yr",
+    proofs: ["recent paystubs"],
+  });
+  assert.match(message, /I work at Acme/);
+  assert.match(message, /\$180k\/yr/);
+  assert.doesNotMatch(message, /don't draw a salary/);
+});
+
+test("with no documents listed it still offers them on request", () => {
+  const message = draftTourMessage(feed(), { ...DEFAULT_PROFILE, proofs: [] });
+  assert.match(message, /on request/);
+});
+
+// --- adaptive outreach channel --------------------------------------------
+
+test("the offered action matches what the listing actually has", () => {
+  assert.equal(bestChannel({ contactPhone: "845-460-0910", url: "u" }).channel, "text");
+  assert.equal(
+    bestChannel({ contactPhone: "", contactEmail: "a@b.com", url: "u" }).channel,
+    "email"
+  );
+  // The common case: no phone, no email — never offer a dead text button.
+  assert.equal(bestChannel({ contactPhone: "", url: "u" }).channel, "portal");
+});
+
+test("income on the return is cited as documented, not self-reported", () => {
+  const message = draftTourMessage(feed(), {
+    ...DEFAULT_PROFILE,
+    employer: "BetterCampus",
+    employment: "self_employed",
+    income: "$240,000",
+    proofs: ["2025 tax return", "proof of assets"],
+  });
+  assert.match(message, /I own BetterCampus/);
+  assert.match(message, /2025 tax return shows \$240,000/);
+  // Strength, not apology — and the return isn't listed twice.
+  assert.doesNotMatch(message, /don't draw a salary/);
+  assert.match(message, /proof of assets/);
+  assert.equal(message.match(/tax return/g)?.length, 1);
 });

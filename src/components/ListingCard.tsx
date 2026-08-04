@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { FeedListing } from "@/types";
 import { LINK_PREFERENCE, SOURCE_LABEL, STAGE_LABEL } from "@/types";
-import { CONTACT_ICON, CONTACT_LABEL } from "@/lib/outreach";
+import { CONTACT_ICON, CONTACT_LABEL, bestChannel } from "@/lib/outreach";
 
 /** Sites this listing appears on, best-to-open first (Zillow, then StreetEasy). */
-function orderedSources(listing: FeedListing) {
+export function orderedSources(listing: FeedListing) {
   return [...listing.alsoOn]
     .filter((s) => s.url)
     .sort(
@@ -27,81 +28,60 @@ function relative(iso: string): string {
 
 interface Props {
   listing: FeedListing;
+  focused?: boolean;
   onOpen: (listing: FeedListing) => void;
   onStar: (listing: FeedListing) => void;
   onPass: (listing: FeedListing) => void;
-  onText: (listing: FeedListing) => void;
+  onReach: (listing: FeedListing) => void;
 }
 
-export default function ListingCard({ listing, onOpen, onStar, onPass, onText }: Props) {
+export default function ListingCard({
+  listing,
+  focused,
+  onOpen,
+  onStar,
+  onPass,
+  onReach,
+}: Props) {
   const dropped = listing.price < listing.originalPrice;
   const rose = listing.price > listing.originalPrice;
   const delta = listing.price - listing.originalPrice;
+  const reach = bestChannel(listing);
+  // Listing CDNs expire URLs, so a dead image must fall back to the placeholder
+  // rather than leaving a broken-image glyph in the grid.
+  const [imageBroken, setImageBroken] = useState(false);
+  const sources = orderedSources(listing);
+  const primary = sources[0];
 
   return (
     <article
-      className="surface"
-      style={{
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        opacity: listing.isActive ? 1 : 0.6,
-      }}
+      className="card surface"
+      data-focused={focused ? "true" : undefined}
+      style={{ opacity: listing.isActive ? 1 : 0.55 }}
     >
       <button
         onClick={() => onOpen(listing)}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          display: "block",
-          position: "relative",
-          aspectRatio: "16 / 10",
-          background: "var(--surface-2)",
-        }}
+        className="card-media"
         aria-label={`Open ${listing.address}`}
       >
-        {listing.imageUrl ? (
+        {listing.imageUrl && !imageBroken ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={listing.imageUrl}
             alt=""
             loading="lazy"
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            onError={() => setImageBroken(true)}
           />
         ) : (
-          <div
-            className="muted"
-            style={{
-              display: "grid",
-              placeItems: "center",
-              height: "100%",
-              fontSize: 12,
-            }}
-          >
-            no photo
-          </div>
+          <span className="muted card-noimg">{listing.neighborhood || "No photo"}</span>
         )}
 
-        <div
-          style={{
-            position: "absolute",
-            top: 8,
-            left: 8,
-            display: "flex",
-            gap: 4,
-            flexWrap: "wrap",
-            maxWidth: "calc(100% - 16px)",
-          }}
-        >
+        <div className="card-badges">
           {!listing.isActive && <span className="chip">off market</span>}
-          {dropped && (
-            <span className="chip chip-good">↓ {money(Math.abs(delta))}</span>
-          )}
+          {dropped && <span className="chip chip-good">↓ {money(Math.abs(delta))}</span>}
           {rose && <span className="chip chip-warn">↑ {money(delta)}</span>}
           {listing.noFee && <span className="chip chip-accent">no fee</span>}
-          {listing.unseenEvents > 0 && (
-            <span className="chip chip-accent">{listing.unseenEvents} new</span>
-          )}
+          {listing.needsFollowUp && <span className="chip chip-warn">follow up</span>}
         </div>
 
         <button
@@ -109,28 +89,17 @@ export default function ListingCard({ listing, onOpen, onStar, onPass, onText }:
             e.stopPropagation();
             onStar(listing);
           }}
+          className="card-star"
           title={listing.starred ? "Unstar" : "Star"}
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-            border: "none",
-            borderRadius: 8,
-            width: 30,
-            height: 30,
-            background: "rgba(0,0,0,0.45)",
-            color: listing.starred ? "#fbbf24" : "#fff",
-            fontSize: 15,
-            lineHeight: 1,
-          }}
+          style={{ color: listing.starred ? "#fbbf24" : "#fff" }}
         >
           {listing.starred ? "★" : "☆"}
         </button>
       </button>
 
-      <div style={{ padding: 12, display: "grid", gap: 8, flex: 1 }}>
+      <div className="card-body">
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <strong style={{ fontSize: 18, letterSpacing: "-0.01em" }}>
+          <strong style={{ fontSize: 17, letterSpacing: "-0.01em" }}>
             {money(listing.price)}
           </strong>
           {(dropped || rose) && (
@@ -147,24 +116,15 @@ export default function ListingCard({ listing, onOpen, onStar, onPass, onText }:
           </span>
         </div>
 
-        <button
-          onClick={() => onOpen(listing)}
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 500,
-            lineHeight: 1.35,
-          }}
-        >
+        <button className="card-title" onClick={() => onOpen(listing)}>
           {listing.address}
           {listing.unit ? ` #${listing.unit}` : ""}
         </button>
 
         <div className="muted" style={{ fontSize: 12 }}>
-          {listing.neighborhood || listing.borough || "NYC"} · seen{" "}
+          {listing.neighborhood || listing.borough || "NYC"} ·{" "}
           {relative(listing.firstSeenAt)}
-          {listing.daysOnMarket > 21 ? ` · ${listing.daysOnMarket}d on market` : ""}
+          {listing.daysOnMarket > 21 ? ` · ${listing.daysOnMarket}d listed` : ""}
         </div>
 
         {listing.score != null && (
@@ -172,15 +132,14 @@ export default function ListingCard({ listing, onOpen, onStar, onPass, onText }:
             <div className="meter">
               <span style={{ width: `${listing.score}%` }} />
             </div>
-            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-              {listing.score}% match · {listing.scoreReasons[0] ?? "—"}
+            <div className="muted card-why">
+              {listing.score}% · {listing.scoreReasons[0] ?? "—"}
             </div>
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: "auto" }}>
-          {/* Each site it was found on opens directly, best-UI site first. */}
-          {orderedSources(listing).map((s) => (
+        <div className="card-chips">
+          {sources.map((s) => (
             <a
               key={s.source}
               className="chip"
@@ -188,7 +147,7 @@ export default function ListingCard({ listing, onOpen, onStar, onPass, onText }:
               target="_blank"
               rel="noreferrer"
               title={`Open on ${SOURCE_LABEL[s.source]}`}
-              style={{ textDecoration: "none" }}
+              onClick={(e) => e.stopPropagation()}
             >
               {SOURCE_LABEL[s.source]} ↗
             </a>
@@ -197,7 +156,7 @@ export default function ListingCard({ listing, onOpen, onStar, onPass, onText }:
             <span className="chip chip-accent">{STAGE_LABEL[listing.stage]}</span>
           )}
           {listing.lastContactChannel && (
-            <span className="chip" title={`Last contacted ${relative(listing.lastContactAt!)}`}>
+            <span className="chip" title={`Last contact ${relative(listing.lastContactAt!)}`}>
               {CONTACT_ICON[listing.lastContactChannel]}{" "}
               {CONTACT_LABEL[listing.lastContactChannel]}
               {listing.contactCount > 1 ? ` ×${listing.contactCount}` : ""}
@@ -205,25 +164,29 @@ export default function ListingCard({ listing, onOpen, onStar, onPass, onText }:
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+        <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+          {/* The label follows what this listing can actually do. There is no
+              state where the primary button is present but does nothing. */}
           <button
             className="btn btn-primary"
-            style={{ flex: 1 }}
-            onClick={() => onText(listing)}
-            title="Draft a tour request text"
+            style={{ flex: 1, minWidth: 0 }}
+            onClick={() => onReach(listing)}
+            title={reach.hint}
           >
-            Text for tour
+            {reach.label}
           </button>
-          <a
-            className="btn"
-            href={orderedSources(listing)[0]?.url ?? listing.url}
-            target="_blank"
-            rel="noreferrer"
-            title={`Open on ${SOURCE_LABEL[orderedSources(listing)[0]?.source ?? listing.source]}`}
-          >
-            Open
-          </a>
-          <button className="btn" onClick={() => onPass(listing)} title="Not for me">
+          {primary && (
+            <a
+              className="btn"
+              href={primary.url}
+              target="_blank"
+              rel="noreferrer"
+              title={`Open on ${SOURCE_LABEL[primary.source]}`}
+            >
+              ↗
+            </a>
+          )}
+          <button className="btn" onClick={() => onPass(listing)} title="Not for me (X)">
             ✕
           </button>
         </div>

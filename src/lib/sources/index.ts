@@ -1,6 +1,6 @@
 import type { Listing, SearchCriteria, Source } from "@/types";
 import { inBounds } from "@/lib/criteria";
-import { hasRealtyKey } from "@/lib/realtyapi";
+import { hasRealtyKey, BudgetExhaustedError } from "@/lib/realtyapi";
 import { fetchStreetEasy } from "@/lib/sources/streeteasy";
 import { fetchZillow } from "@/lib/sources/zillow";
 import { fetchHotPads } from "@/lib/sources/hotpads";
@@ -37,7 +37,7 @@ const FETCHERS: Record<string, { run: Fetcher; needsKey: boolean }> = {
  */
 export async function runSearch(c: SearchCriteria): Promise<SearchRun> {
   const enabled = c.sources.filter((s) => FETCHERS[s]);
-  const keyed = hasRealtyKey();
+  const keyed = await hasRealtyKey();
 
   const settled = await Promise.allSettled(
     enabled.map(async (source): Promise<SourceReport & { listings: Listing[] }> => {
@@ -48,7 +48,7 @@ export async function runSearch(c: SearchCriteria): Promise<SearchRun> {
           ok: false,
           fetched: 0,
           kept: 0,
-          message: "skipped: REALTYAPI_KEY not set",
+          message: "skipped: no API key — add one in Settings",
           listings: [],
         };
       }
@@ -64,14 +64,15 @@ export async function runSearch(c: SearchCriteria): Promise<SearchRun> {
           listings: kept,
         };
       } catch (err) {
-        return {
-          source,
-          ok: false,
-          fetched: 0,
-          kept: 0,
-          message: err instanceof Error ? err.message : String(err),
-          listings: [],
-        };
+        // Running out of quota is not the same as a broken source; label it so
+        // the UI can tell you to swap keys instead of implying an outage.
+        const message =
+          err instanceof BudgetExhaustedError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : String(err);
+        return { source, ok: false, fetched: 0, kept: 0, message, listings: [] };
       }
     })
   );

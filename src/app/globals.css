@@ -280,3 +280,304 @@ textarea {
     animation: none;
   }
 }
+
+/* --- app shell ---------------------------------------------------------- */
+
+.shell {
+  display: flex;
+  min-height: 100dvh;
+}
+
+.sidebar {
+  width: 236px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+.brand {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.main {
+  flex: 1;
+  padding: 18px 20px 40px;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.keyhint {
+  font-size: 10px;
+  line-height: 1.7;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+/* Things that need chasing, and the request budget: both are nagging state,
+   so they get the same quiet-but-clickable treatment. */
+.callout,
+.usage {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 12px;
+  color: inherit;
+}
+
+.callout:hover,
+.usage:hover {
+  border-color: var(--accent);
+}
+
+.callout span {
+  font-size: 11px;
+}
+
+.usage-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.warn-text {
+  color: var(--warn);
+}
+
+/* --- cards -------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+}
+
+.card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  scroll-margin: 24px;
+}
+
+/* Keyboard focus has to be unmistakable — it's how you navigate the feed. */
+.card[data-focused="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.card-media {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--surface-2);
+}
+
+.card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-noimg {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 12px;
+}
+
+.card-badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 52px);
+}
+
+.card-star {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: none;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.card-body {
+  padding: 11px 12px 12px;
+  display: grid;
+  gap: 7px;
+  flex: 1;
+}
+
+.card-title {
+  all: unset;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.card-title:hover {
+  color: var(--accent);
+}
+
+.card-why {
+  font-size: 11px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+a.chip {
+  text-decoration: none;
+}
+
+a.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --- rows, board, misc -------------------------------------------------- */
+
+.row {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.row:hover {
+  background: var(--surface-2);
+}
+
+.board {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.board-col {
+  min-width: 236px;
+  flex: 1;
+}
+
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.board-card {
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.board-card:hover {
+  border-color: var(--accent);
+}
+
+.drawer-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview {
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: var(--surface-2);
+  padding: 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  margin: 0;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}

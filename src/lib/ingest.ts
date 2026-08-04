@@ -320,6 +320,7 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
       // one that supplied the rest of the record — only Zillow exposes a phone.
       contact_phone: firstNonEmpty(group, (l) => l.contactPhone),
       contact_name: firstNonEmpty(group, (l) => l.contactName),
+      contact_email: firstNonEmpty(group, (l) => l.contactEmail),
       available_text: firstNonEmpty(group, (l) => l.availableText),
       is_active: true,
       first_seen_at: existingByFp?.first_seen_at ?? nowIso,

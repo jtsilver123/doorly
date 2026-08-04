@@ -1,5 +1,6 @@
 import type { Listing, SearchCriteria, SearchResponse, StreetEasyListing } from "@/types";
 import { realtyGet } from "@/lib/realtyapi";
+import { loadConfig } from "@/lib/apikey";
 import { getArea, boroughFor } from "@/lib/areas";
 
 /**
@@ -9,7 +10,6 @@ import { getArea, boroughFor } from "@/lib/areas";
  */
 
 const PHOTO_BASE = "https://photos.zillowstatic.com/fp";
-const PAGES_PER_BED = 3;
 
 /** realtyapi's `beds` param maxes out at 4, which means "4 or more". */
 function bedValues(c: SearchCriteria): string[] {
@@ -65,6 +65,7 @@ export function normalizeStreetEasy(raw: StreetEasyListing[]): Listing[] {
       description: n.sourceGroupLabel ? `Listed by ${n.sourceGroupLabel}` : "",
       contactPhone: "",
       contactName: n.sourceGroupLabel || "",
+      contactEmail: "",
       availableText: n.availableAt ?? "",
     });
   }
@@ -72,6 +73,9 @@ export function normalizeStreetEasy(raw: StreetEasyListing[]): Listing[] {
 }
 
 export async function fetchStreetEasy(c: SearchCriteria): Promise<Listing[]> {
+  // Pages per source is the main lever on the monthly request budget;
+  // sorted by newest, one page already catches everything fresh.
+  const PAGES_PER_BED = (await loadConfig()).pagesPerSource;
   const byId = new Map<string, Listing>();
 
   const requests = seLocations(c.areas).flatMap((location) =>

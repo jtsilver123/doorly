@@ -1,3 +1,5 @@
+import { loadConfig, keyHint, recordCall, getUsage } from "@/lib/apikey";
+
 /**
  * Shared client for realtyapi.io.
  *
@@ -10,6 +12,11 @@
  *
  * Every response is 200 even on failure — errors come back as a JSON body with
  * an `error`/`message` field — so callers must check the payload, not the status.
+ *
+ * Requests are metered against a monthly budget (see apikey.ts). When the
+ * budget is gone every call throws BudgetExhaustedError rather than silently
+ * returning nothing, so the UI can say "you're out of requests" instead of
+ * "no new listings".
  */
 
 export type RealtyHost = "streeteasy" | "zillow" | "hotpads" | "realtor";
@@ -25,8 +32,19 @@ export class RealtyApiError extends Error {
   }
 }
 
-export function hasRealtyKey(): boolean {
-  return Boolean(process.env.REALTYAPI_KEY);
+export class BudgetExhaustedError extends RealtyApiError {
+  constructor(used: number, limit: number, host: RealtyHost, path: string) {
+    super(
+      `monthly request budget spent (${used}/${limit}) — add a new API key in Settings`,
+      host,
+      path
+    );
+    this.name = "BudgetExhaustedError";
+  }
+}
+
+export async function hasRealtyKey(): Promise<boolean> {
+  return Boolean((await loadConfig()).realtyApiKey);
 }
 
 const TIMEOUT_MS = 45_000;
@@ -36,9 +54,16 @@ export async function realtyGet<T>(
   path: string,
   params: Record<string, string | number | undefined>
 ): Promise<T> {
-  const apiKey = process.env.REALTYAPI_KEY;
+  const config = await loadConfig();
+  const apiKey = config.realtyApiKey;
   if (!apiKey) {
-    throw new RealtyApiError("REALTYAPI_KEY is not set", host, path);
+    throw new RealtyApiError("no RealtyAPI key configured", host, path);
+  }
+
+  const hint = keyHint(apiKey);
+  const usage = await getUsage();
+  if (usage.remaining <= 0) {
+    throw new BudgetExhaustedError(usage.used, usage.limit, host, path);
   }
 
   const url = new URL(`https://${host}.realtyapi.io${path}`);
@@ -56,11 +81,15 @@ export async function realtyGet<T>(
       cache: "no-store",
     });
   } catch (err) {
+    // A failed call still counts against the quota upstream, so record it.
+    void recordCall(hint, host, path, false);
     const reason = err instanceof Error ? err.message : String(err);
     throw new RealtyApiError(`request failed: ${reason}`, host, path);
   } finally {
     clearTimeout(timer);
   }
+
+  void recordCall(hint, host, path, response.ok);
 
   if (!response.ok) {
     throw new RealtyApiError(`HTTP ${response.status}`, host, path);
@@ -68,10 +97,7 @@ export async function realtyGet<T>(
 
   const body = (await response.json()) as T & { error?: string; message?: string };
 
-  // A 200 with an `error` field, or a "not found"-ish message, is a failure.
-  if (body.error) {
-    throw new RealtyApiError(body.error, host, path);
-  }
+  if (body.error) throw new RealtyApiError(body.error, host, path);
   if (typeof body.message === "string" && /not found|invalid|unauthor/i.test(body.message)) {
     throw new RealtyApiError(body.message, host, path);
   }

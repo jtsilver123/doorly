@@ -12,6 +12,8 @@ import type {
 import { db, currentUserId } from "@/lib/supabase";
 import { DEFAULT_CRITERIA, searchKey, normalizeCriteria } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
+import { fingerprint, extractUnit } from "@/lib/dedupe";
+import { boroughFor } from "@/lib/areas";
 import { DEFAULT_PROFILE, type Profile } from "@/lib/outreach";
 
 export interface FeedFilters {
@@ -24,6 +26,7 @@ export interface FeedFilters {
   bedsMax?: number;
   noFeeOnly?: boolean;
   changedOnly?: boolean;
+  followUpOnly?: boolean;
   includeGone?: boolean;
   starredOnly?: boolean;
   sort?: "best" | "newest" | "cheapest" | "recent_change";
@@ -54,6 +57,7 @@ interface ListingRow {
   building_type: string;
   contact_phone: string;
   contact_name: string;
+  contact_email: string;
   available_text: string;
   is_active: boolean;
   first_seen_at: string;
@@ -98,9 +102,17 @@ function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
     description: row.description,
     contactPhone: row.contact_phone ?? "",
     contactName: row.contact_name ?? "",
+    contactEmail: row.contact_email ?? "",
     availableText: row.available_text ?? "",
   };
 }
+
+/**
+ * How long a reached-out listing may sit silent before it needs chasing.
+ * Two days: long enough not to nag, short enough that in this market the
+ * apartment is probably still available.
+ */
+const FOLLOW_UP_AFTER_DAYS = 2;
 
 function daysBetween(from: string, to = new Date().toISOString()): number {
   const ms = new Date(to).getTime() - new Date(from).getTime();
@@ -147,7 +159,7 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
       .limit(4000),
     supabase
       .from("contact_log")
-      .select("listing_id, occurred_at, channel")
+      .select("listing_id, occurred_at, channel, direction")
       .eq("user_id", userId),
     supabase.from("feedback").select("listing_id, action").eq("user_id", userId),
   ]);
@@ -172,12 +184,20 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
 
   const contactStats = new Map<
     string,
-    { count: number; last: string | null; channel: ContactChannel | null }
+    {
+      count: number;
+      last: string | null;
+      channel: ContactChannel | null;
+      inbound: boolean;
+    }
   >();
   for (const row of contacts.data ?? []) {
     const prev =
-      contactStats.get(row.listing_id) ?? { count: 0, last: null, channel: null };
+      contactStats.get(row.listing_id) ??
+      { count: 0, last: null, channel: null, inbound: false };
     prev.count++;
+    // A reply means the ball is in your court, not theirs — no chase needed.
+    if (row.direction === "in") prev.inbound = true;
     if (!prev.last || row.occurred_at > prev.last) {
       prev.last = row.occurred_at;
       prev.channel = row.channel as ContactChannel;
@@ -221,6 +241,16 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
 
     const contact = contactStats.get(row.id);
 
+    // The CRM chases itself: anything still parked at "contacted" with no
+    // inbound reply after a couple of days gets flagged, so silence surfaces
+    // instead of quietly rotting in the pipeline.
+    const stage = state?.stage ?? "inbox";
+    const needsFollowUp =
+      stage === "contacted" &&
+      contact?.last != null &&
+      !contact.inbound &&
+      daysBetween(contact.last) >= FOLLOW_UP_AFTER_DAYS;
+
     out.push({
       ...listing,
       firstSeenAt: row.first_seen_at,
@@ -243,6 +273,7 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
       scoreReasons: reasons,
       daysOnMarket: daysBetween(row.first_seen_at),
       unseenEvents: unseen,
+      needsFollowUp,
       priceHistory: [],
     });
   }
@@ -265,6 +296,7 @@ function applyFilters(listings: FeedListing[], filters: FeedFilters): FeedListin
   }
 
   if (filters.starredOnly) result = result.filter((l) => l.starred);
+  if (filters.followUpOnly) result = result.filter((l) => l.needsFollowUp);
   if (filters.changedOnly) {
     result = result.filter((l) => l.unseenEvents > 0 || l.price !== l.originalPrice);
   }
@@ -536,4 +568,106 @@ export async function saveProfile(profile: Partial<Profile>): Promise<void> {
       { user_id: currentUserId(), profile: merged, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
+}
+
+// --- manual entry ---------------------------------------------------------
+
+export interface ManualListing {
+  url: string;
+  address: string;
+  price: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  neighborhood?: string;
+  unit?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  notes?: string;
+}
+
+/**
+ * Add a place the scrapers never saw — a friend's tip, a broker's email, a
+ * "for rent" sign. It lands in the same pipeline as everything else, so the
+ * CRM covers your whole search rather than only the automated part.
+ *
+ * Manual listings carry source "manual", which no poll reports on, so the
+ * disappearance sweep in ingest.ts can never mark them off-market.
+ */
+export async function addManualListing(input: ManualListing): Promise<string> {
+  const supabase = db();
+  const now = new Date().toISOString();
+  const id = `manual-${Date.now().toString(36)}`;
+
+  const listing: Listing = {
+    id,
+    source: "manual",
+    sourceId: id,
+    url: input.url,
+    price: Math.round(input.price),
+    bedrooms: input.bedrooms ?? 0,
+    bathrooms: input.bathrooms ?? 1,
+    sqft: null,
+    neighborhood: input.neighborhood ?? "",
+    borough: boroughFor(`${input.neighborhood ?? ""} ${input.address}`),
+    address: input.address,
+    unit: input.unit ?? extractUnit(input.address),
+    lat: null,
+    lon: null,
+    imageUrl: null,
+    availableAt: null,
+    noFee: false,
+    amenities: [],
+    buildingType: "",
+    listingStatus: "ACTIVE",
+    description: input.notes ?? "",
+    contactPhone: input.contactPhone ?? "",
+    contactName: input.contactName ?? "",
+    contactEmail: input.contactEmail ?? "",
+    availableText: "",
+  };
+
+  const { error } = await supabase.from("listings").insert({
+    id,
+    fingerprint: fingerprint(listing),
+    address: listing.address,
+    unit: listing.unit,
+    neighborhood: listing.neighborhood,
+    borough: listing.borough,
+    bedrooms: listing.bedrooms,
+    bathrooms: listing.bathrooms,
+    price: listing.price,
+    original_price: listing.price,
+    description: listing.description,
+    url: listing.url,
+    contact_phone: listing.contactPhone,
+    contact_name: listing.contactName,
+    contact_email: listing.contactEmail,
+    is_active: true,
+    first_seen_at: now,
+    last_seen_at: now,
+  });
+  if (error) throw new Error(`addManualListing: ${error.message}`);
+
+  await supabase.from("listing_sources").insert({
+    source: "manual",
+    source_id: id,
+    listing_id: id,
+    url: listing.url,
+    is_active: true,
+    first_seen_at: now,
+    last_seen_at: now,
+  });
+
+  await supabase.from("events").insert({
+    listing_id: id,
+    kind: "new",
+    new_value: String(listing.price),
+    detail: "Added by hand",
+    occurred_at: now,
+  });
+
+  if (input.notes) await setListingFields(id, { notes: input.notes });
+  await setStage(id, "interested");
+  return id;
 }

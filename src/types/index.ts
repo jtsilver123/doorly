@@ -1,4 +1,10 @@
-export type Source = "streeteasy" | "craigslist" | "zillow" | "hotpads" | "email";
+export type Source =
+  | "streeteasy"
+  | "craigslist"
+  | "zillow"
+  | "hotpads"
+  | "email"
+  | "manual";
 
 export const ALL_SOURCES: Source[] = ["streeteasy", "zillow", "hotpads", "craigslist"];
 
@@ -8,6 +14,7 @@ export const SOURCE_LABEL: Record<Source, string> = {
   zillow: "Zillow",
   hotpads: "HotPads",
   email: "Email alert",
+  manual: "Added by me",
 };
 
 /**
@@ -20,6 +27,7 @@ export const LINK_PREFERENCE: Source[] = [
   "hotpads",
   "craigslist",
   "email",
+  "manual",
 ];
 
 /**
@@ -53,6 +61,8 @@ export interface Listing {
   contactPhone: string;
   /** Broker or management company name. */
   contactName: string;
+  /** Broker email, when the source exposes one. Rare, but reliable when present. */
+  contactEmail: string;
   /** Raw availability string from the source ("2026-09-01", "Immediate"). */
   availableText: string;
 }
@@ -128,6 +138,8 @@ export interface FeedListing extends Listing {
   scoreReasons: string[];
   daysOnMarket: number;
   unseenEvents: number;
+  /** Contacted, still sitting at "contacted", and gone quiet. Chases itself. */
+  needsFollowUp: boolean;
   priceHistory: PricePoint[];
 }
 

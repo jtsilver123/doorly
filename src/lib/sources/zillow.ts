@@ -1,5 +1,6 @@
 import type { Listing, SearchCriteria } from "@/types";
 import { realtyGet } from "@/lib/realtyapi";
+import { loadConfig } from "@/lib/apikey";
 import { getAreas, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
 import { toPrice, toNum } from "@/lib/parse";
@@ -157,6 +158,7 @@ export function normalizeZillow(
       description: notes.join(" · "),
       contactPhone: phone,
       contactName: p.title ?? "",
+      contactEmail: "",
       availableText: "",
     });
   }
@@ -164,9 +166,11 @@ export function normalizeZillow(
   return out;
 }
 
-const MAX_PAGES = 3;
 
 export async function fetchZillow(c: SearchCriteria): Promise<Listing[]> {
+  // Pages per source is the main lever on the monthly request budget;
+  // sorted by newest, one page already catches everything fresh.
+  const MAX_PAGES = (await loadConfig()).pagesPerSource;
   const byId = new Map<string, Listing>();
 
   for (const area of getAreas(c.areas)) {

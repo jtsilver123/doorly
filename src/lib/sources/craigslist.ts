@@ -147,6 +147,7 @@ export function parseCraigslistHtml(html: string): Listing[] {
       description: locationText,
       contactPhone: "",
       contactName: "",
+      contactEmail: "",
       availableText: "",
     });
   }

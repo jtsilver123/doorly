@@ -9,10 +9,18 @@ import type { ContactChannel, FeedListing } from "@/types";
  * facts unprompted, and asks for a specific next step.
  */
 
+/** How you earn, which decides how the qualification line has to be written. */
+export type Employment = "self_employed" | "employed" | "other";
+
 export interface Profile {
   name: string;
+  /** Business name if self-employed, employer otherwise. */
   employer: string;
+  employment: Employment;
+  /** Optional. Business owners who take no salary should leave this blank. */
   income: string;
+  /** What you can show *instead of* (or alongside) a paystub. */
+  proofs: string[];
   /** ISO date, e.g. "2026-09-01". */
   moveInDate: string;
   creditNote: string;
@@ -21,12 +29,26 @@ export interface Profile {
   extra: string;
 }
 
+/** The documents a NYC landlord actually asks for. */
+export const PROOF_OPTIONS = [
+  "2025 tax return",
+  "proof of assets",
+  "business revenue",
+  "bank statements",
+  "recent paystubs",
+  "employment letter",
+  "landlord reference",
+  "guarantor available",
+];
+
 export const DEFAULT_PROFILE: Profile = {
   name: "",
   employer: "",
+  employment: "self_employed",
   income: "",
+  proofs: ["2025 tax return", "proof of assets", "business revenue"],
   moveInDate: "2026-09-01",
-  creditNote: "credit in the 700s, no pets, non-smoker",
+  creditNote: "",
   phone: "",
   email: "",
   extra: "",
@@ -60,14 +82,7 @@ export function draftTourMessage(listing: FeedListing, profile: Profile): string
   const address = `${listing.address}${unit}`;
   const price = listing.price ? ` (listed at $${listing.price.toLocaleString()}/mo)` : "";
 
-  const qualifiers: string[] = [];
-  if (profile.employer) qualifiers.push(`I work at ${profile.employer}`);
-  if (profile.income) qualifiers.push(`my income is ${profile.income}`);
-  if (profile.creditNote) qualifiers.push(profile.creditNote);
-
-  const qualifierLine = qualifiers.length
-    ? `I'm a qualified renter — ${joinList(qualifiers)}.`
-    : "I'm a qualified renter and can provide proof of income, references and credit on request.";
+  const qualifierLine = qualifyingLine(profile);
 
   const moveIn = profile.moveInDate
     ? ` I'm looking to move in around ${formatMoveIn(profile.moveInDate)}.`
@@ -84,6 +99,62 @@ export function draftTourMessage(listing: FeedListing, profile: Profile): string
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+/**
+ * The qualification sentence.
+ *
+ * This is the part that decides whether you get a viewing. A self-employed
+ * applicant who lists no salary reads as unqualified, so when there's no income
+ * figure we say why *and* lead with the documents — answering the landlord's
+ * objection before they raise it, rather than leaving a gap for them to fill in.
+ */
+export function qualifyingLine(profile: Profile): string {
+  const parts: string[] = [];
+
+  const owner = profile.employment === "self_employed";
+
+  if (profile.employer) {
+    parts.push(owner ? `I own ${profile.employer}` : `I work at ${profile.employer}`);
+  }
+  if (profile.income) {
+    // Attributing the figure to the return is what makes it credible for an
+    // owner who takes no salary — it's documented, not self-reported.
+    parts.push(
+      owner
+        ? `my 2025 tax return shows ${profile.income}`
+        : `my income is ${profile.income}`
+    );
+  }
+  if (profile.creditNote) parts.push(profile.creditNote);
+
+  const opener = parts.length
+    ? `I'm a qualified renter — ${joinList(parts)}.`
+    : "I'm a qualified renter.";
+
+  // Only apologise for a missing salary when there is genuinely no figure to
+  // give. With income on the return, that framing would undersell you.
+  const salaryGap = !profile.income && owner;
+  const docs = profile.proofs.filter(Boolean);
+
+  if (!docs.length) {
+    return `${opener} I can provide proof of income, references and credit on request.`;
+  }
+
+  const citedReturn = Boolean(profile.income) && owner;
+  const remaining = citedReturn
+    ? docs.filter((d) => !/tax return/i.test(d))
+    : docs;
+
+  if (!remaining.length) {
+    return `${opener} Happy to share documentation up front.`;
+  }
+
+  const docLine = salaryGap
+    ? `I don't draw a salary from it, but I can show ${joinList(remaining)} up front.`
+    : `I can also show ${joinList(remaining)} up front.`;
+
+  return `${opener} ${docLine}`;
 }
 
 function joinList(items: string[]): string {
@@ -125,6 +196,42 @@ export function mailtoLink(email: string, subject: string, body: string): string
   // URLSearchParams encodes spaces as "+", which mail clients render literally.
   const query = params.toString().replace(/\+/g, "%20");
   return `mailto:${email}?${query}`;
+}
+
+/**
+ * What you can actually do with this listing right now.
+ *
+ * Almost no NYC listing publishes a phone number — 0 of 324 in a live sample —
+ * so a "Text for tour" button is usually a dead end. The action offered adapts
+ * to what the listing actually has, and there is deliberately no fourth state
+ * where the button does nothing:
+ *
+ *   phone  -> text     the fastest channel, when it exists
+ *   email  -> email    reliable, works from any device
+ *   neither-> portal   copy the draft and open the listing's own contact form
+ */
+export type Reachable = {
+  channel: ContactChannel;
+  label: string;
+  hint: string;
+};
+
+export function bestChannel(listing: {
+  contactPhone: string;
+  contactEmail?: string;
+  url: string;
+}): Reachable {
+  if (listing.contactPhone) {
+    return { channel: "text", label: "Text for tour", hint: "Opens Messages" };
+  }
+  if (listing.contactEmail) {
+    return { channel: "email", label: "Email for tour", hint: "Opens Mail" };
+  }
+  return {
+    channel: "portal",
+    label: "Copy & open listing",
+    hint: "Copies the message, opens the listing's contact form",
+  };
 }
 
 /**

@@ -1,17 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FeedListing, Stage } from "@/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FeedListing } from "@/types";
 import { PIPELINE_STAGES, SOURCE_LABEL, STAGE_LABEL, ALL_SOURCES } from "@/types";
 import {
   CONTACT_ICON,
   CONTACT_LABEL,
   DEFAULT_PROFILE,
+  PROOF_OPTIONS,
+  bestChannel,
   draftTourMessage,
+  mailtoLink,
   smsLink,
+  tourSubject,
   type Profile,
 } from "@/lib/outreach";
-import ListingCard from "@/components/ListingCard";
+import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 
 type Tab = "feed" | "changes" | "pipeline" | "profile";
@@ -28,6 +32,14 @@ interface Change {
   url: string;
 }
 
+interface ApiStatus {
+  usage: { used: number; limit: number; remaining: number; keyHint: string };
+  hasKey: boolean;
+  keyHint: string;
+  monthlyLimit: number;
+  pagesPerSource: number;
+}
+
 const money = (n: number) => `$${n.toLocaleString()}`;
 
 export default function Home() {
@@ -39,61 +51,81 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState<FeedListing | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [api, setApi] = useState<ApiStatus | null>(null);
+  const [focus, setFocus] = useState(0);
 
   // filters
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("best");
   const [priceMax, setPriceMax] = useState("");
+  const [beds, setBeds] = useState("any");
   const [source, setSource] = useState("all");
   const [changedOnly, setChangedOnly] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
   const [noFeeOnly, setNoFeeOnly] = useState(false);
+  const [followUpOnly, setFollowUpOnly] = useState(false);
+
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const loadFeed = useCallback(async () => {
     const params = new URLSearchParams({ sort, stage: "all" });
     if (query) params.set("q", query);
     if (priceMax) params.set("priceMax", priceMax);
+    if (beds !== "any") {
+      params.set("bedsMin", beds);
+      params.set("bedsMax", beds);
+    }
     if (source !== "all") params.set("source", source);
     if (changedOnly) params.set("changed", "1");
     if (starredOnly) params.set("starred", "1");
     if (noFeeOnly) params.set("noFee", "1");
+    if (followUpOnly) params.set("followUp", "1");
 
     const res = await fetch(`/api/feed?${params}`);
     const body = await res.json();
     if (body.error) setStatus(body.error);
     setListings(body.listings ?? []);
     setLoading(false);
-  }, [query, sort, priceMax, source, changedOnly, starredOnly, noFeeOnly]);
+  }, [query, sort, priceMax, beds, source, changedOnly, starredOnly, noFeeOnly, followUpOnly]);
 
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
 
+  const loadChanges = useCallback(async () => {
+    const body = await fetch("/api/changes").then((r) => r.json());
+    setChanges(body.changes ?? []);
+  }, []);
+
+  const loadApi = useCallback(async () => {
+    try {
+      setApi(await fetch("/api/settings").then((r) => r.json()));
+    } catch {
+      /* settings are optional; the app still works from the env key */
+    }
+  }, []);
+
   useEffect(() => {
-    fetch("/api/changes")
-      .then((r) => r.json())
-      .then((b) => setChanges(b.changes ?? []))
-      .catch(() => {});
+    loadChanges();
+    loadApi();
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((b) => b.profile && setProfile(b.profile))
+      .then((b) => b.profile && setProfile({ ...DEFAULT_PROFILE, ...b.profile }))
       .catch(() => {});
-  }, []);
+  }, [loadChanges, loadApi]);
 
   async function refresh() {
     setRefreshing(true);
     setStatus("Checking all four sites…");
     try {
-      const res = await fetch("/api/refresh", { method: "POST" });
-      const body = await res.json();
+      const body = await fetch("/api/refresh", { method: "POST" }).then((r) => r.json());
       setStatus(
         body.error
           ? `Refresh failed: ${body.error}`
-          : `${body.newListings} new · ${body.events} changes · ${body.fetched} seen`
+          : `${body.newListings} new · ${body.events} changes`
       );
-      await loadFeed();
-      const c = await fetch("/api/changes").then((r) => r.json());
-      setChanges(c.changes ?? []);
+      await Promise.all([loadFeed(), loadChanges(), loadApi()]);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Refresh failed");
     } finally {
@@ -102,48 +134,145 @@ export default function Home() {
   }
 
   const patch = useCallback(
-    async (id: string, body: Record<string, unknown>) => {
+    async (id: string, body: Record<string, unknown>, reload = true) => {
       await fetch(`/api/listings/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      await loadFeed();
+      if (reload) await loadFeed();
     },
     [loadFeed]
   );
 
-  /** Card-level shortcut: same CRM side effects as the drawer's button. */
-  const textForTour = useCallback(
+  /**
+   * One "reach out" action whose behaviour depends on what the listing has.
+   * Whatever the channel, the CRM is written first — an sms:/mailto: handoff
+   * can unload the page before a later request lands.
+   */
+  const reachOut = useCallback(
     async (listing: FeedListing) => {
-      await patch(listing.id, {
-        action: "contact",
-        channel: "text",
-        direction: "out",
-        who: listing.contactName,
-        note: "Tour request",
-      });
-      if (listing.stage === "inbox" || listing.stage === "interested") {
-        await patch(listing.id, { action: "stage", stage: "contacted" });
-      }
-      window.location.href = smsLink(
-        listing.contactPhone,
-        draftTourMessage(listing, profile)
+      const { channel } = bestChannel(listing);
+      const message = draftTourMessage(listing, profile);
+
+      await patch(
+        listing.id,
+        {
+          action: "contact",
+          channel,
+          direction: "out",
+          who: listing.contactName,
+          note: "Tour request",
+        },
+        false
       );
+      if (listing.stage === "inbox" || listing.stage === "interested") {
+        await patch(listing.id, { action: "stage", stage: "contacted" }, false);
+      }
+      await loadFeed();
+
+      if (channel === "text") {
+        window.location.href = smsLink(listing.contactPhone, message);
+      } else if (channel === "email") {
+        window.location.href = mailtoLink(
+          listing.contactEmail,
+          tourSubject(listing),
+          message
+        );
+      } else {
+        // No published contact: put the draft on the clipboard and open the
+        // listing, where the site's own enquiry form lives.
+        try {
+          await navigator.clipboard.writeText(message);
+          setStatus("Message copied — paste it into the listing's contact form");
+        } catch {
+          setStatus("Opened listing — use “Copy” in the detail panel for the message");
+        }
+        const target = orderedSources(listing)[0]?.url ?? listing.url;
+        if (target) window.open(target, "_blank", "noopener");
+      }
     },
-    [patch, profile]
+    [patch, profile, loadFeed]
   );
 
-  const counts = useMemo(() => {
-    const active = listings.filter((l) => l.isActive).length;
-    const changed = listings.filter(
-      (l) => l.unseenEvents > 0 || l.price !== l.originalPrice
-    ).length;
-    const inPipeline = listings.filter(
-      (l) => l.stage !== "inbox" && l.stage !== "passed"
-    ).length;
-    return { active, changed, inPipeline };
-  }, [listings]);
+  // --- keyboard triage -----------------------------------------------------
+  // With hundreds of listings the bottleneck is triage speed, so the whole
+  // feed is drivable without the mouse.
+  useEffect(() => {
+    if (tab !== "feed" || open) return;
+
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const current = listings[focus];
+      switch (e.key.toLowerCase()) {
+        case "j":
+        case "arrowdown":
+          e.preventDefault();
+          setFocus((f) => Math.min(f + 1, listings.length - 1));
+          break;
+        case "k":
+        case "arrowup":
+          e.preventDefault();
+          setFocus((f) => Math.max(f - 1, 0));
+          break;
+        case "enter":
+          if (current) {
+            e.preventDefault();
+            setOpen(current);
+          }
+          break;
+        case "e":
+          if (current) {
+            e.preventDefault();
+            reachOut(current);
+          }
+          break;
+        case "x":
+          if (current) {
+            e.preventDefault();
+            patch(current.id, { action: "feedback", value: "pass" });
+          }
+          break;
+        case "s":
+          if (current) {
+            e.preventDefault();
+            patch(current.id, { action: "star", starred: !current.starred });
+          }
+          break;
+        case "o":
+          if (current) {
+            e.preventDefault();
+            const target = orderedSources(current)[0]?.url ?? current.url;
+            if (target) window.open(target, "_blank", "noopener");
+          }
+          break;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, open, listings, focus, patch, reachOut]);
+
+  // Keep the focused card in view as you move through the list.
+  useEffect(() => {
+    const node = gridRef.current?.children[focus] as HTMLElement | undefined;
+    node?.scrollIntoView({ block: "nearest" });
+  }, [focus]);
+
+  useEffect(() => setFocus(0), [query, sort, priceMax, beds, source]);
+
+  const counts = useMemo(
+    () => ({
+      active: listings.filter((l) => l.isActive).length,
+      changed: listings.filter((l) => l.unseenEvents > 0 || l.price !== l.originalPrice)
+        .length,
+      pipeline: listings.filter((l) => l.stage !== "inbox" && l.stage !== "passed").length,
+      followUp: listings.filter((l) => l.needsFollowUp).length,
+    }),
+    [listings]
+  );
 
   async function saveProfile(next: Profile) {
     setProfile(next);
@@ -152,31 +281,14 @@ export default function Home() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ profile: next }),
     });
+    setStatus("Details saved");
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100dvh" }}>
-      {/* ---------------- sidebar ---------------- */}
-      <nav
-        style={{
-          width: 232,
-          flexShrink: 0,
-          borderRight: "1px solid var(--border)",
-          background: "var(--surface)",
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-          position: "sticky",
-          top: 0,
-          height: "100dvh",
-          overflowY: "auto",
-        }}
-      >
+    <div className="shell">
+      <nav className="sidebar">
         <div>
-          <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em" }}>
-            Homefinder
-          </div>
+          <div className="brand">Homefinder</div>
           <div className="muted" style={{ fontSize: 11 }}>
             {counts.active} live · {counts.changed} changed
           </div>
@@ -187,7 +299,7 @@ export default function Home() {
             [
               ["feed", "Listings", counts.active],
               ["changes", "What changed", changes.length],
-              ["pipeline", "My pipeline", counts.inPipeline],
+              ["pipeline", "My pipeline", counts.pipeline],
               ["profile", "My details", 0],
             ] as [Tab, string, number][]
           ).map(([key, label, count]) => (
@@ -203,29 +315,48 @@ export default function Home() {
           ))}
         </div>
 
+        {counts.followUp > 0 && (
+          <button
+            className="callout"
+            onClick={() => {
+              setTab("feed");
+              setFollowUpOnly(true);
+            }}
+          >
+            <strong>{counts.followUp} waiting on a reply</strong>
+            <span className="muted">Contacted 2+ days ago — chase them</span>
+          </button>
+        )}
+
         {tab === "feed" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              FILTERS
-            </div>
+          <div style={{ display: "grid", gap: 9 }}>
+            <div className="muted section-label">FILTERS</div>
             <input
               className="field"
-              placeholder="Search address, notes…"
+              placeholder="Address, neighborhood, notes"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <input
-              className="field"
-              placeholder="Max rent"
-              inputMode="numeric"
-              value={priceMax}
-              onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
-            />
-            <select
-              className="field"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-            >
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                className="field"
+                placeholder="Max rent"
+                inputMode="numeric"
+                value={priceMax}
+                onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
+              />
+              <select
+                className="field"
+                value={beds}
+                onChange={(e) => setBeds(e.target.value)}
+              >
+                <option value="any">Any beds</option>
+                <option value="0">Studio</option>
+                <option value="1">1 bed</option>
+                <option value="2">2 bed</option>
+              </select>
+            </div>
+            <select className="field" value={source} onChange={(e) => setSource(e.target.value)}>
               <option value="all">All sites</option>
               {ALL_SOURCES.map((s) => (
                 <option key={s} value={s}>
@@ -233,11 +364,7 @@ export default function Home() {
                 </option>
               ))}
             </select>
-            <select
-              className="field"
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
+            <select className="field" value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="best">Best match</option>
               <option value="newest">Newest</option>
               <option value="cheapest">Cheapest</option>
@@ -246,14 +373,12 @@ export default function Home() {
             {(
               [
                 ["Price changed", changedOnly, setChangedOnly],
-                ["Starred only", starredOnly, setStarredOnly],
-                ["No fee only", noFeeOnly, setNoFeeOnly],
+                ["Starred", starredOnly, setStarredOnly],
+                ["No fee", noFeeOnly, setNoFeeOnly],
+                ["Needs follow-up", followUpOnly, setFollowUpOnly],
               ] as [string, boolean, (v: boolean) => void][]
             ).map(([label, value, set]) => (
-              <label
-                key={label}
-                style={{ display: "flex", gap: 8, fontSize: 13, alignItems: "center" }}
-              >
+              <label key={label} className="check">
                 <input
                   type="checkbox"
                   checked={value}
@@ -262,49 +387,76 @@ export default function Home() {
                 {label}
               </label>
             ))}
+            <div className="muted keyhint">
+              <kbd>J</kbd>/<kbd>K</kbd> move · <kbd>E</kbd> reach out · <kbd>S</kbd> star ·{" "}
+              <kbd>X</kbd> pass · <kbd>O</kbd> open · <kbd>↵</kbd> details
+            </div>
           </div>
         )}
 
-        <button
-          className="btn btn-primary"
-          onClick={refresh}
-          disabled={refreshing}
-          style={{ marginTop: "auto" }}
-        >
-          {refreshing ? <span className="spin">◌</span> : null}
-          {refreshing ? "Checking…" : "Check for new"}
-        </button>
-        {status && (
-          <div className="muted" style={{ fontSize: 11 }}>
-            {status}
-          </div>
+        {api?.usage && (
+          <button className="usage" onClick={() => setTab("profile")} title="Manage API key">
+            <div className="usage-top">
+              <span>API requests</span>
+              <span className={api.usage.remaining <= 25 ? "warn-text" : "muted"}>
+                {api.usage.used}/{api.usage.limit}
+              </span>
+            </div>
+            <div className="meter">
+              <span
+                style={{
+                  width: `${Math.min(100, (api.usage.used / api.usage.limit) * 100)}%`,
+                  background:
+                    api.usage.remaining <= 25 ? "var(--warn)" : "var(--accent)",
+                }}
+              />
+            </div>
+            <div className="muted" style={{ fontSize: 10 }}>
+              {api.usage.remaining} left this month · ~
+              {Math.max(1, Math.floor(api.usage.remaining / 10))} more checks
+            </div>
+          </button>
         )}
+
+        <div style={{ marginTop: "auto", display: "grid", gap: 6 }}>
+          <button className="btn" onClick={() => setAdding(true)}>
+            + Add a place
+          </button>
+          <button className="btn btn-primary" onClick={refresh} disabled={refreshing}>
+            {refreshing ? "Checking…" : "Check for new"}
+          </button>
+          {status && (
+            <div className="muted" style={{ fontSize: 11 }}>
+              {status}
+            </div>
+          )}
+        </div>
       </nav>
 
-      {/* ---------------- main ---------------- */}
-      <main style={{ flex: 1, padding: 20, minWidth: 0 }}>
+      <main className="main">
         {loading && <div className="muted">Loading…</div>}
 
         {!loading && tab === "feed" && (
           <>
+            <div className="toolbar">
+              <span className="muted" style={{ fontSize: 12 }}>
+                {listings.length} listing{listings.length === 1 ? "" : "s"}
+                {followUpOnly ? " needing follow-up" : ""}
+              </span>
+            </div>
             {listings.length === 0 ? (
-              <Empty onRefresh={refresh} />
+              <Empty onRefresh={refresh} onAdd={() => setAdding(true)} />
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gap: 14,
-                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                }}
-              >
-                {listings.map((listing) => (
+              <div className="grid" ref={gridRef}>
+                {listings.map((listing, i) => (
                   <ListingCard
                     key={listing.id}
                     listing={listing}
+                    focused={i === focus}
                     onOpen={setOpen}
                     onStar={(l) => patch(l.id, { action: "star", starred: !l.starred })}
                     onPass={(l) => patch(l.id, { action: "feedback", value: "pass" })}
-                    onText={textForTour}
+                    onReach={reachOut}
                   />
                 ))}
               </div>
@@ -313,30 +465,20 @@ export default function Home() {
         )}
 
         {!loading && tab === "changes" && (
-          <div className="surface" style={{ padding: 4 }}>
+          <div className="surface" style={{ overflow: "hidden" }}>
             {changes.length === 0 && (
               <div className="muted" style={{ padding: 16, fontSize: 13 }}>
-                No changes yet. Once a listing you're tracking drops its price or goes
-                off market, it shows up here.
+                Nothing has changed yet. Price drops, relists and places going off
+                market will appear here after the next check.
               </div>
             )}
             {changes.map((c) => (
               <button
                 key={c.id}
+                className="row"
                 onClick={() => {
                   const hit = listings.find((l) => l.id === c.listingId);
                   if (hit) setOpen(hit);
-                }}
-                style={{
-                  all: "unset",
-                  cursor: "pointer",
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center",
-                  padding: "10px 12px",
-                  borderBottom: "1px solid var(--border)",
-                  width: "100%",
-                  boxSizing: "border-box",
                 }}
               >
                 <span
@@ -367,37 +509,18 @@ export default function Home() {
         )}
 
         {!loading && tab === "pipeline" && (
-          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
+          <div className="board">
             {PIPELINE_STAGES.map((stage) => {
               const column = listings.filter((l) => l.stage === stage);
               return (
-                <div key={stage} style={{ minWidth: 240, flex: 1 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: 8,
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
+                <div key={stage} className="board-col">
+                  <div className="board-head">
                     <span>{STAGE_LABEL[stage]}</span>
                     <span className="muted">{column.length}</span>
                   </div>
                   <div style={{ display: "grid", gap: 8 }}>
                     {column.map((l) => (
-                      <button
-                        key={l.id}
-                        className="surface"
-                        onClick={() => setOpen(l)}
-                        style={{
-                          padding: 10,
-                          textAlign: "left",
-                          cursor: "pointer",
-                          display: "grid",
-                          gap: 4,
-                        }}
-                      >
+                      <button key={l.id} className="surface board-card" onClick={() => setOpen(l)}>
                         <strong style={{ fontSize: 14 }}>{money(l.price)}</strong>
                         <span style={{ fontSize: 12 }}>
                           {l.address}
@@ -406,13 +529,15 @@ export default function Home() {
                         <span className="muted" style={{ fontSize: 11 }}>
                           {l.neighborhood}
                         </span>
-                        {l.lastContactChannel && (
-                          <span className="chip">
-                            {CONTACT_ICON[l.lastContactChannel]}{" "}
-                            {CONTACT_LABEL[l.lastContactChannel]}
-                            {l.contactCount > 1 ? ` ×${l.contactCount}` : ""}
-                          </span>
-                        )}
+                        <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {l.lastContactChannel && (
+                            <span className="chip">
+                              {CONTACT_ICON[l.lastContactChannel]}{" "}
+                              {CONTACT_LABEL[l.lastContactChannel]}
+                            </span>
+                          )}
+                          {l.needsFollowUp && <span className="chip chip-warn">follow up</span>}
+                        </span>
                       </button>
                     ))}
                     {column.length === 0 && (
@@ -428,7 +553,10 @@ export default function Home() {
         )}
 
         {!loading && tab === "profile" && (
-          <ProfileForm profile={profile} onSave={saveProfile} />
+          <div style={{ display: "grid", gap: 16 }}>
+            <ProfileForm profile={profile} onSave={saveProfile} />
+            <ApiSettings status={api} onSaved={loadApi} />
+          </div>
         )}
       </main>
 
@@ -440,27 +568,257 @@ export default function Home() {
           onChanged={loadFeed}
         />
       )}
+
+      {adding && (
+        <AddListing
+          onClose={() => setAdding(false)}
+          onAdded={async () => {
+            setAdding(false);
+            await loadFeed();
+            setStatus("Added to your pipeline");
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function Empty({ onRefresh }: { onRefresh: () => void }) {
+function Empty({ onRefresh, onAdd }: { onRefresh: () => void; onAdd: () => void }) {
   return (
     <div className="surface" style={{ padding: 32, textAlign: "center" }}>
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>Nothing here yet</div>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>Nothing matches</div>
       <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-        Pull listings from StreetEasy, Zillow, HotPads and Craigslist to get started.
+        Loosen the filters, pull fresh listings, or add a place you found yourself.
       </div>
-      <button className="btn btn-primary" onClick={onRefresh}>
-        Check for new listings
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        <button className="btn btn-primary" onClick={onRefresh}>
+          Check for new listings
+        </button>
+        <button className="btn" onClick={onAdd}>
+          Add a place
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Anything the scrapers missed still belongs in the pipeline. */
+function AddListing({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const [form, setForm] = useState({
+    address: "",
+    price: "",
+    bedrooms: "0",
+    neighborhood: "",
+    url: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    notes: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/listings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...form, price: Number(form.price) }),
+    });
+    const body = await res.json();
+    setBusy(false);
+    if (body.error) setError(body.error);
+    else onAdded();
+  }
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  return (
+    <>
+      <div className="scrim" onClick={onClose} />
+      <aside className="drawer" role="dialog" aria-label="Add a place">
+        <header className="drawer-head">
+          <strong>Add a place</strong>
+          <button className="btn" onClick={onClose}>
+            ✕
+          </button>
+        </header>
+        <div style={{ padding: 16, display: "grid", gap: 10, overflowY: "auto" }}>
+          <div className="muted" style={{ fontSize: 12 }}>
+            For somewhere a friend sent you, a broker emailed, or a sign in a window.
+            It joins the same pipeline and outreach flow as everything else.
+          </div>
+          {(
+            [
+              ["address", "Address *", "55 Morton Street #5J"],
+              ["price", "Monthly rent *", "3500"],
+              ["bedrooms", "Bedrooms (0 = studio)", "1"],
+              ["neighborhood", "Neighborhood", "West Village"],
+              ["url", "Link", "https://…"],
+              ["contactName", "Agent / landlord", "Jane at Corcoran"],
+              ["contactPhone", "Their phone", "(212) 555-0134"],
+              ["contactEmail", "Their email", "jane@example.com"],
+              ["notes", "Notes", "Saw a sign in the window"],
+            ] as [keyof typeof form, string, string][]
+          ).map(([key, label, placeholder]) => (
+            <label key={key} style={{ display: "grid", gap: 4, fontSize: 12 }}>
+              <span className="muted">{label}</span>
+              <input
+                className="field"
+                value={form[key]}
+                placeholder={placeholder}
+                onChange={set(key)}
+              />
+            </label>
+          ))}
+          {error && (
+            <div style={{ color: "var(--warn)", fontSize: 12 }}>{error}</div>
+          )}
+          <button
+            className="btn btn-primary"
+            disabled={busy || !form.address || !form.price}
+            onClick={submit}
+          >
+            {busy ? "Adding…" : "Add to pipeline"}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/**
+ * API key and request budget.
+ *
+ * The free tier is 250 requests a month and a poll costs roughly ten, so the
+ * allowance is a real limit rather than a detail — it needs to be visible, and
+ * swapping in a fresh trial key has to be possible without redeploying.
+ */
+function ApiSettings({
+  status,
+  onSaved,
+}: {
+  status: ApiStatus | null;
+  onSaved: () => void;
+}) {
+  const [key, setKey] = useState("");
+  const [pages, setPages] = useState(String(status?.pagesPerSource ?? 1));
+  const [limit, setLimit] = useState(String(status?.monthlyLimit ?? 250));
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (!status) return;
+    setPages(String(status.pagesPerSource));
+    setLimit(String(status.monthlyLimit));
+  }, [status]);
+
+  // 4 areas x pages for Zillow and HotPads, plus 2 bed values for StreetEasy.
+  const perPoll = Number(pages) * 10;
+  const polls = status ? Math.floor(status.usage.remaining / Math.max(perPoll, 1)) : 0;
+
+  async function save() {
+    setBusy(true);
+    await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        realtyApiKey: key || undefined,
+        pagesPerSource: Number(pages),
+        monthlyLimit: Number(limit),
+      }),
+    });
+    setKey("");
+    setBusy(false);
+    setNote("Saved");
+    onSaved();
+  }
+
+  return (
+    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 12 }}>
+      <div>
+        <div style={{ fontWeight: 600 }}>API key & usage</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          StreetEasy, Zillow and HotPads all run on one RealtyAPI key. Craigslist
+          needs none, so it keeps working when the quota is gone.
+        </div>
+      </div>
+
+      {status && (
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span>
+              {status.usage.used} of {status.usage.limit} requests used
+            </span>
+            <span className="muted">key {status.keyHint}</span>
+          </div>
+          <div className="meter">
+            <span
+              style={{
+                width: `${Math.min(100, (status.usage.used / status.usage.limit) * 100)}%`,
+                background: status.usage.remaining <= 25 ? "var(--warn)" : "var(--accent)",
+              }}
+            />
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {status.usage.remaining} left — about {polls} more checks at {perPoll}{" "}
+            requests each. Usage resets when you paste a new key.
+          </div>
+        </div>
+      )}
+
+      <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+        <span className="muted">New API key</span>
+        <input
+          className="field"
+          value={key}
+          placeholder="rt_…"
+          onChange={(e) => setKey(e.target.value)}
+        />
+      </label>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>
+          <span className="muted">Pages per source</span>
+          <select className="field" value={pages} onChange={(e) => setPages(e.target.value)}>
+            <option value="1">1 — lightest (~10/check)</option>
+            <option value="2">2 — deeper (~20/check)</option>
+            <option value="3">3 — thorough (~30/check)</option>
+          </select>
+        </label>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>
+          <span className="muted">Monthly allowance</span>
+          <input
+            className="field"
+            value={limit}
+            inputMode="numeric"
+            onChange={(e) => setLimit(e.target.value.replace(/[^\d]/g, ""))}
+          />
+        </label>
+      </div>
+
+      <div className="muted" style={{ fontSize: 11 }}>
+        Listings are sorted newest-first, so one page catches everything fresh.
+        Raise it only when you want to backfill deeper history.
+      </div>
+
+      <button className="btn btn-primary" onClick={save} disabled={busy}>
+        {busy ? "Saving…" : "Save"}
       </button>
+      {note && (
+        <span className="muted" style={{ fontSize: 12 }}>
+          {note}
+        </span>
+      )}
     </div>
   );
 }
 
 /**
- * The details that go into every outreach message. Filling this in once is what
- * makes "Text for tour" a single tap later.
+ * The details every outreach message is built from. Filling this in once is
+ * what makes reaching out a single keystroke afterwards.
  */
 function ProfileForm({
   profile,
@@ -472,36 +830,117 @@ function ProfileForm({
   const [draft, setDraft] = useState(profile);
   useEffect(() => setDraft(profile), [profile]);
 
-  const fields: [keyof Profile, string, string][] = [
+  const owner = draft.employment === "self_employed";
+
+  function toggleProof(proof: string) {
+    setDraft({
+      ...draft,
+      proofs: draft.proofs.includes(proof)
+        ? draft.proofs.filter((p) => p !== proof)
+        : [...draft.proofs, proof],
+    });
+  }
+
+  const text: [keyof Profile, string, string][] = [
     ["name", "Your name", "Jake Silver"],
-    ["employer", "Where you work", "BetterCampus"],
-    ["income", "Income", "$180k/yr"],
-    ["creditNote", "Anything else that qualifies you", "credit in the 700s, no pets"],
-    ["moveInDate", "Target move-in (YYYY-MM-DD)", "2026-09-01"],
+    ["employer", owner ? "Your business" : "Where you work", "BetterCampus"],
+    [
+      "income",
+      owner ? "Income shown on your 2025 return" : "Your income",
+      "$240,000",
+    ],
+    ["moveInDate", "Target move-in", "2026-09-01"],
     ["phone", "Your phone", "(212) 555-0134"],
     ["email", "Your email", "you@example.com"],
-    ["extra", "Extra line for messages", ""],
+    ["creditNote", "Anything else worth saying", "credit in the 700s, no pets"],
   ];
 
   return (
-    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 12 }}>
+    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 14 }}>
       <div>
         <div style={{ fontWeight: 600 }}>Your details</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          Used to fill in the tour request so it&apos;s one tap to send.
+          These fill in every tour request, so you only write them once.
         </div>
       </div>
-      {fields.map(([key, label, placeholder]) => (
+
+      <div style={{ display: "grid", gap: 4 }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          How you earn
+        </span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {(
+            [
+              ["self_employed", "I own a business"],
+              ["employed", "I'm employed"],
+              ["other", "Other"],
+            ] as [Profile["employment"], string][]
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              className={draft.employment === value ? "btn btn-primary" : "btn"}
+              style={{ fontSize: 12 }}
+              onClick={() => setDraft({ ...draft, employment: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {owner && (
+          <div className="muted" style={{ fontSize: 11 }}>
+            No salary to quote is the usual objection. Put the figure from your
+            return above and the message cites it as documented income.
+          </div>
+        )}
+      </div>
+
+      {text.map(([key, label, placeholder]) => (
         <label key={key} style={{ display: "grid", gap: 4, fontSize: 12 }}>
           <span className="muted">{label}</span>
           <input
             className="field"
-            value={draft[key]}
+            value={String(draft[key] ?? "")}
             placeholder={placeholder}
             onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
           />
         </label>
       ))}
+
+      <div style={{ display: "grid", gap: 6 }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          What you can show
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {PROOF_OPTIONS.map((proof) => (
+            <button
+              key={proof}
+              className={draft.proofs.includes(proof) ? "btn btn-primary" : "btn"}
+              style={{ fontSize: 12, padding: "4px 9px" }}
+              onClick={() => toggleProof(proof)}
+            >
+              {proof}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 4 }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          Preview
+        </span>
+        <pre className="preview">
+          {draftTourMessage(
+            {
+              address: "55 Morton Street",
+              unit: "5J",
+              price: 3500,
+              neighborhood: "West Village",
+            } as FeedListing,
+            draft
+          )}
+        </pre>
+      </div>
+
       <button className="btn btn-primary" onClick={() => onSave(draft)}>
         Save
       </button>
