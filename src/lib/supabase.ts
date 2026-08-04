@@ -1,33 +1,28 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabaseServer, currentUser } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
- * In solo mode every per-user row carries this id. It is the default on the
- * column, so inserts can omit it; queries still filter by it explicitly so that
- * switching to real auth is a one-line change here.
+ * The database handle the app reads and writes through.
+ *
+ * Always request-scoped, never a module singleton: a cached client would carry
+ * one user's session into another user's request. Every call re-reads the
+ * cookies, so RLS decides what's visible rather than the application.
  */
-export const SOLO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
-let cached: SupabaseClient | null = null;
-
-export function db(): SupabaseClient {
-  if (cached) return cached;
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    throw new Error(
-      "Supabase is not configured. Copy .env.example to .env.local and fill in " +
-        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-    );
-  }
-
-  cached = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return cached;
+export async function db(): Promise<SupabaseClient> {
+  return supabaseServer();
 }
 
-/** Current user id. Swap this for the session user when auth lands. */
-export function currentUserId(): string {
-  return SOLO_USER_ID;
+/** Service-role handle. Ingest only — it bypasses RLS by design. */
+export function adminDb(): SupabaseClient {
+  return supabaseAdmin();
 }
+
+/** Signed-in user's id. Throws rather than silently reading someone else's rows. */
+export async function currentUserId(): Promise<string> {
+  const user = await currentUser();
+  if (!user) throw new Error("not signed in");
+  return user.id;
+}
+
+export { currentUser };

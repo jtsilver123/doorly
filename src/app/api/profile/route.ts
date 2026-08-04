@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { loadProfile, saveProfile } from "@/lib/feed";
+import { currentUser } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ profile: await loadProfile() });
+  const [profile, user] = await Promise.all([loadProfile(), currentUser()]);
+  return NextResponse.json({ profile, email: user?.email ?? "" });
 }
 
 export async function PUT(request: Request) {

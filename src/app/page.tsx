@@ -19,6 +19,7 @@ import { daysUntil } from "@/lib/cost";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
+import { signOut } from "@/app/auth/actions";
 import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
@@ -60,6 +61,7 @@ export default function Home() {
   const [open, setOpen] = useState<FeedListing | null>(null);
   const [adding, setAdding] = useState(false);
   const [api, setApi] = useState<ApiStatus | null>(null);
+  const [email, setEmail] = useState("");
   const [focus, setFocus] = useState(0);
   const { toasts, push: toast, dismiss } = useToasts();
 
@@ -133,7 +135,10 @@ export default function Home() {
     loadApi();
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((b) => b.profile && setProfile({ ...DEFAULT_PROFILE, ...b.profile }))
+      .then((b) => {
+        if (b.profile) setProfile({ ...DEFAULT_PROFILE, ...b.profile });
+        if (b.email) setEmail(b.email);
+      })
       .catch(() => {});
   }, [loadChanges, loadApi]);
 
@@ -514,6 +519,12 @@ export default function Home() {
         )}
 
         <div style={{ marginTop: "auto", display: "grid", gap: 6 }}>
+          <div className="account">
+            <span className="muted">{email || "Signed in"}</span>
+            <form action={signOut}>
+              <button type="submit">Sign out</button>
+            </form>
+          </div>
           <button className="btn" onClick={() => setAdding(true)}>
             + Add a place
           </button>

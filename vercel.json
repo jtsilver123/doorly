@@ -1,5 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/poll", "schedule": "*/30 * * * *" }
+    { "path": "/api/cron/poll", "schedule": "0 9,18 * * *" }
   ]
 }

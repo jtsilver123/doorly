@@ -9,7 +9,7 @@ import type {
   Source,
   Stage,
 } from "@/types";
-import { db, currentUserId } from "@/lib/supabase";
+import { db, adminDb, currentUserId } from "@/lib/supabase";
 import { DEFAULT_CRITERIA, searchKey, normalizeCriteria } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
 import { fingerprint, extractUnit } from "@/lib/dedupe";
@@ -22,6 +22,7 @@ import {
   allInMonthly,
   DEFAULT_COSTS,
 } from "@/lib/cost";
+import { statsFor, readDeal, flagsFor } from "@/lib/market";
 
 export interface FeedFilters {
   stage?: Stage | "all" | "active";
@@ -150,8 +151,8 @@ function daysBetween(from: string, to = new Date().toISOString()): number {
  * re-ranks the whole board immediately, without waiting for the next poll.
  */
 export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]> {
-  const supabase = db();
-  const userId = currentUserId();
+  const supabase = await db();
+  const userId = await currentUserId();
 
   let query = supabase.from("listings").select("*");
 
@@ -253,6 +254,15 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
   const profile = await loadProfile().catch(() => DEFAULT_PROFILE);
   const costs = profile.costs ?? DEFAULT_COSTS;
 
+  // Comparison set for pricing. Drawn from everything currently tracked, which
+  // is what makes "12% under market" a measurement rather than an opinion.
+  const corpus = listings.map((r) => ({
+    neighborhood: r.neighborhood,
+    borough: r.borough,
+    bedrooms: r.bedrooms,
+    price: r.price,
+  }));
+
   // --- assemble ----------------------------------------------------------
   const out: FeedListing[] = [];
   for (const row of listings) {
@@ -270,6 +280,7 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
     const contact = contactStats.get(row.id);
     const cost = moveInCost(listing, costs);
     const fit = moveInFit(row.available_at, profile.moveInDate);
+    const deal = readDeal(row.price, statsFor(listing, corpus));
 
     // The CRM chases itself: anything still parked at "contacted" with no
     // inbound reply after a couple of days gets flagged, so silence surfaces
@@ -305,11 +316,26 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
       unseenEvents: unseen,
       needsFollowUp,
       upfrontCost: cost.total,
+      dealVerdict: deal.verdict,
+      dealDelta: deal.percentVsMedian,
+      dealLabel: deal.label,
+      flags: [],
       effectiveRent: effectiveRent(listing),
       allInMonthly: allInMonthly(listing, costs),
       timing: fit.timing,
       timingLabel: fit.label,
       priceHistory: [],
+    });
+  }
+
+  // Flags depend on fields only present once the row is fully assembled
+  // (days on market, how many sites carry it), so they're a second pass.
+  for (const listing of out) {
+    listing.flags = flagsFor(listing, {
+      verdict: listing.dealVerdict,
+      percentVsMedian: listing.dealDelta,
+      stats: statsFor(listing, corpus),
+      label: listing.dealLabel,
     });
   }
 
@@ -379,8 +405,8 @@ export async function loadListingDetail(id: string): Promise<{
   contacts: ContactLog[];
   priceHistory: PricePoint[];
 } | null> {
-  const supabase = db();
-  const userId = currentUserId();
+  const supabase = await db();
+  const userId = await currentUserId();
 
   const [events, contacts, observations] = await Promise.all([
     supabase
@@ -440,7 +466,7 @@ export async function loadListingDetail(id: string): Promise<{
 export async function loadChanges(limit = 200): Promise<
   (ListingEvent & { address: string; neighborhood: string; price: number; url: string })[]
 > {
-  const supabase = db();
+  const supabase = await db();
   const { data } = await supabase
     .from("events")
     .select("*, listings(address, unit, neighborhood, price, url)")
@@ -470,11 +496,11 @@ export async function loadChanges(limit = 200): Promise<
 // --- writes ---------------------------------------------------------------
 
 export async function setStage(listingId: string, stage: Stage): Promise<void> {
-  const supabase = db();
+  const supabase = await db();
   const now = new Date().toISOString();
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: currentUserId(),
+      user_id: await currentUserId(),
       listing_id: listingId,
       stage,
       stage_changed_at: now,
@@ -488,7 +514,7 @@ export async function setStage(listingId: string, stage: Stage): Promise<void> {
   if (implied != null) {
     await supabase.from("feedback").upsert(
       {
-        user_id: currentUserId(),
+        user_id: await currentUserId(),
         listing_id: listingId,
         action: implied ? "like" : "pass",
         created_at: now,
@@ -508,10 +534,10 @@ export async function setListingFields(
     events_seen_at: string | null;
   }>
 ): Promise<void> {
-  const supabase = db();
+  const supabase = await db();
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: currentUserId(),
+      user_id: await currentUserId(),
       listing_id: listingId,
       ...fields,
       updated_at: new Date().toISOString(),
@@ -524,10 +550,10 @@ export async function recordFeedback(
   listingId: string,
   action: "like" | "pass"
 ): Promise<void> {
-  const supabase = db();
+  const supabase = await db();
   await supabase.from("feedback").upsert(
     {
-      user_id: currentUserId(),
+      user_id: await currentUserId(),
       listing_id: listingId,
       action,
       created_at: new Date().toISOString(),
@@ -546,15 +572,15 @@ export async function recordFeedback(
  * you already took back.
  */
 export async function undoPass(listingId: string): Promise<void> {
-  const supabase = db();
+  const supabase = await db();
   await supabase
     .from("feedback")
     .delete()
-    .eq("user_id", currentUserId())
+    .eq("user_id", await currentUserId())
     .eq("listing_id", listingId);
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: currentUserId(),
+      user_id: await currentUserId(),
       listing_id: listingId,
       stage: "inbox",
       stage_changed_at: new Date().toISOString(),
@@ -573,9 +599,9 @@ export async function addContact(
     note?: string;
   }
 ): Promise<void> {
-  const supabase = db();
+  const supabase = await db();
   await supabase.from("contact_log").insert({
-    user_id: currentUserId(),
+    user_id: await currentUserId(),
     listing_id: listingId,
     channel: entry.channel,
     direction: entry.direction,
@@ -588,11 +614,11 @@ export async function addContact(
 // --- saved searches -------------------------------------------------------
 
 export async function loadSearches(): Promise<SavedSearch[]> {
-  const supabase = db();
+  const supabase = await db();
   const { data } = await supabase
     .from("saved_searches")
     .select("*")
-    .eq("user_id", currentUserId())
+    .eq("user_id", await currentUserId())
     .order("created_at", { ascending: true });
 
   return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
@@ -604,14 +630,38 @@ export async function loadSearches(): Promise<SavedSearch[]> {
   }));
 }
 
+/**
+ * Every active search across every account, for the scheduled poll.
+ *
+ * Runs with the service role because a cron job has no session. Identical
+ * criteria collapse by search_key downstream, so two users watching the same
+ * neighborhoods cost one scrape, not two — the whole reason market data is
+ * shared rather than per-user.
+ */
+export async function loadAllActiveSearches(): Promise<SavedSearch[]> {
+  const { data, error } = await adminDb()
+    .from("saved_searches")
+    .select("*")
+    .eq("active", true);
+  if (error) throw new Error(`loadAllActiveSearches: ${error.message}`);
+
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: row.id as number,
+    label: row.label as string,
+    criteria: normalizeCriteria(row.criteria as Record<string, never>),
+    searchKey: row.search_key as string,
+    active: true,
+  }));
+}
+
 /** Guarantees at least one search exists, so a fresh install polls something. */
 export async function ensureDefaultSearch(): Promise<SavedSearch[]> {
   const existing = await loadSearches();
   if (existing.length) return existing;
 
-  const supabase = db();
+  const supabase = await db();
   await supabase.from("saved_searches").insert({
-    user_id: currentUserId(),
+    user_id: await currentUserId(),
     label: "Studio / 1BR downtown",
     criteria: DEFAULT_CRITERIA,
     search_key: searchKey(DEFAULT_CRITERIA),
@@ -623,22 +673,22 @@ export async function ensureDefaultSearch(): Promise<SavedSearch[]> {
 // --- profile --------------------------------------------------------------
 
 export async function loadProfile(): Promise<Profile> {
-  const supabase = db();
+  const supabase = await db();
   const { data } = await supabase
     .from("user_profile")
     .select("profile")
-    .eq("user_id", currentUserId())
+    .eq("user_id", await currentUserId())
     .maybeSingle();
   return { ...DEFAULT_PROFILE, ...((data?.profile as Partial<Profile>) ?? {}) };
 }
 
 export async function saveProfile(profile: Partial<Profile>): Promise<void> {
-  const supabase = db();
+  const supabase = await db();
   const merged = { ...(await loadProfile()), ...profile };
   await supabase
     .from("user_profile")
     .upsert(
-      { user_id: currentUserId(), profile: merged, updated_at: new Date().toISOString() },
+      { user_id: await currentUserId(), profile: merged, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
 }
@@ -668,7 +718,7 @@ export interface ManualListing {
  * disappearance sweep in ingest.ts can never mark them off-market.
  */
 export async function addManualListing(input: ManualListing): Promise<string> {
-  const supabase = db();
+  const supabase = await db();
   const now = new Date().toISOString();
   const id = `manual-${Date.now().toString(36)}`;
 

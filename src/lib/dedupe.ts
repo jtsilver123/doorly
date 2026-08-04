@@ -71,6 +71,20 @@ export function streetKey(address: string): string {
 }
 
 /**
+ * Does this look like a real street address?
+ *
+ * "Contains a digit" is not enough: New York listing titles are full of numbers
+ * that aren't addresses — "Sunny 1BR", "24hr doorman", "2 bath". A street
+ * address begins with a house number followed by a word, so that's what we
+ * check. Getting this wrong in either direction is costly: too loose and
+ * unrelated Craigslist posts merge into one apartment, too strict and real
+ * addresses stop matching across sites.
+ */
+export function hasStreetNumber(address: string): boolean {
+  return /^\s*\d{1,5}[a-z]?\s+\S/i.test(address.trim());
+}
+
+/**
  * The dedupe key. Two listings sharing a fingerprint are treated as the same
  * apartment even if they came from different sites at different prices.
  *
@@ -80,7 +94,7 @@ export function streetKey(address: string): string {
  */
 export function fingerprint(listing: Listing): string {
   const street = streetKey(listing.address);
-  if (!street || !/\d/.test(street)) {
+  if (!street || !hasStreetNumber(listing.address)) {
     // No street number means we can't safely match it to anything.
     return `id:${listing.source}-${listing.sourceId}`;
   }

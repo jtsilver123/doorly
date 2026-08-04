@@ -42,10 +42,10 @@ export async function loadConfig(): Promise<AppConfig> {
 
   let stored: Partial<AppConfig> = {};
   try {
-    const { data } = await db()
+    const { data } = await (await db())
       .from("app_config")
       .select("config")
-      .eq("user_id", currentUserId())
+      .eq("user_id", await currentUserId())
       .maybeSingle();
     stored = (data?.config as Partial<AppConfig>) ?? {};
   } catch {
@@ -66,10 +66,10 @@ export async function loadConfig(): Promise<AppConfig> {
 export async function saveConfig(patch: Partial<AppConfig>): Promise<void> {
   const current = await loadConfig();
   const next = { ...current, ...patch };
-  await db()
+  await (await db())
     .from("app_config")
     .upsert(
-      { user_id: currentUserId(), config: next, updated_at: new Date().toISOString() },
+      { user_id: await currentUserId(), config: next, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
   cache = null;
@@ -98,7 +98,7 @@ export async function getUsage(): Promise<Usage> {
   const hint = keyHint(config.realtyApiKey);
   let used = 0;
   try {
-    const { count } = await db()
+    const { count } = await (await db())
       .from("api_usage")
       .select("id", { count: "exact", head: true })
       .eq("key_hint", hint)
@@ -124,7 +124,7 @@ export async function recordCall(
   ok: boolean
 ): Promise<void> {
   try {
-    await db().from("api_usage").insert({ key_hint: hint, host, path, ok });
+    await (await db()).from("api_usage").insert({ key_hint: hint, host, path, ok });
   } catch {
     /* ignore */
   }

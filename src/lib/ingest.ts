@@ -1,6 +1,6 @@
 import type { Listing, SavedSearch, Source } from "@/types";
 import { LINK_PREFERENCE } from "@/types";
-import { db } from "@/lib/supabase";
+import { adminDb } from "@/lib/supabase";
 import { fingerprint, contentHash, matchConfidence } from "@/lib/dedupe";
 import { runSearch, type SourceReport } from "@/lib/sources";
 
@@ -139,7 +139,9 @@ export function pickCanonicalUrl(group: Listing[]): string {
 }
 
 export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
-  const supabase = db();
+  // Shared market data is written once for everyone, so it needs the service
+  // role: RLS deliberately gives users read-only access to it.
+  const supabase = adminDb();
   const startedAt = new Date();
   const nowIso = startedAt.toISOString();
   const errors: string[] = [];

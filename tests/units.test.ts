@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { fingerprint, streetKey, extractUnit, matchConfidence } from "@/lib/dedupe";
+import { fingerprint, streetKey, extractUnit, matchConfidence, hasStreetNumber } from "@/lib/dedupe";
 import { toNum, toPrice } from "@/lib/parse";
 import { craigslistId, parseCraigslistHtml } from "@/lib/sources/craigslist";
 import { inBounds, searchKey, DEFAULT_CRITERIA } from "@/lib/criteria";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/cost";
 import { neighborhoodAt, withinAreas } from "@/lib/geo";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
+import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import type { Listing, FeedListing } from "@/types";
 
 function listing(over: Partial<Listing> = {}): Listing {
@@ -309,6 +310,10 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     unseenEvents: 0,
     needsFollowUp: false,
     upfrontCost: 7020,
+    dealVerdict: "market" as const,
+    dealDelta: 0,
+    dealLabel: "",
+    flags: [],
     timing: "unknown" as const,
     timingLabel: "",
     effectiveRent: 3500,
@@ -575,4 +580,103 @@ test("scouting week doesn't nag about pace", () => {
   // Six weeks out there is nothing worth contacting yet, so no pace warning.
   const actions = todaysActions([], funnelFor([], 50), phaseFor(50));
   assert.ok(!actions.some((a) => a.key === "pace"));
+});
+
+// --- is it a good price, and is it real? -----------------------------------
+
+const CORPUS = [
+  // Nine East Village 1-beds, median 3400.
+  ...[3000, 3200, 3300, 3350, 3400, 3450, 3600, 3800, 4000].map((price) => ({
+    neighborhood: "East Village", borough: "Manhattan", bedrooms: 1, price,
+  })),
+];
+
+test("comparisons are drawn from genuinely similar listings", () => {
+  const stats = statsFor(
+    { neighborhood: "East Village", borough: "Manhattan", bedrooms: 1 },
+    CORPUS
+  );
+  assert.ok(stats);
+  assert.equal(stats!.median, 3400);
+  assert.equal(stats!.count, 9);
+  assert.match(stats!.scope, /East Village 1-beds/);
+});
+
+test("a thin comparison set widens instead of lying", () => {
+  // Only two Flatiron studios: not enough to claim a median, so fall back.
+  const thin = [
+    { neighborhood: "Flatiron", borough: "Manhattan", bedrooms: 0, price: 3000 },
+    { neighborhood: "Flatiron", borough: "Manhattan", bedrooms: 0, price: 3200 },
+    ...CORPUS,
+  ];
+  const stats = statsFor(
+    { neighborhood: "Flatiron", borough: "Manhattan", bedrooms: 0 },
+    thin
+  );
+  // Nothing comparable at all -> say so rather than average two listings.
+  assert.equal(stats, null);
+});
+
+test("the verdict says how far off market a price is", () => {
+  const stats = statsFor({ neighborhood: "East Village", borough: "Manhattan", bedrooms: 1 }, CORPUS);
+  assert.equal(readDeal(3400, stats).verdict, "market");
+  assert.equal(readDeal(3000, stats).verdict, "good");   // ~12% under
+  assert.equal(readDeal(2600, stats).verdict, "steal");  // ~24% under
+  assert.equal(readDeal(4200, stats).verdict, "high");   // ~24% over
+  // The scope is always stated, so the number can be judged.
+  assert.match(readDeal(3000, stats).label, /median of 9 East Village 1-beds/);
+});
+
+test("with no comparable listings it declines to guess", () => {
+  const deal = readDeal(3400, null);
+  assert.equal(deal.verdict, "unknown");
+  assert.match(deal.label, /Not enough/);
+});
+
+test("an impossibly cheap listing gets flagged, not celebrated", () => {
+  const stats = statsFor({ neighborhood: "East Village", borough: "Manhattan", bedrooms: 1 }, CORPUS);
+  const deal = readDeal(1900, stats); // 44% under median
+  const flags = flagsFor(feed({ neighborhood: "East Village", price: 1900 }), deal);
+  const bait = flags.find((f) => f.kind === "too-cheap");
+  assert.ok(bait, "should flag a 44%-under listing");
+  assert.equal(bait!.severity, "warn");
+  assert.match(bait!.message, /never wire a deposit/);
+});
+
+test("a listing with no street number can't be matched to a building", () => {
+  const flags = flagsFor(
+    feed({ address: "Sunny renovated 1BR must see!!", imageUrl: null }),
+    readDeal(3400, null)
+  );
+  assert.ok(flags.some((f) => f.kind === "vague-address" && f.severity === "warn"));
+  assert.ok(flags.some((f) => f.kind === "no-photos"));
+});
+
+test("an ordinary listing carries no warnings", () => {
+  const stats = statsFor({ neighborhood: "East Village", borough: "Manhattan", bedrooms: 1 }, CORPUS);
+  const flags = flagsFor(
+    feed({ address: "55 Morton Street", imageUrl: "x", neighborhood: "East Village", daysOnMarket: 3 }),
+    readDeal(3400, stats)
+  );
+  assert.equal(flags.filter((f) => f.severity === "warn").length, 0);
+});
+
+test("a house number is not just any digit", () => {
+  assert.ok(hasStreetNumber("55 Morton Street"));
+  assert.ok(hasStreetNumber("417 E 57th St APT 11C"));
+  assert.ok(hasStreetNumber("1 Wall St"));
+  // Listing titles are full of numbers that aren't addresses.
+  assert.ok(!hasStreetNumber("Sunny renovated 1BR must see!!"));
+  assert.ok(!hasStreetNumber("24hr doorman, 2 bath, no fee"));
+  assert.ok(!hasStreetNumber("Great deal , East village , heat included"));
+  assert.ok(!hasStreetNumber(""));
+});
+
+test("a Craigslist title never poses as an address for deduping", () => {
+  // Two unrelated posts that both happen to contain digits must not merge.
+  const a = listing({ id: "craigslist-1", source: "craigslist", sourceId: "1", address: "Sunny 1BR in EV", unit: "" });
+  const b = listing({ id: "craigslist-2", source: "craigslist", sourceId: "2", address: "Bright 1BR near park", unit: "" });
+  assert.ok(fingerprint(a).startsWith("id:"));
+  assert.ok(fingerprint(b).startsWith("id:"));
+  assert.notEqual(fingerprint(a), fingerprint(b));
 });

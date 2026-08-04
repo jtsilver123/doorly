@@ -3,10 +3,15 @@
  * Run with: npm run poll
  */
 import { ingest } from "@/lib/ingest";
-import { ensureDefaultSearch } from "@/lib/feed";
+import { loadAllActiveSearches } from "@/lib/feed";
 
 async function main() {
-  const searches = await ensureDefaultSearch();
+  // Runs outside a request, so there's no session to scope to a user.
+  const searches = await loadAllActiveSearches();
+  if (!searches.length) {
+    console.log("No active saved searches. Sign in and create one first.");
+    return;
+  }
   console.log(`polling ${searches.length} search(es)…`);
   for (const s of searches) console.log(`  · ${s.label}  [${s.searchKey}]`);
 

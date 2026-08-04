@@ -157,6 +157,12 @@ export interface FeedListing extends Listing {
   needsFollowUp: boolean;
   /** Cash needed on day one — the number that decides if you can take it. */
   upfrontCost: number;
+  /** How this price compares to genuinely similar listings. */
+  dealVerdict: "steal" | "good" | "market" | "high" | "unknown";
+  dealDelta: number;
+  dealLabel: string;
+  /** Reasons to look twice before spending an evening on it. */
+  flags: { kind: string; message: string; severity: "warn" | "info" }[];
   /** Rent after concessions — what you actually pay each month. */
   effectiveRent: number;
   /** Rent after concessions *and* amortized move-in costs. The true monthly. */

@@ -287,6 +287,41 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
             </details>
           </section>
 
+          {/* --- is it a good price, and is it real? --------------------- */}
+          <section style={{ display: "grid", gap: 8 }}>
+            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
+              PRICE CHECK
+            </label>
+            <div
+              className={
+                listing.dealVerdict === "steal" || listing.dealVerdict === "good"
+                  ? "pricecheck is-good"
+                  : listing.dealVerdict === "high"
+                    ? "pricecheck is-high"
+                    : "pricecheck"
+              }
+            >
+              <strong>{listing.dealLabel}</strong>
+              {listing.dealVerdict === "steal" && (
+                <span className="muted">
+                  {" "}
+                  Worth seeing today — and worth verifying in person.
+                </span>
+              )}
+            </div>
+
+            {listing.flags.length > 0 && (
+              <ul className="flags">
+                {listing.flags.map((flag) => (
+                  <li key={flag.kind} className={`flag flag-${flag.severity}`}>
+                    <span>{flag.severity === "warn" ? "⚠" : "·"}</span>
+                    <span>{flag.message}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           {/* --- pipeline ------------------------------------------------ */}
           <section style={{ display: "grid", gap: 6 }}>
             <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>

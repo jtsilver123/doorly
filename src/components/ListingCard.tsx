@@ -48,6 +48,7 @@ export default function ListingCard({
   const delta = listing.price - listing.originalPrice;
   const reach = bestChannel(listing);
   const hasConcession = listing.effectiveRent < listing.price;
+  const warn = listing.flags.find((f) => f.severity === "warn");
   // Listing CDNs expire URLs, so a dead image must fall back to the placeholder
   // rather than leaving a broken-image glyph in the grid.
   const [imageBroken, setImageBroken] = useState(false);
@@ -85,6 +86,22 @@ export default function ListingCard({
           {listing.needsFollowUp && <span className="chip chip-warn">follow up</span>}
           {listing.monthsFree > 0 && (
             <span className="chip chip-good">{listing.monthsFree} mo free</span>
+          )}
+          {/* The judgement a listing site will never make for you. */}
+          {(listing.dealVerdict === "steal" || listing.dealVerdict === "good") && (
+            <span className="chip chip-good" title={listing.dealLabel}>
+              {Math.abs(listing.dealDelta)}% under market
+            </span>
+          )}
+          {listing.dealVerdict === "high" && (
+            <span className="chip chip-warn" title={listing.dealLabel}>
+              {listing.dealDelta}% over
+            </span>
+          )}
+          {warn && (
+            <span className="chip chip-warn" title={warn.message}>
+              ⚠ check this
+            </span>
           )}
           {listing.timing === "late" && (
             <span className="chip chip-warn" title={listing.timingLabel}>
@@ -161,7 +178,10 @@ export default function ListingCard({
               <span style={{ width: `${listing.score}%` }} />
             </div>
             <div className="muted card-why">
-              {listing.score}% · {listing.scoreReasons[0] ?? "—"}
+              {listing.score}% ·{" "}
+              {listing.dealVerdict !== "unknown"
+                ? listing.dealLabel
+                : (listing.scoreReasons[0] ?? "—")}
             </div>
           </div>
         )}
