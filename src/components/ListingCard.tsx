@@ -47,6 +47,7 @@ export default function ListingCard({
   const rose = listing.price > listing.originalPrice;
   const delta = listing.price - listing.originalPrice;
   const reach = bestChannel(listing);
+  const hasConcession = listing.effectiveRent < listing.price;
   // Listing CDNs expire URLs, so a dead image must fall back to the placeholder
   // rather than leaving a broken-image glyph in the grid.
   const [imageBroken, setImageBroken] = useState(false);
@@ -82,6 +83,19 @@ export default function ListingCard({
           {rose && <span className="chip chip-warn">↑ {money(delta)}</span>}
           {listing.noFee && <span className="chip chip-accent">no fee</span>}
           {listing.needsFollowUp && <span className="chip chip-warn">follow up</span>}
+          {listing.monthsFree > 0 && (
+            <span className="chip chip-good">{listing.monthsFree} mo free</span>
+          )}
+          {listing.timing === "late" && (
+            <span className="chip chip-warn" title={listing.timingLabel}>
+              late
+            </span>
+          )}
+          {listing.timing === "stale" && (
+            <span className="chip" title={listing.timingLabel}>
+              {listing.timingLabel}
+            </span>
+          )}
         </div>
 
         <button
@@ -116,6 +130,19 @@ export default function ListingCard({
           </span>
         </div>
 
+        {/* The two numbers listing sites never show you: what a concession
+            really makes the rent, and the cheque due on day one. */}
+        <div className="card-money">
+          {hasConcession && (
+            <span className="chip chip-good" title={`${listing.monthsFree} months free`}>
+              {money(listing.effectiveRent)}/mo effective
+            </span>
+          )}
+          <span className="muted" style={{ fontSize: 11 }}>
+            {money(listing.upfrontCost)} to move in
+          </span>
+        </div>
+
         <button className="card-title" onClick={() => onOpen(listing)}>
           {listing.address}
           {listing.unit ? ` #${listing.unit}` : ""}
@@ -125,6 +152,7 @@ export default function ListingCard({
           {listing.neighborhood || listing.borough || "NYC"} ·{" "}
           {relative(listing.firstSeenAt)}
           {listing.daysOnMarket > 21 ? ` · ${listing.daysOnMarket}d listed` : ""}
+          {listing.timing === "ready" ? " · ready for your date" : ""}
         </div>
 
         {listing.score != null && (

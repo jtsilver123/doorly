@@ -4,6 +4,7 @@ import { hasRealtyKey, BudgetExhaustedError } from "@/lib/realtyapi";
 import { fetchStreetEasy } from "@/lib/sources/streeteasy";
 import { fetchZillow } from "@/lib/sources/zillow";
 import { fetchHotPads } from "@/lib/sources/hotpads";
+import { fetchApartments } from "@/lib/sources/apartments";
 import { fetchCraigslist } from "@/lib/sources/craigslist";
 
 export interface SourceReport {
@@ -25,6 +26,7 @@ const FETCHERS: Record<string, { run: Fetcher; needsKey: boolean }> = {
   streeteasy: { run: fetchStreetEasy, needsKey: true },
   zillow: { run: fetchZillow, needsKey: true },
   hotpads: { run: fetchHotPads, needsKey: true },
+  apartments: { run: fetchApartments, needsKey: true },
   craigslist: { run: fetchCraigslist, needsKey: false },
 };
 

@@ -97,6 +97,9 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
       contactPhone: row.contact_phone ?? "",
       contactName: row.broker_name ?? row.name ?? "",
       contactEmail: "",
+      monthsFree: 0,
+      leaseMonths: 12,
+      netEffectiveRent: null,
       availableText: row.available_date ?? "",
     });
   }

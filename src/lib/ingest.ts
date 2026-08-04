@@ -321,6 +321,12 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
       contact_phone: firstNonEmpty(group, (l) => l.contactPhone),
       contact_name: firstNonEmpty(group, (l) => l.contactName),
       contact_email: firstNonEmpty(group, (l) => l.contactEmail),
+      // Concessions: take the best deal any site is advertising for this unit.
+      months_free: Math.max(...group.map((l) => l.monthsFree ?? 0), 0),
+      lease_months: primary.leaseMonths ?? 12,
+      net_effective_rent:
+        group.map((l) => l.netEffectiveRent).filter((v): v is number => !!v).sort((a, b) => a - b)[0] ??
+        null,
       available_text: firstNonEmpty(group, (l) => l.availableText),
       is_active: true,
       first_seen_at: existingByFp?.first_seen_at ?? nowIso,

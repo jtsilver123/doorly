@@ -32,6 +32,22 @@ model re-ranks everything. It explains itself: every score decomposes into
 reasons ("likes neighborhood West Village", "no broker fee"), because a ranking
 you can't interrogate isn't one you'll trust.
 
+**Prices what you'd actually pay** — listing sites compare on sticker rent,
+which is the wrong number twice over. A concession ("2 months free on a
+14-month lease") makes a $3,800 listing really $3,257 — invisible if you filter
+on gross. And a $3,300 with a broker fee costs more on day one than a $3,500
+no-fee. Every card shows effective rent, cash-to-move-in, and an all-in
+monthly, and you can sort on any of them.
+
+**Knows your move-in date** — listings are checked against your target date:
+ready, a bit late, too late, or suspiciously long-vacant. The sidebar counts
+down the days.
+
+**Gets you application-ready** — a renter résumé built from your profile, a
+document checklist, and a readiness score. It matters most for the case that
+looks weakest on a standard form: a business owner with no paystub. See
+[Securing, not just finding](#securing-not-just-finding).
+
 **Runs your outreach** — one tap drafts a tour request naming the address, the
 rent, your qualifications and your move-in date, and opens Messages or Mail.
 Sending logs the contact and advances the listing to *Contacted* automatically,
@@ -59,6 +75,23 @@ The schema lives in `supabase/migrations/`. Apply `0001_init.sql` then
 
 Set your name, employer, income and move-in date under **My details** — those
 fill in the tour message, so filling them once is what makes outreach one tap.
+
+## Securing, not just finding
+
+Finding an apartment and getting it are different problems, and the second is
+where a strong applicant loses to a faster one. Three things here address it:
+
+- **The application packet.** A one-page renter résumé — financial position,
+  terms, documents ready — that goes out the moment a viewing goes well. In a
+  market where the flat goes to the first complete file, having it pre-built is
+  the whole game.
+- **Income framing for owners.** A blank salary field reads as "can't pay". If
+  you own a business and take no salary, the message and the packet cite the
+  figure on your 2025 return as *documented* income rather than leaving a gap
+  for the landlord to fill in. With no figure at all, it names the gap and
+  closes it with the documents instead.
+- **Readiness score.** The honest version of "am I ready to apply?" — it lists
+  exactly what's still missing.
 
 ## The request budget
 
@@ -125,9 +158,17 @@ the logic changes.
 
 ## Known limits
 
-- **Apartments.com is not included.** It has no API on this key and hard-403s
-  direct requests behind CoStar's bot protection. HotPads (Zillow-owned) is in
-  as the closest substitute for that inventory.
+- **Apartments.com is included but unverified.** It *is* on this key
+  (`apartments.realtyapi.io`) — an earlier probe hit the wrong path and wrongly
+  concluded otherwise. The adapter is written from the published OpenAPI spec,
+  but the per-listing field names were never seen against a live response
+  because the key ran out of credits first. It reads every field through
+  tolerant lookups and degrades rather than throwing; check `npm run smoke`
+  output on the first run with a fresh key.
+- **Concession data only arrives on new polls.** `monthsFree` /
+  `netEffectivePrice` are captured from StreetEasy going forward; rows ingested
+  before that show no concession, so effective rent equals sticker rent for
+  them.
 - **Phone numbers are rare.** Zero of 324 listings in a live sample had one;
   only Zillow publishes them at all. Rather than show a text button that can't
   text, the primary action adapts: *Text for tour* when there's a phone, *Email

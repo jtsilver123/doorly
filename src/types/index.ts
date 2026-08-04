@@ -3,16 +3,24 @@ export type Source =
   | "craigslist"
   | "zillow"
   | "hotpads"
+  | "apartments"
   | "email"
   | "manual";
 
-export const ALL_SOURCES: Source[] = ["streeteasy", "zillow", "hotpads", "craigslist"];
+export const ALL_SOURCES: Source[] = [
+  "streeteasy",
+  "zillow",
+  "apartments",
+  "hotpads",
+  "craigslist",
+];
 
 export const SOURCE_LABEL: Record<Source, string> = {
   streeteasy: "StreetEasy",
   craigslist: "Craigslist",
   zillow: "Zillow",
   hotpads: "HotPads",
+  apartments: "Apartments.com",
   email: "Email alert",
   manual: "Added by me",
 };
@@ -24,6 +32,7 @@ export const SOURCE_LABEL: Record<Source, string> = {
 export const LINK_PREFERENCE: Source[] = [
   "zillow",
   "streeteasy",
+  "apartments",
   "hotpads",
   "craigslist",
   "email",
@@ -65,6 +74,12 @@ export interface Listing {
   contactEmail: string;
   /** Raw availability string from the source ("2026-09-01", "Immediate"). */
   availableText: string;
+  /** Months of free rent offered as a concession. 0 when there's no deal. */
+  monthsFree: number;
+  /** Lease length the concession is spread over. 12 unless stated. */
+  leaseMonths: number;
+  /** Source-supplied net effective rent, when it publishes one. */
+  netEffectiveRent: number | null;
 }
 
 /**
@@ -140,6 +155,15 @@ export interface FeedListing extends Listing {
   unseenEvents: number;
   /** Contacted, still sitting at "contacted", and gone quiet. Chases itself. */
   needsFollowUp: boolean;
+  /** Cash needed on day one — the number that decides if you can take it. */
+  upfrontCost: number;
+  /** Rent after concessions — what you actually pay each month. */
+  effectiveRent: number;
+  /** Rent after concessions *and* amortized move-in costs. The true monthly. */
+  allInMonthly: number;
+  /** Whether it's free in time for your move-in date. */
+  timing: "ready" | "soon" | "late" | "stale" | "unknown";
+  timingLabel: string;
   priceHistory: PricePoint[];
 }
 
@@ -228,6 +252,9 @@ export interface StreetEasyListing {
     leadMedia: { photo: { key: string } | null } | null;
     livingAreaSize: number;
     noFee: boolean;
+    monthsFree: number;
+    netEffectivePrice: number;
+    leaseTermMonths: number | null;
     price: number;
     sourceGroupLabel: string;
     status: string;

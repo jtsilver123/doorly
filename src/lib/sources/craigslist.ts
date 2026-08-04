@@ -148,6 +148,9 @@ export function parseCraigslistHtml(html: string): Listing[] {
       contactPhone: "",
       contactName: "",
       contactEmail: "",
+      monthsFree: 0,
+      leaseMonths: 12,
+      netEffectiveRent: null,
       availableText: "",
     });
   }

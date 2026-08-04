@@ -15,6 +15,13 @@ import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
 import { fingerprint, extractUnit } from "@/lib/dedupe";
 import { boroughFor } from "@/lib/areas";
 import { DEFAULT_PROFILE, type Profile } from "@/lib/outreach";
+import {
+  moveInCost,
+  moveInFit,
+  effectiveRent,
+  allInMonthly,
+  DEFAULT_COSTS,
+} from "@/lib/cost";
 
 export interface FeedFilters {
   stage?: Stage | "all" | "active";
@@ -29,7 +36,17 @@ export interface FeedFilters {
   followUpOnly?: boolean;
   includeGone?: boolean;
   starredOnly?: boolean;
-  sort?: "best" | "newest" | "cheapest" | "recent_change";
+  sort?:
+    | "best"
+    | "newest"
+    | "cheapest"
+    | "effective"
+    | "allin"
+    | "upfront"
+    | "recent_change";
+  /** Filter on effective rent, so concession deals aren't hidden by gross. */
+  effectiveMax?: number;
+  readyByMoveIn?: boolean;
   search?: string;
   limit?: number;
 }
@@ -58,6 +75,9 @@ interface ListingRow {
   contact_phone: string;
   contact_name: string;
   contact_email: string;
+  months_free: number;
+  lease_months: number;
+  net_effective_rent: number | null;
   available_text: string;
   is_active: boolean;
   first_seen_at: string;
@@ -103,6 +123,9 @@ function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
     contactPhone: row.contact_phone ?? "",
     contactName: row.contact_name ?? "",
     contactEmail: row.contact_email ?? "",
+    monthsFree: row.months_free ?? 0,
+    leaseMonths: row.lease_months ?? 12,
+    netEffectiveRent: row.net_effective_rent ?? null,
     availableText: row.available_text ?? "",
   };
 }
@@ -225,6 +248,11 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
   }
   const model = train(signals);
 
+  // Cost assumptions and the move-in date come from the profile, so the numbers
+  // on every card reflect this user's situation rather than a generic default.
+  const profile = await loadProfile().catch(() => DEFAULT_PROFILE);
+  const costs = profile.costs ?? DEFAULT_COSTS;
+
   // --- assemble ----------------------------------------------------------
   const out: FeedListing[] = [];
   for (const row of listings) {
@@ -240,6 +268,8 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
     ).length;
 
     const contact = contactStats.get(row.id);
+    const cost = moveInCost(listing, costs);
+    const fit = moveInFit(row.available_at, profile.moveInDate);
 
     // The CRM chases itself: anything still parked at "contacted" with no
     // inbound reply after a couple of days gets flagged, so silence surfaces
@@ -274,6 +304,11 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
       daysOnMarket: daysBetween(row.first_seen_at),
       unseenEvents: unseen,
       needsFollowUp,
+      upfrontCost: cost.total,
+      effectiveRent: effectiveRent(listing),
+      allInMonthly: allInMonthly(listing, costs),
+      timing: fit.timing,
+      timingLabel: fit.label,
       priceHistory: [],
     });
   }
@@ -295,8 +330,16 @@ function applyFilters(listings: FeedListing[], filters: FeedFilters): FeedListin
     result = result.filter((l) => l.stage !== "passed");
   }
 
+  if (filters.effectiveMax != null) {
+    result = result.filter((l) => l.effectiveRent <= filters.effectiveMax!);
+  }
   if (filters.starredOnly) result = result.filter((l) => l.starred);
   if (filters.followUpOnly) result = result.filter((l) => l.needsFollowUp);
+  if (filters.readyByMoveIn) {
+    // "unknown" stays in: most sources publish no date, and dropping them
+    // would hide the majority of the market.
+    result = result.filter((l) => l.timing === "ready" || l.timing === "unknown");
+  }
   if (filters.changedOnly) {
     result = result.filter((l) => l.unseenEvents > 0 || l.price !== l.originalPrice);
   }
@@ -319,6 +362,9 @@ function applyFilters(listings: FeedListing[], filters: FeedFilters): FeedListin
     best: (a, b) => (b.score ?? 0) - (a.score ?? 0),
     newest: (a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt),
     cheapest: (a, b) => a.price - b.price,
+    upfront: (a, b) => a.upfrontCost - b.upfrontCost,
+    effective: (a, b) => a.effectiveRent - b.effectiveRent,
+    allin: (a, b) => a.allInMonthly - b.allInMonthly,
     recent_change: (a, b) =>
       (b.priceChangedAt ?? b.lastSeenAt).localeCompare(a.priceChangedAt ?? a.lastSeenAt),
   };
@@ -625,6 +671,9 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     contactName: input.contactName ?? "",
     contactEmail: input.contactEmail ?? "",
     availableText: "",
+    monthsFree: 0,
+    leaseMonths: 12,
+    netEffectiveRent: null,
   };
 
   const { error } = await supabase.from("listings").insert({

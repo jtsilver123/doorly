@@ -15,6 +15,8 @@ import {
   tourSubject,
   type Profile,
 } from "@/lib/outreach";
+import { daysUntil } from "@/lib/cost";
+import ApplicationPacket from "@/components/ApplicationPacket";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 
@@ -65,6 +67,7 @@ export default function Home() {
   const [starredOnly, setStarredOnly] = useState(false);
   const [noFeeOnly, setNoFeeOnly] = useState(false);
   const [followUpOnly, setFollowUpOnly] = useState(false);
+  const [readyOnly, setReadyOnly] = useState(false);
 
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -81,13 +84,25 @@ export default function Home() {
     if (starredOnly) params.set("starred", "1");
     if (noFeeOnly) params.set("noFee", "1");
     if (followUpOnly) params.set("followUp", "1");
+    if (readyOnly) params.set("readyBy", "1");
 
     const res = await fetch(`/api/feed?${params}`);
     const body = await res.json();
     if (body.error) setStatus(body.error);
     setListings(body.listings ?? []);
     setLoading(false);
-  }, [query, sort, priceMax, beds, source, changedOnly, starredOnly, noFeeOnly, followUpOnly]);
+  }, [
+    query,
+    sort,
+    priceMax,
+    beds,
+    source,
+    changedOnly,
+    starredOnly,
+    noFeeOnly,
+    followUpOnly,
+    readyOnly,
+  ]);
 
   useEffect(() => {
     loadFeed();
@@ -274,6 +289,8 @@ export default function Home() {
     [listings]
   );
 
+  const daysToMove = daysUntil(profile.moveInDate);
+
   async function saveProfile(next: Profile) {
     setProfile(next);
     await fetch("/api/profile", {
@@ -292,6 +309,14 @@ export default function Home() {
           <div className="muted" style={{ fontSize: 11 }}>
             {counts.active} live · {counts.changed} changed
           </div>
+          {daysToMove > 0 && (
+            <div
+              className={daysToMove <= 21 ? "warn-text" : "muted"}
+              style={{ fontSize: 11, fontWeight: 600 }}
+            >
+              {daysToMove} days to move-in
+            </div>
+          )}
         </div>
 
         <div style={{ display: "grid", gap: 2 }}>
@@ -367,7 +392,10 @@ export default function Home() {
             <select className="field" value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="best">Best match</option>
               <option value="newest">Newest</option>
-              <option value="cheapest">Cheapest</option>
+              <option value="effective">Cheapest (after concessions)</option>
+              <option value="allin">Cheapest all-in</option>
+              <option value="upfront">Least cash up front</option>
+              <option value="cheapest">Cheapest sticker price</option>
               <option value="recent_change">Recently changed</option>
             </select>
             {(
@@ -376,6 +404,7 @@ export default function Home() {
                 ["Starred", starredOnly, setStarredOnly],
                 ["No fee", noFeeOnly, setNoFeeOnly],
                 ["Needs follow-up", followUpOnly, setFollowUpOnly],
+                ["Ready by my date", readyOnly, setReadyOnly],
               ] as [string, boolean, (v: boolean) => void][]
             ).map(([label, value, set]) => (
               <label key={label} className="check">
@@ -555,6 +584,7 @@ export default function Home() {
         {!loading && tab === "profile" && (
           <div style={{ display: "grid", gap: 16 }}>
             <ProfileForm profile={profile} onSave={saveProfile} />
+            <ApplicationPacket profile={profile} onSave={saveProfile} />
             <ApiSettings status={api} onSaved={loadApi} />
           </div>
         )}

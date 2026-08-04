@@ -159,6 +159,9 @@ export function normalizeZillow(
       contactPhone: phone,
       contactName: p.title ?? "",
       contactEmail: "",
+      monthsFree: 0,
+      leaseMonths: 12,
+      netEffectiveRent: null,
       availableText: "",
     });
   }

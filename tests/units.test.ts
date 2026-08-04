@@ -13,6 +13,13 @@ import {
   normalizePhone,
   DEFAULT_PROFILE,
 } from "@/lib/outreach";
+import {
+  effectiveRent,
+  allInMonthly,
+  moveInCost,
+  moveInFit,
+  DEFAULT_COSTS,
+} from "@/lib/cost";
 import type { Listing, FeedListing } from "@/types";
 
 function listing(over: Partial<Listing> = {}): Listing {
@@ -42,6 +49,9 @@ function listing(over: Partial<Listing> = {}): Listing {
     contactName: "",
     contactEmail: "",
     availableText: "",
+    monthsFree: 0,
+    leaseMonths: 12,
+    netEffectiveRent: null,
     ...over,
   };
 }
@@ -296,6 +306,11 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     daysOnMarket: 1,
     unseenEvents: 0,
     needsFollowUp: false,
+    upfrontCost: 7020,
+    timing: "unknown" as const,
+    timingLabel: "",
+    effectiveRent: 3500,
+    allInMonthly: 3502,
     priceHistory: [],
     ...over,
   };
@@ -394,4 +409,52 @@ test("income on the return is cited as documented, not self-reported", () => {
   assert.doesNotMatch(message, /don't draw a salary/);
   assert.match(message, /proof of assets/);
   assert.equal(message.match(/tax return/g)?.length, 1);
+});
+
+// --- what you actually pay -------------------------------------------------
+
+test("effective rent spreads free months across the lease term", () => {
+  // $3,800 with 2 months free on a 14-month lease is really ~$3,257.
+  assert.equal(
+    effectiveRent({ price: 3800, monthsFree: 2, leaseMonths: 14 }),
+    3257
+  );
+  // No concession means the sticker price is the real price.
+  assert.equal(effectiveRent({ price: 3500 }), 3500);
+  // The source's own net figure wins when it publishes one.
+  assert.equal(
+    effectiveRent({ price: 3800, monthsFree: 2, leaseMonths: 14, netEffectiveRent: 3300 }),
+    3300
+  );
+  // A concession longer than the lease is nonsense; don't produce a free flat.
+  assert.equal(effectiveRent({ price: 3500, monthsFree: 18, leaseMonths: 12 }), 3500);
+});
+
+test("move-in cost exposes the fee that monthly rent hides", () => {
+  const withFee = { price: 3300, noFee: false };
+  const noFee = { price: 3500, noFee: true };
+  const assume = { ...DEFAULT_COSTS, brokerFeeMonths: 1 };
+
+  const a = moveInCost(withFee, assume);
+  const b = moveInCost(noFee, assume);
+  // The cheaper-looking apartment costs more to actually move into.
+  assert.ok(a.total > b.total, `${a.total} should exceed ${b.total}`);
+  assert.ok(a.lines.some((l) => l.label === "Broker fee"));
+  assert.ok(!b.lines.some((l) => l.label === "Broker fee"));
+});
+
+test("a deposit is not a cost, so it stays out of the monthly", () => {
+  const cheap = allInMonthly({ price: 3000, noFee: true }, DEFAULT_COSTS);
+  // Only the $20 application fee is sunk, spread over 12 months.
+  assert.ok(cheap >= 3000 && cheap <= 3003, `got ${cheap}`);
+});
+
+test("move-in timing flags what can't be ready in time", () => {
+  const now = new Date("2026-08-04T12:00:00Z");
+  assert.equal(moveInFit("2026-09-01", "2026-09-01", now).timing, "ready");
+  assert.equal(moveInFit("2026-09-10", "2026-09-01", now).timing, "soon");
+  assert.equal(moveInFit("2026-10-15", "2026-09-01", now).timing, "late");
+  // Free since April and still listed: something is wrong with it.
+  assert.equal(moveInFit("2026-04-01", "2026-09-01", now).timing, "stale");
+  assert.equal(moveInFit(null, "2026-09-01", now).timing, "unknown");
 });

@@ -581,3 +581,12 @@ a.chip:hover {
     border-bottom: 1px solid var(--border);
   }
 }
+
+/* The numbers listing sites bury: concession-adjusted rent and move-in cash. */
+.card-money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: -2px;
+}

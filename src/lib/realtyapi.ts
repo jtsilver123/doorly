@@ -8,6 +8,9 @@ import { loadConfig, keyHint, recordCall, getUsage } from "@/lib/apikey";
  *   streeteasy.realtyapi.io  /search/rent          richest NYC rental data
  *   zillow.realtyapi.io      /search/byaddress     huge coverage, coarser fields
  *   hotpads.realtyapi.io     /search/bylocation    Zillow-owned, overlapping
+ *   apartments.realtyapi.io  /search/bylocation    big-building inventory, and
+ *                                                  the only search that filters
+ *                                                  by availability window
  *   realtor.realtyapi.io     /search/bylocation    thin for NYC rentals
  *
  * Every response is 200 even on failure — errors come back as a JSON body with
@@ -19,7 +22,12 @@ import { loadConfig, keyHint, recordCall, getUsage } from "@/lib/apikey";
  * "no new listings".
  */
 
-export type RealtyHost = "streeteasy" | "zillow" | "hotpads" | "realtor";
+export type RealtyHost =
+  | "streeteasy"
+  | "zillow"
+  | "hotpads"
+  | "apartments"
+  | "realtor";
 
 export class RealtyApiError extends Error {
   constructor(
@@ -35,7 +43,8 @@ export class RealtyApiError extends Error {
 export class BudgetExhaustedError extends RealtyApiError {
   constructor(used: number, limit: number, host: RealtyHost, path: string) {
     super(
-      `monthly request budget spent (${used}/${limit}) — add a new API key in Settings`,
+      `out of API credits (${used}/${limit} used) — paste a new key under My details. ` +
+        `Craigslist keeps working without one.`,
       host,
       path
     );
@@ -91,11 +100,23 @@ export async function realtyGet<T>(
 
   void recordCall(hint, host, path, response.ok);
 
+  // 402 is the upstream's own "you're out of credits". Trust it over our local
+  // counter, which only sees requests made through this app — probing, other
+  // tools, or a key that arrived already part-spent all go unseen by us.
+  if (response.status === 402) {
+    throw new BudgetExhaustedError(usage.limit, usage.limit, host, path);
+  }
   if (!response.ok) {
     throw new RealtyApiError(`HTTP ${response.status}`, host, path);
   }
 
   const body = (await response.json()) as T & { error?: string; message?: string };
+
+  // Some hosts answer 200 with the credit error in the body instead.
+  const creditText = `${body.error ?? ""} ${body.message ?? ""}`;
+  if (/not enough credits|quota|402/i.test(creditText)) {
+    throw new BudgetExhaustedError(usage.limit, usage.limit, host, path);
+  }
 
   if (body.error) throw new RealtyApiError(body.error, host, path);
   if (typeof body.message === "string" && /not found|invalid|unauthor/i.test(body.message)) {

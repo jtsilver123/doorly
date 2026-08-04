@@ -12,7 +12,7 @@ export const DEFAULT_CRITERIA: SearchCriteria = {
   bedMax: 1,
   priceMin: 2000,
   priceMax: 4000,
-  sources: ["streeteasy", "zillow", "hotpads", "craigslist"],
+  sources: ["streeteasy", "zillow", "apartments", "hotpads", "craigslist"],
   noFeeOnly: false,
 };
 

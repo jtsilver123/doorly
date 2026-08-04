@@ -22,6 +22,8 @@ export async function GET(request: Request) {
     bedsMax: num(params.get("bedsMax")),
     noFeeOnly: params.get("noFee") === "1",
     changedOnly: params.get("changed") === "1",
+    followUpOnly: params.get("followUp") === "1",
+    readyByMoveIn: params.get("readyBy") === "1",
     starredOnly: params.get("starred") === "1",
     includeGone: params.get("gone") === "1",
     search: params.get("q") ?? undefined,

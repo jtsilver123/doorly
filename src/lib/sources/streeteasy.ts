@@ -67,6 +67,14 @@ export function normalizeStreetEasy(raw: StreetEasyListing[]): Listing[] {
       contactName: n.sourceGroupLabel || "",
       contactEmail: "",
       availableText: n.availableAt ?? "",
+      // StreetEasy publishes both the concession and the resulting net rent.
+      // netEffectivePrice is 0 when there is no concession, not when it's free.
+      monthsFree: n.monthsFree ?? 0,
+      leaseMonths: n.leaseTermMonths ?? 12,
+      netEffectiveRent:
+        n.netEffectivePrice && n.netEffectivePrice > 0
+          ? Math.round(n.netEffectivePrice)
+          : null,
     });
   }
   return out;

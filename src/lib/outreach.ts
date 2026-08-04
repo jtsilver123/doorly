@@ -1,4 +1,5 @@
 import type { ContactChannel, FeedListing } from "@/types";
+import { DEFAULT_COSTS, type CostAssumptions } from "@/lib/cost";
 
 /**
  * Drafting the "can I see this today?" text.
@@ -27,6 +28,10 @@ export interface Profile {
   phone: string;
   email: string;
   extra: string;
+  /** Which documents you actually have to hand, for the application packet. */
+  documents: string[];
+  /** What you assume it costs to move in. Tunable — the rules vary. */
+  costs: CostAssumptions;
 }
 
 /** The documents a NYC landlord actually asks for. */
@@ -52,6 +57,8 @@ export const DEFAULT_PROFILE: Profile = {
   phone: "",
   email: "",
   extra: "",
+  documents: [],
+  costs: DEFAULT_COSTS,
 };
 
 function formatMoveIn(iso: string): string {
