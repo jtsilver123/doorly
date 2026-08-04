@@ -32,6 +32,7 @@ export interface FeedFilters {
   priceMax?: number;
   bedsMin?: number;
   bedsMax?: number;
+  bathsMin?: number;
   noFeeOnly?: boolean;
   changedOnly?: boolean;
   followUpOnly?: boolean;
@@ -161,6 +162,7 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
   if (filters.priceMax != null) query = query.lte("price", filters.priceMax);
   if (filters.bedsMin != null) query = query.gte("bedrooms", filters.bedsMin);
   if (filters.bedsMax != null) query = query.lte("bedrooms", filters.bedsMax);
+  if (filters.bathsMin != null) query = query.gte("bathrooms", filters.bathsMin);
   if (filters.noFeeOnly) query = query.eq("no_fee", true);
 
   const { data: rows, error } = await query

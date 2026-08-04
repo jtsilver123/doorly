@@ -229,11 +229,37 @@ export interface SearchCriteria {
   areas: string[];
   bedMin: number;
   bedMax: number | null;
+  /**
+   * Minimum bathrooms. 0 means "don't care". Every source treats baths as
+   * "N or more" rather than a range, which matches how people search — "2B2B"
+   * is a floor, not an exact spec.
+   */
+  bathMin: number;
   priceMin: number;
   priceMax: number;
   sources: Source[];
   noFeeOnly: boolean;
 }
+
+/**
+ * The layouts people actually ask for, in the shorthand they use.
+ * "2B1B" is a far more natural way to say it than two separate dropdowns.
+ */
+export const LAYOUT_PRESETS: {
+  label: string;
+  bedMin: number;
+  bedMax: number | null;
+  bathMin: number;
+}[] = [
+  { label: "Studio", bedMin: 0, bedMax: 0, bathMin: 0 },
+  { label: "1B1B", bedMin: 1, bedMax: 1, bathMin: 1 },
+  { label: "2B1B", bedMin: 2, bedMax: 2, bathMin: 1 },
+  { label: "2B2B", bedMin: 2, bedMax: 2, bathMin: 2 },
+  { label: "3B1B", bedMin: 3, bedMax: 3, bathMin: 1 },
+  { label: "3B2B", bedMin: 3, bedMax: 3, bathMin: 2 },
+  { label: "Studio–1B", bedMin: 0, bedMax: 1, bathMin: 0 },
+  { label: "2B+", bedMin: 2, bedMax: null, bathMin: 0 },
+];
 
 export interface SavedSearch {
   id: number;

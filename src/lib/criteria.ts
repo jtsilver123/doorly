@@ -11,6 +11,7 @@ export const DEFAULT_CRITERIA: SearchCriteria = {
   areas: ["west-village", "east-village", "chelsea", "flatiron"],
   bedMin: 0,
   bedMax: 1,
+  bathMin: 0,
   priceMin: 2000,
   priceMax: 4000,
   sources: ["streeteasy", "zillow", "apartments", "hotpads", "craigslist"],
@@ -27,7 +28,8 @@ export function searchKey(c: SearchCriteria): string {
   const sources = [...c.sources].sort().join("+");
   const max = c.bedMax == null ? "" : c.bedMax;
   const fee = c.noFeeOnly ? "|nofee" : "";
-  return `${areas}|beds:${c.bedMin}-${max}|price:${c.priceMin}-${c.priceMax}|src:${sources}${fee}`;
+  const baths = c.bathMin > 0 ? `|baths:${c.bathMin}` : "";
+  return `${areas}|beds:${c.bedMin}-${max}${baths}|price:${c.priceMin}-${c.priceMax}|src:${sources}${fee}`;
 }
 
 export function criteriaSummary(c: SearchCriteria, areaLabels: string[]): string {
@@ -39,9 +41,12 @@ export function criteriaSummary(c: SearchCriteria, areaLabels: string[]): string
           ? "Studio"
           : `${c.bedMin}BR`
         : `${c.bedMin}–${c.bedMax}BR`;
+  const baths = c.bathMin > 0 ? `${c.bathMin}+ bath` : "";
   const price = `$${c.priceMin.toLocaleString()}–$${c.priceMax.toLocaleString()}`;
   const where = areaLabels.length ? areaLabels.join(", ") : "NYC";
-  return [beds, price, where, c.noFeeOnly ? "no fee" : ""].filter(Boolean).join(" · ");
+  return [beds, baths, price, where, c.noFeeOnly ? "no fee" : ""]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**
@@ -58,6 +63,10 @@ export function inBounds(listing: Listing, c: SearchCriteria): boolean {
   if (listing.price < c.priceMin || listing.price > c.priceMax) return false;
   if (listing.bedrooms < c.bedMin) return false;
   if (c.bedMax != null && listing.bedrooms > c.bedMax) return false;
+  // Baths are a floor, not a range — a 2-bath listing satisfies a 1-bath search.
+  if (c.bathMin > 0 && (!Number.isFinite(listing.bathrooms) || listing.bathrooms < c.bathMin)) {
+    return false;
+  }
   if (c.noFeeOnly && !listing.noFee) return false;
 
   const hoods = neighborhoodFilter(c.areas);
@@ -82,6 +91,8 @@ export function normalizeCriteria(input: Partial<SearchCriteria>): SearchCriteri
   const bedMin = clamp(Math.floor(merged.bedMin ?? 0), 0, 8);
   const bedMax =
     merged.bedMax == null ? null : clamp(Math.floor(merged.bedMax), bedMin, 8);
+  // Halves are meaningful here (1.5 baths is a real listing category).
+  const bathMin = clamp(Math.round((merged.bathMin ?? 0) * 2) / 2, 0, 6);
   const priceMin = clamp(Math.floor(merged.priceMin ?? 0), 0, 100_000);
   const priceMax = clamp(Math.floor(merged.priceMax ?? 0), priceMin || 1, 100_000);
   const areas = (merged.areas ?? []).filter(Boolean);
@@ -91,6 +102,7 @@ export function normalizeCriteria(input: Partial<SearchCriteria>): SearchCriteri
     areas: areas.length ? areas : DEFAULT_CRITERIA.areas,
     bedMin,
     bedMax,
+    bathMin,
     priceMin,
     priceMax,
     sources: sources.length ? sources : DEFAULT_CRITERIA.sources,

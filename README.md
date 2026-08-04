@@ -124,6 +124,36 @@ means never seeing it.
 `npm run geocheck` re-scores the centroids against whatever is in your database;
 `npm run fitgeo` re-derives them and prints replacements.
 
+## Searches
+
+Bed *and* bath, because "2B1B" and "2B2B" are different apartments and
+different searches. Bathrooms are a floor everywhere — a 2-bath listing shows
+up in a 1-bath search, which is how every source models it and how people
+actually think. Layout presets (Studio, 1B1B, 2B1B, 2B2B, 3B2B, 2B+) sit above
+the exact controls for the common cases.
+
+Neighborhoods are chosen per account across all five boroughs — nothing is
+hardcoded — and can be changed later under **My details → What you're looking
+for**.
+
+## How often it checks
+
+A cron schedule is fixed at deploy time; how often *you* want checking isn't.
+So `vercel.json` ticks hourly and the app decides whether to act, which means
+the setting takes effect immediately with no redeploy:
+
+| Setting | Requests/day | A 250-request key lasts |
+|---|---|---|
+| Only when I press the button | 0 | indefinitely |
+| Once a day | ~5 | ~50 days |
+| Twice a day *(default)* | ~10 | ~25 days |
+| Every 6 hours | ~20 | ~12 days |
+| Every 3 hours | ~40 | ~6 days |
+
+If the last-run time can't be read, the tick does nothing rather than assuming
+a check is due — guessing wrong in that direction spends a month's budget in
+under two days.
+
 ## The request budget
 
 The RealtyAPI free tier is **250 requests a month**, which is a real design

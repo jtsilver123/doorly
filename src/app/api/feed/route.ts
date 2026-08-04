@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     priceMax: num(params.get("priceMax")),
     bedsMin: num(params.get("bedsMin")),
     bedsMax: num(params.get("bedsMax")),
+    bathsMin: num(params.get("bathsMin")),
     noFeeOnly: params.get("noFee") === "1",
     changedOnly: params.get("changed") === "1",
     followUpOnly: params.get("followUp") === "1",

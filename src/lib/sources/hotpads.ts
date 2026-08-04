@@ -120,6 +120,8 @@ export async function fetchHotPads(c: SearchCriteria): Promise<Listing[]> {
   const PAGES = config.pagesPerSource;
   const byId = new Map<string, Listing>();
   const bedsRange = `${c.bedMin}-${c.bedMax ?? 8}`;
+  // Open-ended upper bound: baths are a floor, so never cap what qualifies.
+  const bathsRange = c.bathMin > 0 ? `${c.bathMin}-8` : "";
 
   for (const area of queryScopes(c.areas, config.wideQueries)) {
     const pages = await Promise.allSettled(
@@ -128,6 +130,7 @@ export async function fetchHotPads(c: SearchCriteria): Promise<Listing[]> {
           location: area.hotpads,
           priceRange: `${c.priceMin}-${c.priceMax}`,
           bedsRange,
+          bathsRange,
           resultCount: 100,
           page: i + 1,
           sortOrder: "Newest",

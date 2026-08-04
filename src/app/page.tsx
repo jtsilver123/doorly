@@ -17,6 +17,7 @@ import {
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
 import ApplicationPacket from "@/components/ApplicationPacket";
+import SearchEditor from "@/components/SearchEditor";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
 import { signOut } from "@/app/auth/actions";
@@ -44,9 +45,20 @@ interface ApiStatus {
   keyHint: string;
   monthlyLimit: number;
   pagesPerSource: number;
+  checksPerDay: number;
+  lastCheckedAt: string | null;
 }
 
 const money = (n: number) => `$${n.toLocaleString()}`;
+
+function sinceText(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 2) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
 
 export default function Home() {
   // Today is the default: the hunt is a four-week sprint, and the first
@@ -70,6 +82,7 @@ export default function Home() {
   const [sort, setSort] = useState("best");
   const [priceMax, setPriceMax] = useState("");
   const [beds, setBeds] = useState("any");
+  const [baths, setBaths] = useState("any");
   const [source, setSource] = useState("all");
   const [changedOnly, setChangedOnly] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
@@ -87,6 +100,7 @@ export default function Home() {
       params.set("bedsMin", beds);
       params.set("bedsMax", beds);
     }
+    if (baths !== "any") params.set("bathsMin", baths);
     if (source !== "all") params.set("source", source);
     if (changedOnly) params.set("changed", "1");
     if (starredOnly) params.set("starred", "1");
@@ -105,6 +119,7 @@ export default function Home() {
     sort,
     priceMax,
     beds,
+    baths,
     source,
     changedOnly,
     starredOnly,
@@ -337,7 +352,7 @@ export default function Home() {
     node?.scrollIntoView({ block: "nearest" });
   }, [focus]);
 
-  useEffect(() => setFocus(0), [query, sort, priceMax, beds, source]);
+  useEffect(() => setFocus(0), [query, sort, priceMax, beds, baths, source]);
 
   const counts = useMemo(
     () => ({
@@ -450,6 +465,17 @@ export default function Home() {
                 <option value="0">Studio</option>
                 <option value="1">1 bed</option>
                 <option value="2">2 bed</option>
+                <option value="3">3 bed</option>
+              </select>
+              <select
+                className="field"
+                value={baths}
+                onChange={(e) => setBaths(e.target.value)}
+              >
+                <option value="any">Any bath</option>
+                <option value="1">1+ bath</option>
+                <option value="1.5">1.5+</option>
+                <option value="2">2+ bath</option>
               </select>
             </div>
             <select className="field" value={source} onChange={(e) => setSource(e.target.value)}>
@@ -531,6 +557,14 @@ export default function Home() {
           <button className="btn btn-primary" onClick={refresh} disabled={refreshing}>
             {refreshing ? "Checking…" : "Check for new"}
           </button>
+          {api?.lastCheckedAt && (
+            <div className="muted" style={{ fontSize: 10, textAlign: "center" }}>
+              Last checked {sinceText(api.lastCheckedAt)}
+              {api.checksPerDay > 0
+                ? ` · auto ${api.checksPerDay}×/day`
+                : " · auto off"}
+            </div>
+          )}
   
         </div>
       </nav>
@@ -738,6 +772,7 @@ export default function Home() {
 
         {!loading && tab === "profile" && (
           <div style={{ display: "grid", gap: 16 }}>
+            <SearchEditor onSaved={loadFeed} />
             <ProfileForm profile={profile} onSave={saveProfile} />
             <ApplicationPacket profile={profile} onSave={saveProfile} />
             <ApiSettings status={api} onSaved={loadApi} />
@@ -893,6 +928,7 @@ function ApiSettings({
   const [key, setKey] = useState("");
   const [pages, setPages] = useState(String(status?.pagesPerSource ?? 1));
   const [limit, setLimit] = useState(String(status?.monthlyLimit ?? 250));
+  const [checks, setChecks] = useState(String(status?.checksPerDay ?? 2));
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
 
@@ -900,6 +936,7 @@ function ApiSettings({
     if (!status) return;
     setPages(String(status.pagesPerSource));
     setLimit(String(status.monthlyLimit));
+    setChecks(String(status.checksPerDay));
   }, [status]);
 
   // 4 areas x pages for Zillow and HotPads, plus 2 bed values for StreetEasy.
@@ -915,6 +952,7 @@ function ApiSettings({
         realtyApiKey: key || undefined,
         pagesPerSource: Number(pages),
         monthlyLimit: Number(limit),
+        checksPerDay: Number(checks),
       }),
     });
     setKey("");
@@ -955,6 +993,26 @@ function ApiSettings({
           </div>
         </div>
       )}
+
+      <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+        <span className="muted">Check for new listings</span>
+        <select className="field" value={checks} onChange={(e) => setChecks(e.target.value)}>
+          <option value="0">Only when I press the button</option>
+          <option value="1">Once a day</option>
+          <option value="2">Twice a day (morning and evening)</option>
+          <option value="4">Every 6 hours</option>
+          <option value="8">Every 3 hours</option>
+        </select>
+        <span className="muted" style={{ fontSize: 11 }}>
+          {Number(checks) === 0
+            ? "Nothing runs on its own — the feed only changes when you refresh it."
+            : `About ${Number(checks) * perPoll} requests a day, so this key lasts ` +
+              `roughly ${Math.max(1, Math.floor((status?.usage.remaining ?? 0) / Math.max(Number(checks) * perPoll, 1)))} more days.`}
+          {status?.lastCheckedAt
+            ? ` Last checked ${new Date(status.lastCheckedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
+            : " Never checked yet."}
+        </span>
+      </label>
 
       <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
         <span className="muted">New API key</span>

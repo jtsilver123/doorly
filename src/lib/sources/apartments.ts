@@ -180,6 +180,7 @@ export async function fetchApartments(
           location: area.hotpads, // "West Village, New York, NY" — same city form
           priceRange: `${c.priceMin}-${c.priceMax}`,
           bedRange: `${c.bedMin}-${c.bedMax ?? 4}`,
+          bathRange: c.bathMin > 0 ? `${c.bathMin}-8` : undefined,
           resultCount: 100,
           page: i + 1,
           sortOrder: "Newest",

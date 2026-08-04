@@ -11,6 +11,18 @@ import { getArea, boroughFor } from "@/lib/areas";
 
 const PHOTO_BASE = "https://photos.zillowstatic.com/fp";
 
+/**
+ * StreetEasy expresses baths as a floor with its own spelling of the halves.
+ * Anything above 3 collapses to "3_plus", which is the top of its scale.
+ */
+function bathParam(bathMin: number): string {
+  if (bathMin <= 0) return "any";
+  if (bathMin <= 1) return "1_plus";
+  if (bathMin <= 1.5) return "1point5_plus";
+  if (bathMin <= 2) return "2_plus";
+  return "3_plus";
+}
+
 /** realtyapi's `beds` param maxes out at 4, which means "4 or more". */
 function bedValues(c: SearchCriteria): string[] {
   const CAP = 4;
@@ -103,6 +115,7 @@ export async function fetchStreetEasy(c: SearchCriteria): Promise<Listing[]> {
         beds: r.beds,
         page: r.page,
         priceRange: `${c.priceMin}-${c.priceMax}`,
+        baths: bathParam(c.bathMin),
         sort_by: "Newest",
       })
     )

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AREAS } from "@/lib/areas";
+import { LAYOUT_PRESETS } from "@/types";
 
 /**
  * Setup, in one screen.
@@ -23,6 +24,7 @@ export default function Welcome() {
   const [priceMax, setPriceMax] = useState("4000");
   const [bedMin, setBedMin] = useState("0");
   const [bedMax, setBedMax] = useState("1");
+  const [bathMin, setBathMin] = useState("0");
   const [moveIn, setMoveIn] = useState(defaultMoveIn());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -71,6 +73,7 @@ export default function Welcome() {
           areas,
           bedMin: Number(bedMin),
           bedMax: bedMax === "any" ? null : Number(bedMax),
+          bathMin: Number(bathMin),
           priceMin: 0,
           priceMax: Number(priceMax) || 4000,
           sources: ["streeteasy", "zillow", "apartments", "hotpads", "craigslist"],
@@ -147,6 +150,37 @@ export default function Welcome() {
           </div>
         </div>
 
+        <div className="welcome-field">
+          <span className="muted">What layout?</span>
+          <div className="welcome-chips">
+            {LAYOUT_PRESETS.map((preset) => {
+              const active =
+                Number(bedMin) === preset.bedMin &&
+                (preset.bedMax === null ? bedMax === "any" : Number(bedMax) === preset.bedMax) &&
+                Number(bathMin) === preset.bathMin;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className={active ? "btn btn-primary" : "btn"}
+                  style={{ fontSize: 12, padding: "5px 10px" }}
+                  onClick={() => {
+                    setBedMin(String(preset.bedMin));
+                    setBedMax(preset.bedMax === null ? "any" : String(preset.bedMax));
+                    setBathMin(String(preset.bathMin));
+                  }}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="muted welcome-hint">
+            Or set it exactly below. Bathrooms are a minimum — a 2-bath place
+            still shows up in a 1-bath search.
+          </span>
+        </div>
+
         <div className="welcome-row">
           <label className="welcome-field">
             <span className="muted">Max rent</span>
@@ -174,6 +208,16 @@ export default function Welcome() {
               <option value="2">2 bed</option>
               <option value="3">3 bed</option>
               <option value="any">No limit</option>
+            </select>
+          </label>
+          <label className="welcome-field">
+            <span className="muted">Baths</span>
+            <select className="field" value={bathMin} onChange={(e) => setBathMin(e.target.value)}>
+              <option value="0">Any</option>
+              <option value="1">1+</option>
+              <option value="1.5">1.5+</option>
+              <option value="2">2+</option>
+              <option value="3">3+</option>
             </select>
           </label>
         </div>

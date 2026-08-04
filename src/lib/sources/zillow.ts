@@ -68,6 +68,16 @@ interface ZillowResponse {
 
 const BED_ENUM = ["No_Min", "Studio", "1", "2", "3", "4", "5"];
 
+/** Zillow's own spelling of the same "N or more" idea. */
+function bathParam(bathMin: number): string {
+  if (bathMin <= 0) return "Any";
+  if (bathMin <= 1) return "OnePlus";
+  if (bathMin <= 1.5) return "OneHalfPlus";
+  if (bathMin <= 2) return "TwoPlus";
+  if (bathMin <= 3) return "ThreePlus";
+  return "FourPlus";
+}
+
 function bedMinParam(bedMin: number): string {
   if (bedMin <= 0) return "No_Min";
   return BED_ENUM[Math.min(bedMin + 1, BED_ENUM.length - 1)] ?? "No_Min";
@@ -191,6 +201,7 @@ export async function fetchZillow(c: SearchCriteria): Promise<Listing[]> {
           location: area.zillow,
           listingStatus: "For_Rent",
           bed_min: bedMinParam(c.bedMin),
+          bathrooms: bathParam(c.bathMin),
           listPriceRange: `${c.priceMin}-${c.priceMax}`,
           sortOrder: "Newest",
           page: i + 1,

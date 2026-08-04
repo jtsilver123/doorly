@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { fingerprint, streetKey, extractUnit, matchConfidence, hasStreetNumber } from "@/lib/dedupe";
 import { toNum, toPrice } from "@/lib/parse";
 import { craigslistId, parseCraigslistHtml } from "@/lib/sources/craigslist";
-import { inBounds, searchKey, DEFAULT_CRITERIA } from "@/lib/criteria";
+import { inBounds, searchKey, normalizeCriteria, DEFAULT_CRITERIA } from "@/lib/criteria";
 import { train, score, features } from "@/lib/rank";
 import {
   bestChannel,
@@ -23,6 +24,7 @@ import {
 import { neighborhoodAt, withinAreas } from "@/lib/geo";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
+import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
 function listing(over: Partial<Listing> = {}): Listing {
@@ -679,4 +681,59 @@ test("a Craigslist title never poses as an address for deduping", () => {
   assert.ok(fingerprint(a).startsWith("id:"));
   assert.ok(fingerprint(b).startsWith("id:"));
   assert.notEqual(fingerprint(a), fingerprint(b));
+});
+
+// --- bed and bath combinations ---------------------------------------------
+
+test("bathrooms are a floor, not an exact match", () => {
+  const twoByTwo = { ...DEFAULT_CRITERIA, areas: [], bedMin: 2, bedMax: 2, bathMin: 2,
+    priceMin: 0, priceMax: 9000 };
+
+  // Exactly 2B2B qualifies.
+  assert.ok(inBounds(listing({ bedrooms: 2, bathrooms: 2 }), twoByTwo));
+  // So does a 2-bed with more bathrooms — nobody searching 2B2B rejects 2B3B.
+  assert.ok(inBounds(listing({ bedrooms: 2, bathrooms: 3 }), twoByTwo));
+  // A 2B1B does not.
+  assert.ok(!inBounds(listing({ bedrooms: 2, bathrooms: 1 }), twoByTwo));
+});
+
+test("2B1B and 2B2B are different searches", () => {
+  const oneBath = { ...DEFAULT_CRITERIA, bedMin: 2, bedMax: 2, bathMin: 1 };
+  const twoBath = { ...DEFAULT_CRITERIA, bedMin: 2, bedMax: 2, bathMin: 2 };
+  // They must not collapse to one scrape, which is what the key controls.
+  assert.notEqual(searchKey(oneBath), searchKey(twoBath));
+  assert.match(searchKey(twoBath), /baths:2/);
+  // No bath requirement leaves the key clean rather than encoding a zero.
+  assert.ok(!searchKey({ ...DEFAULT_CRITERIA, bathMin: 0 }).includes("baths:"));
+});
+
+test("half baths survive normalization", () => {
+  assert.equal(normalizeCriteria({ bathMin: 1.5 }).bathMin, 1.5);
+  assert.equal(normalizeCriteria({ bathMin: 1.4 }).bathMin, 1.5);
+  assert.equal(normalizeCriteria({ bathMin: -3 }).bathMin, 0);
+  assert.equal(normalizeCriteria({}).bathMin, 0);
+});
+
+test("a listing with no bath count fails an explicit bath requirement", () => {
+  const needsTwo = { ...DEFAULT_CRITERIA, areas: [], bedMin: 0, bedMax: 4, bathMin: 2,
+    priceMin: 0, priceMax: 9000 };
+  assert.ok(!inBounds(listing({ bathrooms: Number.NaN }), needsTwo));
+  // But with no requirement, unknown bath counts are fine.
+  assert.ok(inBounds(listing({ bathrooms: Number.NaN }), { ...needsTwo, bathMin: 0 }));
+});
+
+test("every layout preset is a coherent search", () => {
+  for (const preset of LAYOUT_PRESETS) {
+    const c = normalizeCriteria(preset);
+    assert.ok(c.bedMin >= 0, preset.label);
+    if (c.bedMax != null) assert.ok(c.bedMax >= c.bedMin, `${preset.label} bed range`);
+    assert.ok(c.bathMin >= 0, `${preset.label} baths`);
+  }
+});
+
+test("an unreadable poll history must not mean 'poll now'", () => {
+  // Guarding a documented invariant: with ~5 requests a poll and 250 a month,
+  // defaulting to "due" on an error would spend the budget in under two days.
+  const source = readFileSync("src/lib/apikey.ts", "utf8");
+  assert.match(source, /if \(!read\) return \{ due: false/);
 });

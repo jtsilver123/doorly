@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ingest } from "@/lib/ingest";
 import { loadAllActiveSearches } from "@/lib/feed";
+import { nextCheckDue } from "@/lib/apikey";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -16,6 +17,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
+    // The cron ticks hourly; the user's setting decides whether to act on it.
+    const { due, lastAt, intervalHours } = await nextCheckDue();
+    if (!due) {
+      return NextResponse.json({
+        skipped: true,
+        message: intervalHours
+          ? `next check due ${intervalHours}h after ${lastAt ?? "never"}`
+          : "automatic checks are off",
+      });
+    }
+
     // No session here, so gather every account's searches with the service role.
     const searches = await loadAllActiveSearches();
     if (!searches.length) {

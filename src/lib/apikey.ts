@@ -1,4 +1,4 @@
-import { db, currentUserId } from "@/lib/supabase";
+import { db, adminDb, currentUserId } from "@/lib/supabase";
 
 /**
  * API key handling and the monthly request budget.
@@ -25,6 +25,15 @@ export interface AppConfig {
    * coordinates. Roughly a third of the requests for the same coverage.
    */
   wideQueries: boolean;
+  /**
+   * How often to check automatically, per day. 0 means manual only.
+   *
+   * The schedule can't live in vercel.json because that's fixed at deploy time
+   * and this is a per-person preference. Instead the cron ticks hourly and the
+   * route decides whether enough time has passed — so changing this takes
+   * effect immediately, with no redeploy.
+   */
+  checksPerDay: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -32,6 +41,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   monthlyLimit: DEFAULT_MONTHLY_LIMIT,
   pagesPerSource: 1,
   wideQueries: true,
+  checksPerDay: 2,
 };
 
 let cache: { value: AppConfig; at: number } | null = null;
@@ -114,6 +124,60 @@ export async function getUsage(): Promise<Usage> {
     keyHint: hint,
     since: monthStart(),
   };
+}
+
+/**
+ * Is another automatic check due?
+ *
+ * Guards the request budget as much as the schedule: at ~5 requests a poll and
+ * 250 a month, hourly checking would exhaust a free key in under two days.
+ */
+export async function nextCheckDue(): Promise<{
+  due: boolean;
+  lastAt: string | null;
+  intervalHours: number;
+}> {
+  const config = await loadConfig();
+  if (config.checksPerDay <= 0) {
+    return { due: false, lastAt: null, intervalHours: 0 };
+  }
+  const intervalHours = 24 / config.checksPerDay;
+
+  // Called from two places with different auth: the cron route (no session, so
+  // it needs the service role) and the settings route (session, no service key
+  // required). Try both rather than assuming either.
+  let lastAt: string | null = null;
+  let read = false;
+  for (const getClient of [
+    () => adminDb(),
+    async () => await db(),
+  ]) {
+    try {
+      const client = await getClient();
+      const { data, error } = await client
+        .from("poll_runs")
+        .select("started_at")
+        .eq("ok", true)
+        .order("started_at", { ascending: false })
+        .limit(1);
+      if (error) continue;
+      lastAt = (data?.[0]?.started_at as string) ?? null;
+      read = true;
+      break;
+    } catch {
+      // try the next one
+    }
+  }
+
+  // If the last run can't be read, do nothing. Guessing "due" would make every
+  // hourly tick poll and spend a month's request budget in under two days;
+  // guessing "not due" only delays a check until the next tick.
+  if (!read) return { due: false, lastAt: null, intervalHours };
+
+  if (!lastAt) return { due: true, lastAt: null, intervalHours };
+  const elapsedHours = (Date.now() - new Date(lastAt).getTime()) / 3_600_000;
+  // Small tolerance so an hourly tick isn't skipped by a few seconds of drift.
+  return { due: elapsedHours >= intervalHours - 0.1, lastAt, intervalHours };
 }
 
 /** Fire-and-forget: metering must never be able to fail a real request. */
