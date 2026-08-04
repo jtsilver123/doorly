@@ -984,6 +984,7 @@ a.chip:hover {
 }
 
 .account button {
+  white-space: nowrap;
   border: none;
   background: none;
   color: var(--text-muted);

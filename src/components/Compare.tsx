@@ -33,7 +33,7 @@ const ROWS: Row[] = [
     label: "Effective rent",
     value: (l) =>
       l.effectiveRent < l.price ? `${money(l.effectiveRent)}/mo` : "—",
-    num: (l) => l.effectiveRent,
+    num: (l) => (l.effectiveRent < l.price ? l.effectiveRent : null),
   },
   { label: "Cash to move in", value: (l) => money(l.upfrontCost), num: (l) => l.upfrontCost },
   { label: "All-in monthly", value: (l) => money(l.allInMonthly), num: (l) => l.allInMonthly },
@@ -110,6 +110,7 @@ export default function Compare({
     const pick = values.reduce((a, b) =>
       row.invert ? (b.v > a.v ? b : a) : (b.v < a.v ? b : a)
     );
+    if (values.every((x) => x.v === pick.v)) return null;
     return pick.i;
   }
 

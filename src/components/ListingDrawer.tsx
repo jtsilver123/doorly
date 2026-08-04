@@ -16,6 +16,7 @@ import {
   STAGE_LABEL,
 } from "@/types";
 import {
+  bestChannel,
   draftTourMessage,
   mailtoLink,
   smsLink,
@@ -130,15 +131,17 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
     onChanged();
   }
 
+  const reach = bestChannel(listing);
+
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
-   * then hand off to Messages or Mail. The CRM writes happen *first* on purpose
-   * — an sms:/mailto: handoff can unload the page before a later fetch lands.
+   * then hand off. The CRM writes happen *first* on purpose — an sms:/mailto:
+   * handoff can unload the page before a later fetch lands.
    */
-  async function reachOut(channel: "text" | "email") {
+  async function reachOut(channel: "text" | "email" | "portal") {
     await patch({
       action: "contact",
-      channel,
+      channel: channel === "portal" ? "portal" : channel,
       direction: "out",
       who: listing.contactName,
       note: "Tour request",
@@ -146,10 +149,23 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
     if (listing.stage === "inbox" || listing.stage === "interested") {
       await patch({ action: "stage", stage: "contacted" });
     }
-    window.location.href =
-      channel === "text"
-        ? smsLink(listing.contactPhone, message)
-        : mailtoLink("", tourSubject(listing), message);
+    if (channel === "text") {
+      window.location.href = smsLink(listing.contactPhone, message);
+    } else if (channel === "email") {
+      window.location.href = mailtoLink(
+        listing.contactEmail,
+        tourSubject(listing),
+        message
+      );
+    } else {
+      // No published contact: draft to clipboard, then the listing's own form.
+      try {
+        await navigator.clipboard.writeText(message);
+      } catch {
+        /* the Copy button still works */
+      }
+      if (listing.url) window.open(listing.url, "_blank", "noopener");
+    }
   }
 
   async function copyMessage() {
@@ -200,28 +216,31 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
               <button
                 className="btn btn-primary"
                 style={{ flex: 1 }}
-                onClick={() => reachOut("text")}
+                onClick={() =>
+                  reachOut(reach.channel === "text" || reach.channel === "email" ? reach.channel : "portal")
+                }
+                title={reach.hint}
               >
-                Text for tour
+                {reach.label}
               </button>
-              <button className="btn" onClick={() => reachOut("email")}>
-                Email
-              </button>
+              {reach.channel !== "email" && (
+                <button
+                  className="btn"
+                  onClick={() => reachOut("email")}
+                  title="Same message, in an email draft"
+                >
+                  Email
+                </button>
+              )}
               <button className="btn" onClick={copyMessage}>
                 {copied ? "Copied" : "Copy"}
               </button>
             </div>
-            {listing.contactPhone ? (
-              <div className="muted" style={{ fontSize: 12 }}>
-                Sends to {listing.contactPhone}
-                {listing.contactName ? ` · ${listing.contactName}` : ""}
-              </div>
-            ) : (
-              <div className="muted" style={{ fontSize: 12 }}>
-                No phone published for this listing — the draft opens Messages empty so
-                you can pick a contact, and “Copy text” puts it on the clipboard.
-              </div>
-            )}
+            <div className="muted" style={{ fontSize: 12 }}>
+              {listing.contactPhone
+                ? `Texts ${listing.contactPhone}${listing.contactName ? ` · ${listing.contactName}` : ""}. Sending logs it and moves this to Contacted.`
+                : "No phone or email published — the button copies the message and opens the listing, where their contact form lives. Either way it's logged and moved to Contacted."}
+            </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {listing.contactPhone && (
                 <a

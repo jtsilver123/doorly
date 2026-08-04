@@ -1010,8 +1010,8 @@ function ApiSettings({
       <div>
         <div style={{ fontWeight: 600 }}>API key & usage</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          StreetEasy, Zillow and HotPads all run on one RealtyAPI key. Craigslist
-          needs none, so it keeps working when the quota is gone.
+          StreetEasy, Zillow, Apartments.com and HotPads all run on one RealtyAPI
+          key. Craigslist needs none, so it keeps working when the quota is gone.
         </div>
       </div>
 
