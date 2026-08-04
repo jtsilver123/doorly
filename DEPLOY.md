@@ -1,5 +1,8 @@
 # Deploying Homefinder
 
+**Live:** https://homefinder-red.vercel.app — production tracks the
+`claude/homefinder-nyc-tracker-pst66m` branch, so every push there deploys.
+
 **GitHub Pages will not work.** It serves static files only, and this app needs
 a server: the RealtyAPI key and the Supabase service-role key must stay
 server-side, and scraping runs in a scheduled route. Vercel is the natural home
@@ -56,6 +59,19 @@ paid plan — edit the `schedule` in `vercel.json`:
 
 The sidebar shows usage against the limit, and polls fail with "out of credits"
 rather than silently reporting no new listings.
+
+## Redeploying
+
+There is no "redeploy" button for a project that has never built — Vercel needs
+a push to the production branch. Any commit does it; an empty one is enough:
+
+```bash
+git commit --allow-empty -m "trigger deploy" && git push
+```
+
+This matters more than it sounds: `NEXT_PUBLIC_*` variables are inlined at
+**build** time, not read at runtime. Adding them in the dashboard after a build
+has no effect until something triggers a new one.
 
 ## 4. First run
 
