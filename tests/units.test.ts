@@ -21,6 +21,7 @@ import {
   DEFAULT_COSTS,
 } from "@/lib/cost";
 import { neighborhoodAt, withinAreas } from "@/lib/geo";
+import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import type { Listing, FeedListing } from "@/types";
 
 function listing(over: Partial<Listing> = {}): Listing {
@@ -503,4 +504,75 @@ test("without coordinates it still falls back to matching text", () => {
   assert.ok(inBounds(cl, criteria));
   const elsewhere = listing({ source: "craigslist", neighborhood: "Astoria", address: "x", lat: null, lon: null });
   assert.ok(!inBounds(elsewhere, criteria));
+});
+
+// --- the New York clock ----------------------------------------------------
+
+test("the phase tracks how the NYC listing cycle actually works", () => {
+  // Six weeks out, the units listed are for earlier move-ins.
+  assert.equal(phaseFor(50).phase, "early");
+  // Four weeks out, your inventory is landing — this is the widest choice.
+  assert.equal(phaseFor(28).phase, "prime");
+  assert.equal(phaseFor(25).phase, "prime");
+  // Two weeks out, the good ones from this batch are going.
+  assert.equal(phaseFor(14).phase, "decide");
+  assert.equal(phaseFor(8).phase, "crunch");
+  assert.equal(phaseFor(2).phase, "final");
+  assert.equal(phaseFor(-1).phase, "past");
+});
+
+test("progress runs left to right and every phase has advice", () => {
+  const early = phaseFor(45);
+  const late = phaseFor(2);
+  assert.ok(early.progress < late.progress);
+  assert.ok(early.progress >= 0 && late.progress <= 1);
+  for (const days of [50, 28, 14, 8, 2]) {
+    assert.ok(phaseFor(days).advice.length > 20, `no advice at ${days} days`);
+  }
+});
+
+test("phase bands span the whole bar exactly once", () => {
+  const total = phaseBands().reduce((sum, b) => sum + b.width, 0);
+  assert.ok(Math.abs(total - 1) < 1e-9, `bands sum to ${total}`);
+});
+
+test("the funnel says how much outreach a lease actually takes", () => {
+  const none = funnelFor([], 28);
+  // Default rates compound to roughly one lease per 25-ish contacts.
+  assert.ok(none.targetContacts >= 15 && none.targetContacts <= 60, `${none.targetContacts}`);
+  // Nothing sent four weeks out is behind, and the app should say so.
+  assert.equal(none.onPace, false);
+  assert.ok(none.expectedByNow > 0);
+});
+
+test("your own reply rate replaces the assumption once there's data", () => {
+  // 12 contacted, all still sitting at "contacted" — nobody replied.
+  const contacted = Array.from({ length: 12 }, (_, i) =>
+    feed({ id: `l${i}`, stage: "contacted", contactCount: 1, lastContactChannel: "email" })
+  );
+  const f = funnelFor(contacted, 20);
+  assert.equal(f.usingOwnRates, true);
+  assert.equal(f.contacted, 12);
+  // A dismal reply rate means many more contacts are needed than the default.
+  assert.ok(f.targetContacts > funnelFor([], 20).targetContacts);
+});
+
+test("today's actions lead with what's rotting", () => {
+  const listings = [
+    feed({ id: "a", needsFollowUp: true, stage: "contacted" }),
+    feed({ id: "b", stage: "tour" }),
+    feed({ id: "c", stage: "inbox", daysOnMarket: 1 }),
+  ];
+  const info = phaseFor(28);
+  const actions = todaysActions(listings, funnelFor(listings, 28), info);
+  // Silent leads first: they expire, and one nudge usually revives them.
+  assert.equal(actions[0].key, "followUp");
+  assert.ok(actions.some((a) => a.key === "tour"));
+  assert.ok(actions.some((a) => a.key === "new"));
+});
+
+test("scouting week doesn't nag about pace", () => {
+  // Six weeks out there is nothing worth contacting yet, so no pace warning.
+  const actions = todaysActions([], funnelFor([], 50), phaseFor(50));
+  assert.ok(!actions.some((a) => a.key === "pace"));
 });

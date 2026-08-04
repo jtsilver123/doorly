@@ -18,10 +18,12 @@ import {
 import { daysUntil } from "@/lib/cost";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import Toasts, { useToasts } from "@/components/Toasts";
+import Timeline from "@/components/Timeline";
+import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 
-type Tab = "feed" | "changes" | "pipeline" | "profile";
+type Tab = "today" | "feed" | "changes" | "pipeline" | "profile";
 
 interface Change {
   id: number;
@@ -46,7 +48,9 @@ interface ApiStatus {
 const money = (n: number) => `$${n.toLocaleString()}`;
 
 export default function Home() {
-  const [tab, setTab] = useState<Tab>("feed");
+  // Today is the default: the hunt is a four-week sprint, and the first
+  // question each morning is what to do, not what exists.
+  const [tab, setTab] = useState<Tab>("today");
   const [listings, setListings] = useState<FeedListing[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
@@ -342,6 +346,15 @@ export default function Home() {
   );
 
   const daysToMove = daysUntil(profile.moveInDate);
+  const phase = useMemo(() => phaseFor(daysToMove), [daysToMove]);
+  const funnel = useMemo(
+    () => funnelFor(listings, daysToMove),
+    [listings, daysToMove]
+  );
+  const actions = useMemo(
+    () => todaysActions(listings, funnel, phase),
+    [listings, funnel, phase]
+  );
 
   async function saveProfile(next: Profile) {
     setProfile(next);
@@ -374,6 +387,7 @@ export default function Home() {
         <div style={{ display: "grid", gap: 2 }}>
           {(
             [
+              ["today", "Today", actions.length],
               ["feed", "Listings", counts.active],
               ["changes", "What changed", changes.length],
               ["pipeline", "My pipeline", counts.pipeline],
@@ -524,6 +538,74 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {!loading && tab === "today" && (
+          <div style={{ display: "grid", gap: 16, maxWidth: 860 }}>
+            <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <div className="muted section-label">DO THIS TODAY</div>
+              {actions.length === 0 ? (
+                <div className="surface" style={{ padding: 20 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    Nothing urgent
+                  </div>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    No silent leads, no viewings booked, nothing new since
+                    yesterday. Pull fresh listings or work through the feed.
+                  </div>
+                </div>
+              ) : (
+                actions.map((action) => (
+                  <button
+                    key={action.key}
+                    className={`surface action action-${action.tone}`}
+                    onClick={() => {
+                      if (action.filter === "followUp") {
+                        setFollowUpOnly(true);
+                        setTab("feed");
+                      } else if (action.filter === "new") {
+                        setSort("newest");
+                        setTab("feed");
+                      } else if (action.filter === "tour") {
+                        setTab("pipeline");
+                      } else {
+                        setTab("feed");
+                      }
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{action.title}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {action.detail}
+                      </div>
+                    </div>
+                    <span className="action-arrow">→</span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* The best of what's live, so Today can stand alone. */}
+            {listings.length > 0 && (
+              <div style={{ display: "grid", gap: 10 }}>
+                <div className="muted section-label">BEST MATCHES RIGHT NOW</div>
+                <div className="grid">
+                  {listings.slice(0, 4).map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      onOpen={setOpen}
+                      onStar={star}
+                      onPass={pass}
+                      onReach={reachOut}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

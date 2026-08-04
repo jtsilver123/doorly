@@ -760,3 +760,172 @@ a.chip:hover {
     transform: none;
   }
 }
+
+/* --- hunt timeline ------------------------------------------------------ */
+
+.timeline {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.timeline-phase {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.timeline-funnel {
+  display: flex;
+  gap: 18px;
+}
+
+.timeline-stat {
+  display: grid;
+  gap: 1px;
+  text-align: right;
+}
+
+.timeline-stat strong {
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.timeline-stat span {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* Phase bands, widths proportional to their real length in days. */
+.timeline-bar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 30px;
+}
+
+.timeline-band {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  overflow: hidden;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.timeline-band span {
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Only the phase you're in is coloured — the rest are context, not signal. */
+.timeline-band.is-current.band-early { background: var(--accent-soft); color: var(--accent); }
+.timeline-band.is-current.band-prime { background: var(--good-soft); color: var(--good); }
+.timeline-band.is-current.band-decide { background: var(--accent-soft); color: var(--accent); }
+.timeline-band.is-current.band-crunch { background: var(--warn-soft); color: var(--warn); }
+.timeline-band.is-current.band-final { background: var(--warn-soft); color: var(--warn); }
+
+.timeline-marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transform: translateX(-1px);
+  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.timeline-marker-dot {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text);
+  transform: translateX(-50%);
+}
+
+.timeline-advice {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.timeline-pace {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.timeline-pace.is-behind {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.timeline-pace.is-behind .muted {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* --- today's actions ---------------------------------------------------- */
+
+.action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 13px 15px;
+  text-align: left;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+
+.action-urgent { border-left-color: var(--warn); }
+.action-good   { border-left-color: var(--good); }
+.action-normal { border-left-color: var(--accent); }
+
+.action:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.action-arrow {
+  color: var(--text-muted);
+  transition: transform 0.14s ease;
+}
+
+.action:hover .action-arrow {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-marker,
+  .action,
+  .action-arrow {
+    transition: none;
+  }
+  .action:hover {
+    transform: none;
+  }
+}
