@@ -17,6 +17,7 @@ import {
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
 import ApplicationPacket from "@/components/ApplicationPacket";
+import Toasts, { useToasts } from "@/components/Toasts";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 
@@ -51,11 +52,12 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [status, setStatus] = useState("");
+
   const [open, setOpen] = useState<FeedListing | null>(null);
   const [adding, setAdding] = useState(false);
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [focus, setFocus] = useState(0);
+  const { toasts, push: toast, dismiss } = useToasts();
 
   // filters
   const [query, setQuery] = useState("");
@@ -88,10 +90,11 @@ export default function Home() {
 
     const res = await fetch(`/api/feed?${params}`);
     const body = await res.json();
-    if (body.error) setStatus(body.error);
+    if (body.error) toast({ message: body.error, tone: "warn" });
     setListings(body.listings ?? []);
     setLoading(false);
   }, [
+    toast,
     query,
     sort,
     priceMax,
@@ -132,17 +135,25 @@ export default function Home() {
 
   async function refresh() {
     setRefreshing(true);
-    setStatus("Checking all four sites…");
+
     try {
       const body = await fetch("/api/refresh", { method: "POST" }).then((r) => r.json());
-      setStatus(
-        body.error
-          ? `Refresh failed: ${body.error}`
-          : `${body.newListings} new · ${body.events} changes`
-      );
+      if (body.error) {
+        toast({ message: body.error, tone: "warn" });
+      } else if (body.newListings || body.events) {
+        toast({
+          message: `${body.newListings} new · ${body.events} changes`,
+          tone: "good",
+        });
+      } else {
+        toast({ message: "Nothing new since last check" });
+      }
       await Promise.all([loadFeed(), loadChanges(), loadApi()]);
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Refresh failed");
+      toast({
+        message: err instanceof Error ? err.message : "Refresh failed",
+        tone: "warn",
+      });
     } finally {
       setRefreshing(false);
     }
@@ -158,6 +169,44 @@ export default function Home() {
       if (reload) await loadFeed();
     },
     [loadFeed]
+  );
+
+  /**
+   * Star and pass update the list immediately and reconcile in the background.
+   * Waiting on a round trip for a keystroke is what made triage feel heavy —
+   * at one card per second, a 300ms refetch is most of the interaction.
+   */
+  const star = useCallback(
+    (listing: FeedListing) => {
+      const next = !listing.starred;
+      setListings((list) =>
+        list.map((l) => (l.id === listing.id ? { ...l, starred: next } : l))
+      );
+      patch(listing.id, { action: "star", starred: next }, false).catch(() =>
+        loadFeed()
+      );
+    },
+    [patch, loadFeed]
+  );
+
+  const pass = useCallback(
+    (listing: FeedListing) => {
+      setListings((list) => list.filter((l) => l.id !== listing.id));
+      setFocus((f) => Math.max(0, Math.min(f, listings.length - 2)));
+      patch(listing.id, { action: "feedback", value: "pass" }, false).catch(() =>
+        loadFeed()
+      );
+      toast({
+        message: `Passed on ${listing.address}`,
+        actionLabel: "Undo",
+        onAction: () => {
+          patch(listing.id, { action: "unpass" }, false)
+            .then(loadFeed)
+            .catch(() => loadFeed());
+        },
+      });
+    },
+    [patch, loadFeed, toast, listings.length]
   );
 
   /**
@@ -199,9 +248,12 @@ export default function Home() {
         // listing, where the site's own enquiry form lives.
         try {
           await navigator.clipboard.writeText(message);
-          setStatus("Message copied — paste it into the listing's contact form");
+          toast({
+            message: "Message copied — paste it into their contact form",
+            tone: "good",
+          });
         } catch {
-          setStatus("Opened listing — use “Copy” in the detail panel for the message");
+          toast({ message: "Opened listing — copy the message from the detail panel" });
         }
         const target = orderedSources(listing)[0]?.url ?? listing.url;
         if (target) window.open(target, "_blank", "noopener");
@@ -248,13 +300,13 @@ export default function Home() {
         case "x":
           if (current) {
             e.preventDefault();
-            patch(current.id, { action: "feedback", value: "pass" });
+            pass(current);
           }
           break;
         case "s":
           if (current) {
             e.preventDefault();
-            patch(current.id, { action: "star", starred: !current.starred });
+            star(current);
           }
           break;
         case "o":
@@ -268,7 +320,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, listings, focus, patch, reachOut]);
+  }, [tab, open, listings, focus, pass, star, reachOut]);
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
@@ -298,7 +350,7 @@ export default function Home() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ profile: next }),
     });
-    setStatus("Details saved");
+    toast({ message: "Saved", tone: "good" });
   }
 
   return (
@@ -454,16 +506,26 @@ export default function Home() {
           <button className="btn btn-primary" onClick={refresh} disabled={refreshing}>
             {refreshing ? "Checking…" : "Check for new"}
           </button>
-          {status && (
-            <div className="muted" style={{ fontSize: 11 }}>
-              {status}
-            </div>
-          )}
+  
         </div>
       </nav>
 
       <main className="main">
-        {loading && <div className="muted">Loading…</div>}
+        {loading && (
+          <div className="grid" aria-busy="true" aria-label="Loading listings">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="surface card skeleton-card">
+                <div className="skeleton skeleton-media" />
+                <div className="card-body">
+                  <div className="skeleton skeleton-line" style={{ width: "45%", height: 16 }} />
+                  <div className="skeleton skeleton-line" style={{ width: "80%" }} />
+                  <div className="skeleton skeleton-line" style={{ width: "60%" }} />
+                  <div className="skeleton skeleton-line" style={{ width: "100%", height: 30, marginTop: 6 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {!loading && tab === "feed" && (
           <>
@@ -483,8 +545,8 @@ export default function Home() {
                     listing={listing}
                     focused={i === focus}
                     onOpen={setOpen}
-                    onStar={(l) => patch(l.id, { action: "star", starred: !l.starred })}
-                    onPass={(l) => patch(l.id, { action: "feedback", value: "pass" })}
+                    onStar={star}
+                    onPass={pass}
                     onReach={reachOut}
                   />
                 ))}
@@ -599,13 +661,15 @@ export default function Home() {
         />
       )}
 
+      <Toasts toasts={toasts} onDismiss={dismiss} />
+
       {adding && (
         <AddListing
           onClose={() => setAdding(false)}
           onAdded={async () => {
             setAdding(false);
             await loadFeed();
-            setStatus("Added to your pipeline");
+            toast({ message: "Added to your pipeline", tone: "good" });
           }}
         />
       )}

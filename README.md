@@ -93,6 +93,37 @@ where a strong applicant loses to a faster one. Three things here address it:
 - **Readiness score.** The honest version of "am I ready to apply?" — it lists
   exactly what's still missing.
 
+## Geography
+
+Zillow, HotPads and Apartments.com return coordinates but no neighborhood, so
+results used to be stamped with whichever area was queried — a guess that broke
+whenever a search spilled over a boundary.
+
+Resolving location from coordinates fixes that *and* pays for itself: because
+narrowing now happens locally, one borough-wide request replaces four
+neighborhood ones. **Wide mode costs 5 requests per poll instead of 14** — about
+50 checks a month rather than 17.
+
+Getting there took two attempts, both measured against StreetEasy's own labels:
+
+| Approach | Accuracy |
+|---|---|
+| Bounding boxes, smallest wins | 39% — sub-areas swallow their parents |
+| Nearest centroid (Voronoi), hand-placed | 48% |
+| Nearest centroid, fitted to labelled data | 62% held-out |
+
+62% is not good enough to *label* a listing confidently, and precise labelling
+would need NYC's published NTA boundary polygons. But labelling isn't what the
+optimization needs — it needs one reliable question answered: *is this inside my
+search area?* Measured against the same data, **1.2km around a neighborhood's
+fitted centre captures 100% of its listings** (furthest observed: 1.09km). That
+radius is what `withinAreas` uses, and it's deliberately tuned for recall:
+including a borderline listing costs you one card to skim, excluding a real one
+means never seeing it.
+
+`npm run geocheck` re-scores the centroids against whatever is in your database;
+`npm run fitgeo` re-derives them and prints replacements.
+
 ## The request budget
 
 The RealtyAPI free tier is **250 requests a month**, which is a real design
@@ -119,7 +150,7 @@ The feed is built for triage, so it's drivable without the mouse:
 | `J` / `K` | move between listings |
 | `E` | reach out (text, email or copy-and-open, whichever applies) |
 | `S` | star |
-| `X` | pass — also trains the ranker |
+| `X` | pass — also trains the ranker (undoable from the toast) |
 | `O` | open on the best site |
 | `↵` | open details |
 
@@ -183,11 +214,11 @@ the logic changes.
   street address.
 - **Images can 404.** Listing CDNs expire URLs; cards fall back to a
   placeholder rather than showing a broken image.
-- **Neighborhoods for Zillow/HotPads come from the query, not the listing.**
-  Neither returns a neighborhood field, so results are tagged with the area they
-  were searched under. Both return coordinates, so point-in-polygon tagging
-  would let a single borough-wide query replace four neighborhood queries —
-  cutting request cost further. Not done yet.
+- **Neighborhood labels are approximate for Zillow/HotPads/Apartments.** They
+  publish coordinates but no neighborhood, and nearest-centroid resolution is
+  ~62% accurate against StreetEasy's labels. Area *filtering* is reliable (see
+  [Geography](#geography)); the displayed name can be off near a boundary.
+  Proper NTA polygons would fix it.
 - **Solo mode.** There is no login: `user_id` defaults to a fixed UUID. The
   column and the RLS policies are already multi-user, so adding auth is a policy
   swap rather than a migration — see the comments in `0002_solo_mode.sql`.

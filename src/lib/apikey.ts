@@ -20,12 +20,18 @@ export interface AppConfig {
   monthlyLimit: number;
   /** Pages fetched per source per area. 1 is enough when sorting by newest. */
   pagesPerSource: number;
+  /**
+   * Query one borough instead of each neighborhood, narrowing locally by
+   * coordinates. Roughly a third of the requests for the same coverage.
+   */
+  wideQueries: boolean;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
   realtyApiKey: "",
   monthlyLimit: DEFAULT_MONTHLY_LIMIT,
   pagesPerSource: 1,
+  wideQueries: true,
 };
 
 let cache: { value: AppConfig; at: number } | null = null;

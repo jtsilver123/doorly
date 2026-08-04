@@ -20,6 +20,7 @@ import {
   moveInFit,
   DEFAULT_COSTS,
 } from "@/lib/cost";
+import { neighborhoodAt, withinAreas } from "@/lib/geo";
 import type { Listing, FeedListing } from "@/types";
 
 function listing(over: Partial<Listing> = {}): Listing {
@@ -457,4 +458,49 @@ test("move-in timing flags what can't be ready in time", () => {
   // Free since April and still listed: something is wrong with it.
   assert.equal(moveInFit("2026-04-01", "2026-09-01", now).timing, "stale");
   assert.equal(moveInFit(null, "2026-09-01", now).timing, "unknown");
+});
+
+// --- geography -------------------------------------------------------------
+
+test("coordinates resolve to a neighborhood", () => {
+  // 55 Morton Street, West Village.
+  assert.equal(neighborhoodAt(40.7329, -74.0055), "West Village");
+  // 52 Saint Marks Place, East Village.
+  assert.equal(neighborhoodAt(40.7284, -73.9866), "East Village");
+  // Middle of the Hudson: nothing is close enough to claim it.
+  assert.equal(neighborhoodAt(40.73, -74.05), "");
+  assert.equal(neighborhoodAt(null, null), "");
+});
+
+test("the search radius covers a neighborhood without swallowing the city", () => {
+  const areas = ["west village", "east village", "chelsea", "flatiron"];
+  // A West Village address is in.
+  assert.ok(withinAreas(40.7329, -74.0025, areas));
+  // Measured worst case: the furthest in-area listing sat 1.09km out.
+  assert.ok(withinAreas(40.7329 + 0.0095, -74.0025, areas));
+  // The Upper West Side is not a downtown neighborhood.
+  assert.ok(!withinAreas(40.787, -73.9754, areas));
+  // Neither is Brooklyn.
+  assert.ok(!withinAreas(40.6702, -73.9812, areas));
+});
+
+test("in-bounds uses coordinates when it has them", () => {
+  const criteria = { ...DEFAULT_CRITERIA, priceMin: 0, priceMax: 9000, bedMin: 0, bedMax: 4 };
+
+  // Right place, but its text says nothing useful — coordinates carry it.
+  const geoOnly = listing({ neighborhood: "", address: "no address", lat: 40.7329, lon: -74.0025 });
+  assert.ok(inBounds(geoOnly, criteria));
+
+  // Text claims West Village, coordinates say Upper West Side. Trust the map.
+  const liar = listing({ neighborhood: "West Village", address: "1 West Village Way", lat: 40.787, lon: -73.9754 });
+  assert.ok(!inBounds(liar, criteria));
+});
+
+test("without coordinates it still falls back to matching text", () => {
+  const criteria = { ...DEFAULT_CRITERIA, priceMin: 0, priceMax: 9000, bedMin: 0, bedMax: 4 };
+  // Craigslist rarely has coordinates, so the name has to be enough.
+  const cl = listing({ source: "craigslist", neighborhood: "Chelsea", lat: null, lon: null });
+  assert.ok(inBounds(cl, criteria));
+  const elsewhere = listing({ source: "craigslist", neighborhood: "Astoria", address: "x", lat: null, lon: null });
+  assert.ok(!inBounds(elsewhere, criteria));
 });

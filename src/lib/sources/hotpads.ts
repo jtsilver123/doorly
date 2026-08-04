@@ -1,8 +1,9 @@
 import type { Listing, SearchCriteria } from "@/types";
 import { realtyGet } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
-import { getAreas, boroughFor, canonicalNeighborhood } from "@/lib/areas";
+import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
+import { locate } from "@/lib/geo";
 
 /**
  * HotPads via realtyapi.io.
@@ -66,9 +67,13 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
     const amenities = row.amenities ?? [];
     const amenityBlob = amenities.join(" ");
 
+    const located = locate(row.address?.latitude, row.address?.longitude);
     const neighborhood =
-      canonicalNeighborhood(`${row.name ?? ""} ${street}`) || areaLabel;
-    const borough = boroughFor(`${neighborhood} ${street} ${row.address?.city ?? ""}`);
+      located.neighborhood ||
+      canonicalNeighborhood(`${row.name ?? ""} ${street}`) ||
+      areaLabel;
+    const borough =
+      located.borough || boroughFor(`${neighborhood} ${street} ${row.address?.city ?? ""}`);
 
     out.push({
       id: `hotpads-${row.listing_id}`,
@@ -111,11 +116,12 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
 export async function fetchHotPads(c: SearchCriteria): Promise<Listing[]> {
   // Pages per source is the main lever on the monthly request budget;
   // sorted by newest, one page already catches everything fresh.
-  const PAGES = (await loadConfig()).pagesPerSource;
+  const config = await loadConfig();
+  const PAGES = config.pagesPerSource;
   const byId = new Map<string, Listing>();
   const bedsRange = `${c.bedMin}-${c.bedMax ?? 8}`;
 
-  for (const area of getAreas(c.areas)) {
+  for (const area of queryScopes(c.areas, config.wideQueries)) {
     const pages = await Promise.allSettled(
       Array.from({ length: PAGES }, (_, i) =>
         realtyGet<HotPadsResponse>("hotpads", "/search/bylocation", {

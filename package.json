@@ -9,7 +9,9 @@
     "lint": "eslint",
     "poll": "tsx --env-file=.env.local scripts/poll.ts",
     "test": "tsx --test tests/*.test.ts",
-    "smoke": "tsx --env-file=.env.local scripts/smoke.ts"
+    "smoke": "tsx --env-file=.env.local scripts/smoke.ts",
+    "geocheck": "tsx --env-file=.env.local scripts/geocheck.ts",
+    "fitgeo": "tsx --env-file=.env.local scripts/fitgeo.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",

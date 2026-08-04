@@ -1,8 +1,9 @@
 import type { Listing, SearchCriteria } from "@/types";
 import { realtyGet } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
-import { getAreas, boroughFor, canonicalNeighborhood } from "@/lib/areas";
+import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
+import { locate } from "@/lib/geo";
 import { toPrice, toNum } from "@/lib/parse";
 
 /**
@@ -121,9 +122,15 @@ export function normalizeZillow(
 
     if (price == null) continue;
 
+    // Coordinates beat both the title text and the queried label: they're the
+    // only signal that still works when one borough query covers four areas.
+    const located = locate(p.location?.latitude, p.location?.longitude);
     const neighborhood =
-      canonicalNeighborhood(`${p.title ?? ""} ${street}`) || areaLabel;
-    const borough = boroughFor(`${neighborhood} ${street} ${p.address?.city ?? ""}`);
+      located.neighborhood ||
+      canonicalNeighborhood(`${p.title ?? ""} ${street}`) ||
+      areaLabel;
+    const borough =
+      located.borough || boroughFor(`${neighborhood} ${street} ${p.address?.city ?? ""}`);
     const photo =
       p.media?.propertyPhotoLinks?.highResolutionLink ??
       p.media?.propertyPhotoLinks?.mediumSizeLink ??
@@ -173,10 +180,11 @@ export function normalizeZillow(
 export async function fetchZillow(c: SearchCriteria): Promise<Listing[]> {
   // Pages per source is the main lever on the monthly request budget;
   // sorted by newest, one page already catches everything fresh.
-  const MAX_PAGES = (await loadConfig()).pagesPerSource;
+  const config = await loadConfig();
+  const MAX_PAGES = config.pagesPerSource;
   const byId = new Map<string, Listing>();
 
-  for (const area of getAreas(c.areas)) {
+  for (const area of queryScopes(c.areas, config.wideQueries)) {
     const pages = await Promise.allSettled(
       Array.from({ length: MAX_PAGES }, (_, i) =>
         realtyGet<ZillowResponse>("zillow", "/search/byaddress", {

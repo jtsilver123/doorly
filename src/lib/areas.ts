@@ -183,6 +183,23 @@ export function areaLabel(slug: string): string {
   return getArea(slug)?.label ?? slug;
 }
 
+/**
+ * What to actually query.
+ *
+ * Wide mode collapses several neighborhoods to the one borough containing them,
+ * turning four upstream requests into one. Safe only because coordinates let us
+ * re-narrow locally afterwards (see geo.withinAreas) — without that, the extra
+ * results would simply be noise.
+ */
+export function queryScopes(slugs: string[], wide: boolean): Area[] {
+  const areas = getAreas(slugs);
+  if (!wide) return areas;
+
+  const boroughs = new Set(areas.map((a) => a.borough));
+  const scopes = AREAS.filter((a) => a.isBorough && boroughs.has(a.borough));
+  return scopes.length ? scopes : areas;
+}
+
 /** Distinct Craigslist subareas covering the given areas. */
 export function craigslistSubareas(slugs: string[]): string[] {
   const set = new Set<string>();

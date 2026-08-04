@@ -1,8 +1,9 @@
 import type { Listing, SearchCriteria } from "@/types";
 import { realtyGet } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
-import { getAreas, boroughFor, canonicalNeighborhood } from "@/lib/areas";
+import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
+import { locate } from "@/lib/geo";
 import { toPrice, toNum } from "@/lib/parse";
 
 /**
@@ -99,7 +100,11 @@ export function normalizeApartments(
     })();
 
     const url = pickString(row, "url", "listingUrl", "webUrl", "detailUrl");
+    const lat = toNum(pick(row, "latitude", "lat"));
+    const lon = toNum(pick(row, "longitude", "lon", "lng"));
+    const located = locate(lat, lon);
     const neighborhood =
+      located.neighborhood ||
       canonicalNeighborhood(`${name} ${address}`) ||
       pickString(row, "neighborhood", "area") ||
       areaLabel;
@@ -122,11 +127,11 @@ export function normalizeApartments(
       bathrooms: baths,
       sqft: sqft && sqft > 0 ? Math.round(sqft) : null,
       neighborhood,
-      borough: boroughFor(`${neighborhood} ${address}`),
+      borough: located.borough || boroughFor(`${neighborhood} ${address}`),
       address: address || name,
       unit: extractUnit(address),
-      lat: toNum(pick(row, "latitude", "lat")),
-      lon: toNum(pick(row, "longitude", "lon", "lng")),
+      lat,
+      lon,
       imageUrl: photo,
       availableAt: pickString(row, "availableFrom", "availableDate", "dateAvailable") || null,
       noFee: /no\s*fee/i.test(blob),
@@ -163,11 +168,12 @@ export async function fetchApartments(
   c: SearchCriteria,
   moveInDate = ""
 ): Promise<Listing[]> {
-  const pages = (await loadConfig()).pagesPerSource;
+  const config = await loadConfig();
+  const pages = config.pagesPerSource;
   const byId = new Map<string, Listing>();
   const window = availabilityWindow(moveInDate);
 
-  for (const area of getAreas(c.areas)) {
+  for (const area of queryScopes(c.areas, config.wideQueries)) {
     const results = await Promise.allSettled(
       Array.from({ length: pages }, (_, i) =>
         realtyGet<ApartmentsResponse>("apartments", "/search/bylocation", {

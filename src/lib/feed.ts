@@ -537,6 +537,33 @@ export async function recordFeedback(
   if (action === "pass") await setStage(listingId, "passed");
 }
 
+/**
+ * Undo a pass.
+ *
+ * Triage is fast and keyboard-driven, which means it will sometimes be wrong —
+ * one stray keystroke and a flat you wanted is gone. Reversing it has to clear
+ * the training signal too, otherwise the ranker keeps learning from a mistake
+ * you already took back.
+ */
+export async function undoPass(listingId: string): Promise<void> {
+  const supabase = db();
+  await supabase
+    .from("feedback")
+    .delete()
+    .eq("user_id", currentUserId())
+    .eq("listing_id", listingId);
+  await supabase.from("user_listing_state").upsert(
+    {
+      user_id: currentUserId(),
+      listing_id: listingId,
+      stage: "inbox",
+      stage_changed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,listing_id" }
+  );
+}
+
 export async function addContact(
   listingId: string,
   entry: {

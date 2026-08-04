@@ -5,6 +5,7 @@ import {
   recordFeedback,
   setListingFields,
   setStage,
+  undoPass,
 } from "@/lib/feed";
 import type { ContactLog, Stage } from "@/types";
 
@@ -50,6 +51,9 @@ export async function PATCH(request: Request, { params }: Params) {
         break;
       case "seen":
         await setListingFields(id, { events_seen_at: new Date().toISOString() });
+        break;
+      case "unpass":
+        await undoPass(id);
         break;
       case "feedback":
         await recordFeedback(id, body.value === "like" ? "like" : "pass");

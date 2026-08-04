@@ -1,5 +1,6 @@
 import type { Listing, SearchCriteria, Source } from "@/types";
 import { neighborhoodFilter } from "@/lib/areas";
+import { withinAreas } from "@/lib/geo";
 
 /**
  * Jake's search: studio or 1BR around $3,500 in the West Village, East Village,
@@ -60,18 +61,20 @@ export function inBounds(listing: Listing, c: SearchCriteria): boolean {
   if (c.noFeeOnly && !listing.noFee) return false;
 
   const hoods = neighborhoodFilter(c.areas);
-  if (hoods.size > 0) {
-    const haystack = `${listing.neighborhood} ${listing.address}`.toLowerCase();
-    let hit = false;
-    for (const hood of hoods) {
-      if (haystack.includes(hood)) {
-        hit = true;
-        break;
-      }
-    }
-    if (!hit) return false;
+  if (hoods.size === 0) return true; // whole-borough search: everything qualifies
+
+  const names = [...hoods];
+
+  // Coordinates first. They're the only signal that survives a borough-wide
+  // query, and they don't care that Zillow writes "West Village, Manhattan, NY"
+  // while Craigslist writes "w village".
+  if (listing.lat != null && listing.lon != null) {
+    return withinAreas(listing.lat, listing.lon, names);
   }
-  return true;
+
+  // No coordinates (Craigslist, mostly): fall back to matching the text.
+  const haystack = `${listing.neighborhood} ${listing.address}`.toLowerCase();
+  return names.some((hood) => haystack.includes(hood));
 }
 
 export function normalizeCriteria(input: Partial<SearchCriteria>): SearchCriteria {
