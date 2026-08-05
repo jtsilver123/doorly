@@ -71,6 +71,21 @@ function toLocalInput(iso: string | null): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
+/**
+ * "2026-08-03" is a database's idea of a date. If the source string parses,
+ * show "Aug 3"; anything human-written ("Immediate") passes through.
+ */
+function friendlyAvailable(text: string): string {
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text.trim())) {
+    const at = new Date(`${text.trim()}T12:00:00Z`);
+    if (!Number.isNaN(at.getTime())) {
+      return at.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    }
+  }
+  return text;
+}
+
 function money(n: number) {
   return `$${n.toLocaleString()}`;
 }
@@ -431,7 +446,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               aria-label={`Share ${listing.address}`}
             >
               <Icon name={shared ? "check" : "external"} size={14} />
-              {shared ? "Link copied" : "Share"}
+              <span className="drawer-share-label">{shared ? "Link copied" : "Share"}</span>
             </button>
             <button className="btn drawer-close" onClick={onClose} aria-label="Close">
               <Icon name="close" size={15} />
@@ -476,7 +491,8 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             <div>
               <dt>Available</dt>
               <dd className="is-text">
-                {listing.availableText || (listing.timing === "ready" ? "In time" : "Not stated")}
+                {friendlyAvailable(listing.availableText) ||
+                  (listing.timing === "ready" ? "In time" : "Not stated")}
               </dd>
             </div>
           </dl>

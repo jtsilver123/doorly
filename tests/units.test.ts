@@ -37,6 +37,7 @@ import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar
 import { tourDays } from "../src/lib/tourday.ts";
 import { normalizeApartments } from "../src/lib/sources/apartments.ts";
 import { amenityRowsFor } from "../src/components/Compare.tsx";
+import { sweepPlan } from "../src/lib/sweep.ts";
 import {
   nearestStation,
   stationsWithin,
@@ -1527,4 +1528,46 @@ test("the follow-up greets the agent by name when we have one", () => {
   );
   assert.match(named, /^Hi Jane —/);
   assert.match(named, /This is Jake\./);
+});
+
+// --- the delist circuit breaker --------------------------------------------
+
+function sweepRows(source: string, active: number, gone: number) {
+  return Array.from({ length: active }, (_, i) => ({ source, gone: i < gone }));
+}
+
+test("a partial fetch cannot delist half a source's inventory", () => {
+  // The afternoon the corpus flapped: ~300 active, a poll saw only 121.
+  const { sweepable, skipped } = sweepPlan(sweepRows("streeteasy", 200, 110));
+  assert.ok(!sweepable.has("streeteasy"));
+  assert.equal(skipped[0]?.gone, 110);
+});
+
+test("honest turnover still sweeps", () => {
+  // 15 of 200 gone is a Tuesday, not an outage.
+  const { sweepable, skipped } = sweepPlan(sweepRows("streeteasy", 200, 15));
+  assert.ok(sweepable.has("streeteasy"));
+  assert.equal(skipped.length, 0);
+});
+
+test("small sources can turn over completely without tripping the breaker", () => {
+  // 8 of 9 gone on a tiny source is below MIN_GONE_COUNT — plausible churn,
+  // and blocking it forever would keep dead listings alive.
+  const { sweepable } = sweepPlan(sweepRows("craigslist", 9, 8));
+  assert.ok(sweepable.has("craigslist"));
+});
+
+test("one bad source doesn't block the others' sweeps", () => {
+  const rows = [...sweepRows("zillow", 100, 60), ...sweepRows("hotpads", 100, 5)];
+  const { sweepable } = sweepPlan(rows);
+  assert.ok(!sweepable.has("zillow"));
+  assert.ok(sweepable.has("hotpads"));
+});
+
+test("exactly at the thresholds, the sweep still runs", () => {
+  // 25% share or 10 rows is the boundary; the breaker trips strictly above.
+  const share = sweepPlan(sweepRows("a", 100, 25));
+  assert.ok(share.sweepable.has("a"));
+  const count = sweepPlan(sweepRows("b", 20, 10));
+  assert.ok(count.sweepable.has("b"));
 });

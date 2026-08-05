@@ -3510,3 +3510,13 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* A fresh notice keeps its tint until the next visit, so "what's new since I
    last looked" survives the badge being cleared. */
 .changerow[data-fresh="true"] { background: var(--accent-soft); }
+
+/* The drawer head on a phone: the score, the essentials, two small icons.
+   "Share" as a word and the rating headline both cost width the address
+   needs at 390px. */
+@media (max-width: 560px) {
+  .drawer-head { gap: var(--s2); }
+  .drawer-share-label { display: none; }
+  .drawer-share { padding: 5px 8px; }
+  .drawer-head-price > span { display: none; }
+}

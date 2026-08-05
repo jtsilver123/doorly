@@ -3,6 +3,7 @@ import { LINK_PREFERENCE } from "@/types";
 import { adminDb } from "@/lib/supabase";
 import { fingerprint, contentHash, matchConfidence } from "@/lib/dedupe";
 import { deliver, noticesForEvents } from "@/lib/notify";
+import { sweepPlan } from "@/lib/sweep";
 import { runSearch, type SourceReport } from "@/lib/sources";
 
 /**
@@ -473,25 +474,15 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
      * entirely and say so. The listings stay live until a poll that actually
      * saw the whole picture.
      */
-    const activePerSource = new Map<string, number>();
-    for (const row of stale ?? []) {
-      activePerSource.set(row.source, (activePerSource.get(row.source) ?? 0) + 1);
-    }
-    const gonePerSource = new Map<string, number>();
-    for (const row of stale ?? []) {
-      if (seenSourceKeys.has(`${row.source}:${row.source_id}`)) continue;
-      gonePerSource.set(row.source, (gonePerSource.get(row.source) ?? 0) + 1);
-    }
-    const sweepable = new Set<string>();
-    for (const [source, active] of activePerSource) {
-      const gone = gonePerSource.get(source) ?? 0;
-      if (gone > 10 && gone / active > 0.25) {
-        errors.push(
-          `sweep skipped for ${source}: would delist ${gone} of ${active} — fetch looks partial`
-        );
-        continue;
-      }
-      sweepable.add(source);
+    const rows = (stale ?? []).map((row) => ({
+      source: row.source as string,
+      gone: !seenSourceKeys.has(`${row.source}:${row.source_id}`),
+    }));
+    const { sweepable, skipped } = sweepPlan(rows);
+    for (const skip of skipped) {
+      errors.push(
+        `sweep skipped for ${skip.source}: would delist ${skip.gone} of ${skip.active} — fetch looks partial`
+      );
     }
 
     const goneIds = new Set<string>();
