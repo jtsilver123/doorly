@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { AuthResult } from "@/app/auth/actions";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { siteUrl } from "@/lib/site";
 
 /**
  * Sign in and sign up.
@@ -172,7 +173,11 @@ export default function AuthForm({
               setOauthBusy(true);
               const { error } = await supabaseBrowser().auth.signInWithOAuth({
                 provider: "google",
-                options: { redirectTo: `${window.location.origin}/auth/callback` },
+                // siteUrl, not location.origin: the callback has to land on the
+                // canonical host. Deployment URLs sit behind Vercel's
+                // protection, so a round trip through one ends on a Vercel
+                // login page rather than in the app.
+                options: { redirectTo: siteUrl("/auth/callback") },
               });
               // Success navigates away; only a failure leaves us here.
               if (error) setOauthBusy(false);

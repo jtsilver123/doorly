@@ -9,6 +9,7 @@ import { nextAction } from "@/lib/nextAction";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { RatingDisc, MyScoreDisc, ProsConsLine } from "@/components/Rating";
+import { nearestStation, subwayLabel } from "@/lib/subway";
 
 /**
  * A listing card.
@@ -189,6 +190,19 @@ export default function ListingCard({
 
         <div className="card-where">
           {listing.neighborhood || listing.borough || "NYC"} · {relative(listing.firstSeenAt)}
+          {/* The train, on every card. It's the fact that decides whether a
+              cheap place in a far neighborhood is actually cheap. */}
+          {(() => {
+            const near = nearestStation(listing.lat, listing.lon);
+            return near ? (
+              <>
+                {" · "}
+                <span className="card-train" title={subwayLabel(near)}>
+                  {near.minutes} min to {near.routes.split("").join("/")}
+                </span>
+              </>
+            ) : null;
+          })()}
         </div>
 
         <Perks keys={listing.perks} />

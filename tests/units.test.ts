@@ -10,6 +10,7 @@ import { train, score, features } from "@/lib/rank";
 import {
   bestChannel,
   draftTourMessage,
+  draftFollowUp,
   qualifyingLine,
   smsLink,
   normalizePhone,
@@ -36,6 +37,13 @@ import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar
 import { tourDays } from "../src/lib/tourday.ts";
 import { normalizeApartments } from "../src/lib/sources/apartments.ts";
 import { amenityRowsFor } from "../src/components/Compare.tsx";
+import {
+  nearestStation,
+  stationsWithin,
+  routesWithin,
+  subwayLabel,
+  walkMinutes,
+} from "../src/lib/subway.ts";
 import { applyFilters } from "@/lib/filters";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
@@ -1427,4 +1435,94 @@ test("an amenity row reads yes or a dash, per listing", () => {
   const row = amenityRowsFor([a, b]).find((r) => r.label === "Elevator")!;
   assert.equal(row.value(a), "yes");
   assert.equal(row.value(b), "—");
+});
+
+// --- distance to the train -------------------------------------------------
+
+test("the nearest station is found and named with its lines", () => {
+  // 225 East 10th St, East Village — Astor Place (6) and 1 Av (L) are close.
+  const near = nearestStation(40.72925, -73.98444)!;
+  assert.ok(near, "a station is found");
+  assert.ok(near.minutes >= 1 && near.minutes <= 12, `${near.minutes} min is walkable`);
+  assert.match(near.routes, /^[A-Z0-9]+$/);
+  assert.ok(subwayLabel(near).includes("min to"), subwayLabel(near));
+});
+
+test("a listing without coordinates reports nothing rather than guessing", () => {
+  assert.equal(nearestStation(null, null), null);
+  assert.equal(nearestStation(40.7, null), null);
+  assert.equal(subwayLabel(null), "");
+});
+
+test("the bounding-box prefilter agrees with a full sweep", () => {
+  // The box is an optimisation; if it ever disagreed with brute force it
+  // would silently report the wrong station.
+  for (const [lat, lon] of [
+    [40.72925, -73.98444],
+    [40.7580, -73.9855],
+    [40.6782, -73.9442],
+    [40.8448, -73.8648],
+  ] as [number, number][]) {
+    const viaBox = nearestStation(lat, lon)!;
+    const all = stationsWithin(lat, lon, 10_000);
+    assert.equal(viaBox.name, all[0].name, `${lat},${lon}`);
+  }
+});
+
+test("a midtown address reaches several lines on foot", () => {
+  // Times Square: the densest transfer in the system.
+  const routes = routesWithin(40.7557, -73.9870, 10);
+  assert.ok(routes.length >= 6, `expected many lines, got ${routes.join("")}`);
+});
+
+test("walking minutes never round down to zero", () => {
+  assert.equal(walkMinutes(0), 1);
+  assert.equal(walkMinutes(5), 1);
+});
+
+test("a Murray Hill address gets Grand Central, not a station past it", () => {
+  // 144 East 40th Street. Grand Central (4/5/6/7/S) is ~400m; 33 St (6) is
+  // ~640m. An earlier build averaged complex coordinates by repeated halving
+  // rather than a true mean, which dragged big transfer complexes off their
+  // real position and made the nearer station look further away.
+  const near = nearestStation(40.7495, -73.9756)!;
+  assert.match(near.name, /Grand Central/, `got ${near.name}`);
+  assert.ok(near.minutes <= 8, `${near.minutes} min should be a short walk`);
+});
+
+test("the walk radius widens the list, and orders it nearest-first", () => {
+  // Midtown East really does have only two stations inside twelve minutes —
+  // the first version of this test assumed three and was wrong about the
+  // city, not about the code. What must hold is ordering and monotonicity.
+  const near = stationsWithin(40.7495, -73.9756, 12);
+  const wide = stationsWithin(40.7495, -73.9756, 20);
+  assert.ok(wide.length > near.length, "a longer walk reaches more stations");
+  assert.deepEqual(
+    [...near].sort((a, b) => a.meters - b.meters).map((s) => s.name),
+    near.map((s) => s.name),
+    "nearest first"
+  );
+  assert.ok(near.every((s) => s.minutes <= 12), "nothing over the limit");
+});
+
+// --- chasing silence -------------------------------------------------------
+
+test("the follow-up is one short line, not the pitch again", () => {
+  const first = draftTourMessage(feed(), { ...DEFAULT_PROFILE, name: "Jake" });
+  const nudge = draftFollowUp(feed(), { ...DEFAULT_PROFILE, name: "Jake" });
+  assert.ok(nudge.length < first.length / 2, `${nudge.length} vs ${first.length}`);
+  assert.ok(!nudge.includes("\n\n"), "a nudge is one paragraph");
+  assert.match(nudge, /still available/i);
+  assert.match(nudge, /55 Morton Street #5J/);
+  // The original ask is not repeated — that's what makes it a follow-up.
+  assert.doesNotMatch(nudge, /video walkthrough/i);
+});
+
+test("the follow-up greets the agent by name when we have one", () => {
+  const named = draftFollowUp(
+    feed({ myContactName: "Jane at Corcoran" }),
+    { ...DEFAULT_PROFILE, name: "Jake Silver" }
+  );
+  assert.match(named, /^Hi Jane —/);
+  assert.match(named, /This is Jake\./);
 });

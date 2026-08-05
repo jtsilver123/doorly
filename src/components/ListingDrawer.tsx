@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import type {
   ContactLog,
   FeedListing,
@@ -21,12 +22,20 @@ import Perks from "@/components/Perks";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
+import { nearestStation, stationsWithin } from "@/lib/subway";
+import { siteUrl } from "@/lib/site";
+// Leaflet reads `window` on import, which detonates the server render.
+const SpotMap = dynamic(() => import("@/components/SpotMap"), {
+  ssr: false,
+  loading: () => <div className="spotmap" aria-busy="true" />,
+});
 import Icon from "@/components/Icon";
 import { googleCalendarUrl, icsFilename, icsFor } from "@/lib/calendar";
 import {
   bestChannel,
   reachableOn,
   draftTourMessage,
+  draftFollowUp,
   mailtoLink,
   smsLink,
   tourSubject,
@@ -117,6 +126,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
   const [imageBroken, setImageBroken] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [phone, setPhone] = useState(formatPhone(listing.myContactPhone));
@@ -137,7 +147,17 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
   const panelRef = useRef<HTMLElement>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
 
-  const message = draftTourMessage(listing, profile);
+  /**
+   * Which draft this panel is holding.
+   *
+   * A listing that's gone quiet needs a nudge, not the opening pitch sent a
+   * second time — so the message the buttons send, the preview, and the
+   * clipboard all switch together. One source, or they disagree.
+   */
+  const chasing = nextAction(listing).kind === "chase";
+  const message = chasing
+    ? draftFollowUp(listing, profile)
+    : draftTourMessage(listing, profile);
 
   // A different listing in the same panel starts from its own stage.
   useEffect(() => setStage(listing.stage), [listing.id, listing.stage]);
@@ -304,6 +324,39 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
+  /**
+   * A link straight to this apartment.
+   *
+   * "Look at this one" is the most common thing anyone says during a hunt,
+   * and until now the only way to say it was to paste the StreetEasy URL —
+   * which drops the person into the listing site without the score, the
+   * true monthly, or any of the pipeline. This shares the app's own view.
+   *
+   * navigator.share where it exists (that's the native sheet on a phone,
+   * which is where you're actually forwarding things), clipboard everywhere
+   * else.
+   */
+  async function share() {
+    const url = siteUrl(`/?place=${encodeURIComponent(listing.id)}`);
+    const title = `${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`;
+    const text = `${money(listing.price)}/mo · ${listing.neighborhood} · ${listing.rating}/100 on Doorly`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch {
+        // Cancelled, or the sheet refused — fall through to the clipboard.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    } catch {
+      setShared(false);
+    }
+  }
+
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(message);
@@ -368,9 +421,19 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               {listing.sqft ? ` · ${listing.sqft} ft²` : ""}
             </div>
           </div>
-          <button className="btn drawer-close" onClick={onClose} aria-label="Close">
-            <Icon name="close" size={15} />
-          </button>
+          <div className="drawer-head-acts">
+            <button
+              className={shared ? "btn drawer-share is-done" : "btn drawer-share"}
+              onClick={share}
+              aria-label={`Share ${listing.address}`}
+            >
+              <Icon name={shared ? "check" : "external"} size={14} />
+              {shared ? "Link copied" : "Share"}
+            </button>
+            <button className="btn drawer-close" onClick={onClose} aria-label="Close">
+              <Icon name="close" size={15} />
+            </button>
+          </div>
         </header>
 
         {/* Block flow, not grid: inside a height-constrained scroll container
@@ -414,6 +477,63 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               </dd>
             </div>
           </dl>
+
+          {/* --- getting around ------------------------------------------ */}
+          {(() => {
+            const near = nearestStation(listing.lat, listing.lon);
+            if (!near) return null;
+            const walk = stationsWithin(listing.lat, listing.lon, 12);
+            return (
+              <section className="dsec">
+                <h3 className="dsec-label">Getting around</h3>
+                {/* The block, not just the neighborhood's name. */}
+                {listing.lat != null && listing.lon != null && (
+                  <SpotMap
+                    lat={listing.lat}
+                    lon={listing.lon}
+                    label={`${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`}
+                  />
+                )}
+
+                <div className="transit">
+                  <div className="transit-lead">
+                    <b>{near.minutes} min</b>
+                    <span>
+                      walk to <strong>{near.name}</strong>
+                    </span>
+                  </div>
+                  <div className="transit-lines">
+                    {near.routes.split("").map((route) => (
+                      <span key={route} className="bullet" data-route={route}>
+                        {route}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {walk.length > 1 && (
+                  <ul className="transit-more">
+                    {walk.slice(1, 4).map((station) => (
+                      <li key={`${station.name}-${station.routes}`}>
+                        <span className="muted">{station.minutes} min</span>
+                        {station.name}
+                        <span className="transit-lines">
+                          {station.routes.split("").map((route) => (
+                            <span key={route} className="bullet" data-route={route}>
+                              {route}
+                            </span>
+                          ))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="muted drawer-fineprint">
+                  Straight-line distance at walking pace, from the MTA&apos;s own
+                  station list — a couple of blocks either way.
+                </p>
+              </section>
+            );
+          })()}
 
           {/* --- one judgment: the score, the price, the catches, yours -- */}
           <section className="dsec">
@@ -639,6 +759,34 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                   </button>
                 </div>
 
+                {/*
+                  The payoff for having a number, where the number is.
+
+                  The restructure moved every action to the footer, which was
+                  right for the state machine and wrong for this one: you type
+                  in a phone number in order to text it, and the button has to
+                  be at the end of that sentence rather than somewhere else on
+                  the screen. It stays the loudest thing in this card.
+                */}
+                {contact.phone && (
+                  <button className="textnow" onClick={() => reachOut("text")} title={message}>
+                    <span className="textnow-go" aria-hidden="true">
+                      <Icon name="message" size={20} />
+                    </span>
+                    <span className="textnow-copy">
+                      <b>
+                        {chasing ? "Send a follow-up to " : "Text "}
+                        {formatPhone(contact.phone) || contact.phone}
+                      </b>
+                      <span>
+                        {chasing
+                          ? "One line asking if it's still available"
+                          : "Opens your messages with the request already written"}
+                      </span>
+                    </span>
+                  </button>
+                )}
+
                 {/* Small, equal, quiet: none of these is the next action. */}
                 <div className="reachcard-row">
                   {contact.phone && (
@@ -665,6 +813,11 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                       title="Same message, in an email draft"
                     >
                       <Icon name="mail" size={14} /> Email
+                    </button>
+                  )}
+                  {!contact.phone && !contact.email && listing.url && (
+                    <button className="btn btn-quiet" onClick={() => reachOut("portal")}>
+                      <Icon name="external" size={14} /> Their contact form
                     </button>
                   )}
                   <button className="btn btn-quiet" onClick={copyMessage}>

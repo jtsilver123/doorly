@@ -3127,3 +3127,183 @@ button.fact:hover .fact-label { color: var(--accent); }
   .changerow-detail { grid-area: move; }
   .changerow > .ratedisc { display: none; }
 }
+
+/* Included but past the five-column cap: outlined, not filled. A chip that
+   reads as selected while saying "not shown" is the app contradicting
+   itself. */
+.pill.is-queued {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+  background: none;
+}
+
+.pill.is-queued:hover { border-color: var(--accent); color: var(--accent); }
+
+.pill-note {
+  font-size: var(--t-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+/* --- getting around -------------------------------------------------------
+ *
+ * Route bullets in the MTA's own colours. A New Yorker reads the colour
+ * before the letter — an orange B and a blue A are different neighbourhoods
+ * of the mind — so a monochrome list would throw away the fastest signal on
+ * the panel. Colours are the official trunk-line set.
+ */
+
+.bullet {
+  display: inline-grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: var(--r-full);
+  background: var(--text-muted);
+  color: #fff;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 8th Av — blue */
+.bullet[data-route="A"], .bullet[data-route="C"], .bullet[data-route="E"] { background: #0039a6; }
+/* 6th Av — orange */
+.bullet[data-route="B"], .bullet[data-route="D"],
+.bullet[data-route="F"], .bullet[data-route="M"] { background: #ff6319; }
+/* Crosstown — light green */
+.bullet[data-route="G"] { background: #6cbe45; }
+/* Nassau — brown */
+.bullet[data-route="J"], .bullet[data-route="Z"] { background: #996633; }
+/* Canarsie — grey */
+.bullet[data-route="L"] { background: #a7a9ac; }
+/* Broadway — yellow, dark text for contrast */
+.bullet[data-route="N"], .bullet[data-route="Q"],
+.bullet[data-route="R"], .bullet[data-route="W"] { background: #fccc0a; color: #16324f; }
+/* Broadway–7th Av — red */
+.bullet[data-route="1"], .bullet[data-route="2"], .bullet[data-route="3"] { background: #ee352e; }
+/* Lexington — green */
+.bullet[data-route="4"], .bullet[data-route="5"], .bullet[data-route="6"] { background: #00933c; }
+/* Flushing — purple */
+.bullet[data-route="7"] { background: #b933ad; }
+/* Shuttles and Staten Island */
+.bullet[data-route="S"] { background: #808183; }
+.bullet[data-route="T"] { background: #00add0; }
+
+.transit {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.transit-lead { display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0; }
+
+.transit-lead b {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.transit-lead span { font-size: var(--t-md); color: var(--text-muted); }
+.transit-lead strong { color: var(--text); font-weight: 600; }
+.transit-lines { display: inline-flex; gap: 3px; flex-wrap: wrap; align-items: center; }
+
+.transit-more { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+
+.transit-more li {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-sm);
+}
+
+.transit-more li > .muted {
+  min-width: 3.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* On a card the train is one more fact in the metadata line, not a feature. */
+.card-train { white-space: nowrap; }
+
+/* The address, drawn. An illustration of one place, not a map to navigate. */
+.spotmap {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.spotmap-canvas { height: 190px; width: 100%; }
+
+.spotmap-credit {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  z-index: 500;
+  padding: 1px 5px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 9px;
+  color: #4b5563;
+}
+
+/* The listing: a filled dot with a halo, so it reads over any tile. */
+.spotmap-pin {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  background: var(--action);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* Stations sit behind the pin as small route bullets. */
+.spotmap-station { display: inline-flex; gap: 1px; transform: translate(-50%, -50%); }
+
+.spotmap-station i {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: var(--r-full);
+  background: var(--text-muted);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  font-style: normal;
+  border: 1.5px solid #fff;
+}
+
+/* Same trunk-line colours as the drawer's bullets. */
+.spotmap-station i[data-route="A"], .spotmap-station i[data-route="C"],
+.spotmap-station i[data-route="E"] { background: #0039a6; }
+.spotmap-station i[data-route="B"], .spotmap-station i[data-route="D"],
+.spotmap-station i[data-route="F"], .spotmap-station i[data-route="M"] { background: #ff6319; }
+.spotmap-station i[data-route="G"] { background: #6cbe45; }
+.spotmap-station i[data-route="J"], .spotmap-station i[data-route="Z"] { background: #996633; }
+.spotmap-station i[data-route="L"] { background: #a7a9ac; }
+.spotmap-station i[data-route="N"], .spotmap-station i[data-route="Q"],
+.spotmap-station i[data-route="R"], .spotmap-station i[data-route="W"] { background: #fccc0a; color: #16324f; }
+.spotmap-station i[data-route="1"], .spotmap-station i[data-route="2"],
+.spotmap-station i[data-route="3"] { background: #ee352e; }
+.spotmap-station i[data-route="4"], .spotmap-station i[data-route="5"],
+.spotmap-station i[data-route="6"] { background: #00933c; }
+.spotmap-station i[data-route="7"] { background: #b933ad; }
+.spotmap-station i[data-route="S"] { background: #808183; }
+
+/* Share and close, together, so the header's right edge is one control group. */
+.drawer-head-acts { display: flex; align-items: center; gap: var(--s2); flex-shrink: 0; }
+.drawer-share { padding: 5px 10px; font-size: var(--t-sm); }
+.drawer-share.is-done { border-color: var(--good); color: var(--good); }

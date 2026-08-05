@@ -5,6 +5,7 @@ import type { FeedListing } from "@/types";
 import { STAGE_LABEL } from "@/types";
 import { CONTACT_LABEL } from "@/lib/outreach";
 import { AMENITIES, AMENITY_ORDER } from "@/lib/amenities";
+import { nearestStation, routesWithin } from "@/lib/subway";
 import { RatingDisc } from "@/components/Rating";
 import Icon from "@/components/Icon";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
@@ -136,6 +137,27 @@ const ROWS: Row[] = [
       }`,
   },
   {
+    /*
+     * The question every New Yorker asks and no listing site answers with a
+     * number. "Close to the L" is marketing; "4 min to 6 at 33 St" compares.
+     */
+    label: "Nearest train",
+    value: (l) => {
+      const near = nearestStation(l.lat, l.lon);
+      return near ? `${near.minutes} min · ${near.routes.split("").join("/")}` : "unknown";
+    },
+    num: (l) => nearestStation(l.lat, l.lon)?.minutes ?? null,
+  },
+  {
+    label: "Lines on foot",
+    value: (l) => {
+      const routes = routesWithin(l.lat, l.lon, 12);
+      return routes.length ? routes.join("/") : "none within 12 min";
+    },
+    num: (l) => routesWithin(l.lat, l.lon, 12).length,
+    invert: true,
+  },
+  {
     label: "Amenities",
     value: (l) => (l.perks.length ? `${l.perks.length} listed` : "none listed"),
     num: (l) => l.perks.length,
@@ -234,6 +256,19 @@ export default function Compare({
     persist(ORDER_KEY, ids);
   }
 
+  /**
+   * Bring a queued place into the table.
+   *
+   * The cap is five columns, so promoting means moving this one to the front
+   * of the order — the fifth visible place drops out of view but stays
+   * included, which is the same trade you'd make by hand.
+   */
+  function promote(id: string) {
+    const ids = [id, ...finalists.map((l) => l.id).filter((x) => x !== id)];
+    setOrder(ids);
+    persist(ORDER_KEY, ids);
+  }
+
   function toggle(id: string) {
     const next = excluded.includes(id)
       ? excluded.filter((x) => x !== id)
@@ -315,7 +350,8 @@ export default function Compare({
           {finalists.length} of {candidates.length} places
         </button>
         <span className="muted">
-          Drag a column heading to reorder, or focus one and use ← →.
+          Five at a time. Drag a column heading to reorder, or focus one and
+          use ← →.
         </span>
         {excluded.length > 0 && (
           <button
@@ -332,21 +368,38 @@ export default function Compare({
 
       {picking && (
         <div className="compare-pick" role="group" aria-label="Places to compare">
+          {/*
+            Three states, not two.
+
+            Everything included used to render checked and filled, including
+            the ones past the five-column cap — so a chip said "in the table"
+            and its own label said "over five" in the same breath. Only what
+            is actually on screen is filled now; the queued ones are outlined
+            and say where they stand, and clicking one promotes it into view
+            instead of leaving you to work out the trick.
+          */}
           {candidates.map((l) => {
-            const on = !excluded.includes(l.id);
-            const full = on && !finalists.some((f) => f.id === l.id);
+            const included = !excluded.includes(l.id);
+            const inTable = finalists.some((f) => f.id === l.id);
+            const queued = included && !inTable;
             return (
               <button
                 key={l.id}
-                className={on ? "pill is-on" : "pill"}
-                aria-pressed={on}
-                onClick={() => toggle(l.id)}
-                title={full ? "Included, but the table shows five at a time" : undefined}
+                className={inTable ? "pill is-on" : queued ? "pill is-queued" : "pill"}
+                aria-pressed={included}
+                onClick={() => (queued ? promote(l.id) : toggle(l.id))}
+                title={
+                  queued
+                    ? "Not in the table — the table shows five. Click to bring it in."
+                    : inTable
+                      ? "Shown. Click to take it out."
+                      : "Click to put it back."
+                }
               >
-                {on && <Icon name="check" size={12} />}
+                {inTable && <Icon name="check" size={12} />}
                 {l.address}
                 {l.unit ? ` #${l.unit}` : ""}
-                {full && <span className="muted"> · over five</span>}
+                {queued && <span className="pill-note">not shown</span>}
               </button>
             );
           })}

@@ -240,6 +240,28 @@ export function smsLink(phone: string, body: string): string {
   return target ? `sms:${target}&body=${encoded}` : `sms:&body=${encoded}`;
 }
 
+/**
+ * The follow-up.
+ *
+ * Chasing silence with the original message again is the one thing that
+ * reliably doesn't work: it reads as a bot, and it makes the recipient
+ * re-read three paragraphs they already skipped. A nudge is one line, names
+ * the apartment so they don't have to scroll, and gives them the cheapest
+ * possible way to answer — a yes/no about whether it's still there.
+ *
+ * Deliberately no re-pitch and no new ask. The only goal is a reply.
+ */
+export function draftFollowUp(listing: FeedListing, profile: Profile): string {
+  const agent = firstNameOf(listing.myContactName || listing.contactName || "");
+  const greeting = agent ? `Hi ${agent} —` : "Hi —";
+  const unit = listing.unit ? ` #${listing.unit}` : "";
+  const me = profile.name ? ` This is ${firstNameOf(profile.name)}.` : "";
+  return (
+    `${greeting} following up on ${listing.address}${unit}.${me} ` +
+    `Is it still available? Happy to come see it whenever suits you.`
+  );
+}
+
 export function tourSubject(listing: FeedListing): string {
   const unit = listing.unit ? ` #${listing.unit}` : "";
   return `Viewing request — ${listing.address}${unit}`;

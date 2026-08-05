@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { siteUrl } from "@/lib/site";
 
 /**
  * The tag-team panel.
@@ -77,7 +78,9 @@ export default function CrewPanel({ onChanged }: { onChanged: () => void }) {
     const body = await post({ action: "invite", role });
     if (body?.token) {
       setInviteRole(role);
-      setInviteUrl(`${window.location.origin}/join/${body.token}`);
+      // An invite minted on a deployment URL would send whoever opens
+      // it to a Vercel login page, not to your search.
+      setInviteUrl(siteUrl(`/join/${body.token}`));
       setCopied(false);
     }
   }

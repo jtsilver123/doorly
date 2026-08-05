@@ -224,6 +224,35 @@ export default function Home() {
     loadFeed();
   }, [loadFeed]);
 
+  /**
+   * ?place=<id> opens that listing.
+   *
+   * The half of "share this apartment" that happens on the receiving end.
+   * It waits for the feed, because the drawer needs the whole listing and
+   * not just its id — and it runs once, so closing the drawer doesn't
+   * immediately reopen it.
+   */
+  const openedShared = useRef(false);
+  useEffect(() => {
+    if (openedShared.current || !listings.length) return;
+    const id = new URLSearchParams(window.location.search).get("place");
+    if (!id) return;
+    openedShared.current = true;
+    const hit = listings.find((l) => l.id === id);
+    if (hit) {
+      setOpen(hit);
+      setTab("feed");
+    } else {
+      toast({ message: "That place isn't in your search any more.", tone: "warn" });
+    }
+    // Drop the parameter once it's been used; a reload shouldn't fight you
+    // by reopening a drawer you closed.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("place");
+    window.history.replaceState(null, "", url.toString());
+  }, [listings, toast]);
+
+
   const visible = useMemo(
     () =>
       applyFilters(listings, {

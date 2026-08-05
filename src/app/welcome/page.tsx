@@ -6,6 +6,7 @@ import AreaPicker from "@/components/AreaPicker";
 import type { Source } from "@/types";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
 import BedBathPicker from "@/components/BedBathPicker";
+import { siteUrl } from "@/lib/site";
 
 /**
  * Setup.
@@ -134,7 +135,7 @@ export default function Welcome() {
       .then((r) => r.json())
       .catch(() => ({}));
     setBusy(false);
-    if (body?.token) setInviteUrl(`${window.location.origin}/join/${body.token}`);
+    if (body?.token) setInviteUrl(siteUrl(`/join/${body.token}`));
   }
 
   function finish() {
