@@ -139,6 +139,7 @@ export function parseCraigslistHtml(html: string): Listing[] {
       lat: ld.latitude ?? null,
       lon: ld.longitude ?? null,
       imageUrl: null,
+      images: [],
       availableAt: null,
       noFee: /no\s*fee/i.test(displayTitle),
       amenities: [],

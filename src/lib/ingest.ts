@@ -45,6 +45,7 @@ interface ListingRow {
   first_seen_at: string;
   last_seen_at: string;
   relisted_at: string | null;
+  images: string[] | null;
 }
 
 interface EventInsert {
@@ -232,7 +233,7 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
   for (const batch of chunk(fingerprints, 200)) {
     const { data } = await supabase
       .from("listings")
-      .select("id, fingerprint, price, original_price, is_active, first_seen_at, last_seen_at, relisted_at")
+      .select("id, fingerprint, price, original_price, is_active, first_seen_at, last_seen_at, relisted_at, images")
       .in("fingerprint", batch);
     for (const row of (data ?? []) as ListingRow[]) {
       knownFingerprints.set(row.fingerprint, row);
@@ -330,6 +331,20 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
       description: primary.description,
       url: pickCanonicalUrl(group),
       image_url: primary.imageUrl,
+      /*
+       * The gallery pools across sites: the same unit found on StreetEasy
+       * (one lead photo) and HotPads (the whole set) gets the whole set.
+       * Photos already stored stay — a source dropping out of one poll
+       * shouldn't strip a gallery someone is about to tour with. Primary's
+       * hero leads so the card and the gallery open on the same shot.
+       */
+      images: [
+        ...new Set([
+          ...primary.images,
+          ...group.flatMap((l) => l.images),
+          ...(existingByFp?.images ?? []),
+        ]),
+      ].slice(0, 24),
       available_at: primary.availableAt,
       no_fee: primary.noFee,
       amenities: primary.amenities,

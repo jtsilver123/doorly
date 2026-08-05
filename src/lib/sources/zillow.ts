@@ -50,7 +50,9 @@ interface ZillowProperty {
   rental?: { baseRent?: number };
   media?: {
     propertyPhotoLinks?: { highResolutionLink?: string; mediumSizeLink?: string };
+    allPropertyPhotos?: { highResolution?: string[] };
   };
+  carouselPhotos?: { url?: string }[];
   listCardRecommendation?: {
     ctaRecommendations?: { displayString?: string; contentType?: string }[];
   };
@@ -145,6 +147,15 @@ export function normalizeZillow(
       p.media?.propertyPhotoLinks?.highResolutionLink ??
       p.media?.propertyPhotoLinks?.mediumSizeLink ??
       null;
+    // Zillow sometimes ships the whole carousel on search rows; take it when
+    // it's there, fall back to the single lead photo when it isn't.
+    const photos = [
+      ...(p.media?.allPropertyPhotos?.highResolution ?? []),
+      ...(p.carouselPhotos ?? [])
+        .map((c) => c.url)
+        .filter((u): u is string => Boolean(u)),
+    ];
+    if (!photos.length && photo) photos.push(photo);
 
     const phone = phoneOf(p);
     const notes: string[] = [];
@@ -167,6 +178,7 @@ export function normalizeZillow(
       lat: p.location?.latitude ?? null,
       lon: p.location?.longitude ?? null,
       imageUrl: photo,
+      images: [...new Set(photos)],
       availableAt: null,
       noFee: false,
       amenities: [],

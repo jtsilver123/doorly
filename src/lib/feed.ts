@@ -47,6 +47,7 @@ interface ListingRow {
   description: string;
   url: string;
   image_url: string | null;
+  images: string[] | null;
   available_at: string | null;
   no_fee: boolean;
   amenities: string[] | null;
@@ -104,6 +105,8 @@ function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
     lat: row.lat,
     lon: row.lon,
     imageUrl: row.image_url,
+    // The gallery never renders empty while a hero photo exists.
+    images: row.images?.length ? row.images : row.image_url ? [row.image_url] : [],
     availableAt: row.available_at,
     noFee: row.no_fee,
     amenities: row.amenities ?? [],
@@ -866,6 +869,7 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     lat: null,
     lon: null,
     imageUrl: null,
+    images: [],
     availableAt: null,
     noFee: false,
     amenities: [],

@@ -69,6 +69,9 @@ export function normalizeStreetEasy(raw: StreetEasyListing[]): Listing[] {
       lat: n.geoPoint?.latitude ?? null,
       lon: n.geoPoint?.longitude ?? null,
       imageUrl: photoKey ? `${PHOTO_BASE}/${photoKey}-se_large_800_400.webp` : null,
+      // Search rows carry only the lead photo; the gallery fills in when the
+      // same unit shows up on a site that publishes its whole set.
+      images: photoKey ? [`${PHOTO_BASE}/${photoKey}-se_large_800_400.webp`] : [],
       availableAt: n.availableAt ?? null,
       noFee: Boolean(n.noFee),
       amenities: [],

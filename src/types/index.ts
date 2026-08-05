@@ -79,6 +79,12 @@ export interface Listing {
   lat: number | null;
   lon: number | null;
   imageUrl: string | null;
+  /**
+   * Every photo the sources published, hero first. Often richer than
+   * `imageUrl` because HotPads and Apartments.com ship full arrays in their
+   * search rows, and cross-site dedupe pools them onto the same unit.
+   */
+  images: string[];
   availableAt: string | null;
   noFee: boolean;
   amenities: string[];

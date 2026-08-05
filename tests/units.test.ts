@@ -68,6 +68,7 @@ function listing(over: Partial<Listing> = {}): Listing {
     lat: null,
     lon: null,
     imageUrl: null,
+    images: [],
     availableAt: null,
     noFee: false,
     amenities: [],

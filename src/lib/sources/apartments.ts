@@ -116,20 +116,25 @@ export function normalizeApartments(
     const baths = lowEnd(pick(row, "baths", "bathrooms", "bathRange", "minBaths")) ?? 1;
     const sqft = lowEnd(pick(row, "sqft", "squareFeet", "squareFeetRange", "size"));
 
-    const photo = (() => {
+    // Whatever shape the media field takes, flatten it to every URL in it —
+    // Apartments.com is one of the two sources that publish the whole set.
+    const photos = (() => {
       const media = pick(row, "photos", "images", "media", "photoUrl", "imageUrl");
-      if (typeof media === "string") return media;
-      if (Array.isArray(media) && media.length) {
-        const first = media[0];
-        if (typeof first === "string") return first;
-        if (first && typeof first === "object") {
-          const record = first as Record<string, unknown>;
-          const url = record.url ?? record.href ?? record.src;
-          return typeof url === "string" ? url : null;
-        }
-      }
-      return null;
+      if (typeof media === "string") return [media];
+      if (!Array.isArray(media)) return [];
+      return media
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object") {
+            const record = item as Record<string, unknown>;
+            const url = record.url ?? record.href ?? record.src;
+            return typeof url === "string" ? url : null;
+          }
+          return null;
+        })
+        .filter((u): u is string => Boolean(u));
     })();
+    const photo = photos[0] ?? null;
 
     const url = pickString(row, "url", "listingUrl", "webUrl", "detailUrl");
     const lat = toNum(pick(row, "latitude", "lat"));
@@ -165,6 +170,7 @@ export function normalizeApartments(
       lat,
       lon,
       imageUrl: photo,
+      images: photos,
       availableAt: pickString(row, "availableFrom", "availableDate", "dateAvailable") || null,
       noFee: /no\s*fee/i.test(blob),
       amenities,

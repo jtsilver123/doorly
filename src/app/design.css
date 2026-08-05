@@ -1523,6 +1523,75 @@ button.fact:hover .fact-label { color: var(--accent); }
   display: block;
 }
 
+/*
+ * The photo strip. Scroll-snap does the carousel work: the browser owns the
+ * swipe, so it behaves like every photo viewer on the phone. The images live
+ * in normal flow inside the strip (position:absolute above would stack all of
+ * them on frame one), so they re-declare their own geometry here.
+ */
+.gallery-strip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.gallery-strip::-webkit-scrollbar { display: none; }
+.drawer-photo .gallery-strip img {
+  position: static;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.gallery-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-full);
+  border: none;
+  background: rgba(20, 26, 24, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+.gallery-arrow.is-prev { left: var(--s2); }
+.gallery-arrow.is-next { right: var(--s2); }
+.gallery:hover .gallery-arrow,
+.gallery-arrow:focus-visible { opacity: 1; }
+.gallery-arrow:hover { background: rgba(20, 26, 24, 0.8); }
+.gallery-arrow:disabled { opacity: 0; pointer-events: none; }
+/* Touch has no hover — the arrows stay visible where they're the only cue
+   besides the swipe itself. */
+@media (hover: none) {
+  .gallery-arrow { opacity: 1; }
+  .gallery-arrow:disabled { opacity: 0; }
+}
+
+.gallery-count {
+  position: absolute;
+  right: var(--s2);
+  bottom: var(--s2);
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: rgba(20, 26, 24, 0.65);
+  color: #fff;
+  font-size: var(--t-xs);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
 .drawer-photo-alt {
   position: absolute;
   inset: 0;

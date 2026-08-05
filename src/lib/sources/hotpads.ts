@@ -93,6 +93,8 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
       lat: row.address?.latitude ?? null,
       lon: row.address?.longitude ?? null,
       imageUrl: row.photos?.[0] ?? null,
+      // HotPads is one of the two sources that publish the whole set.
+      images: (row.photos ?? []).filter((p): p is string => typeof p === "string"),
       availableAt: null,
       noFee: NO_FEE_RE.test(amenityBlob) || NO_FEE_RE.test(row.title ?? ""),
       amenities,

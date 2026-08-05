@@ -19,6 +19,7 @@ import {
 } from "@/types";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
+import PhotoGallery from "@/components/PhotoGallery";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
 import { tourQuestions } from "@/lib/tourPrep";
@@ -143,7 +144,6 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
-  const [imageBroken, setImageBroken] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [phone, setPhone] = useState(formatPhone(listing.myContactPhone));
   const [who, setWho] = useState(listing.myContactName);
@@ -459,19 +459,14 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             grid auto rows collapsed to zero and children overlapped. Normal
             flow cannot compress a child below its content. */}
         <div className="drawer-body">
-          <div className="drawer-photo">
-            <span className="drawer-photo-alt" aria-hidden="true">
-              {listing.neighborhood || listing.borough || "No photo"}
-            </span>
-            {listing.imageUrl && !imageBroken && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={listing.imageUrl}
-                alt={`Photo of ${listing.address}`}
-                onError={() => setImageBroken(true)}
-              />
-            )}
-          </div>
+          {/* Keyed by listing so the strip snaps back to the first photo when
+              the panel moves to another apartment. */}
+          <PhotoGallery
+            key={listing.id}
+            images={listing.images}
+            alt={`Photo of ${listing.address}`}
+            placeholder={listing.neighborhood || listing.borough || "No photo"}
+          />
 
           <dl className="drawer-facts">
             <div>
