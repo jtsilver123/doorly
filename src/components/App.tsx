@@ -841,6 +841,24 @@ export default function Home() {
             <span className="brand brandmark">Doorly</span>
           </div>
           <div className="brandmeta">
+            {/* The countdown leads — it's the premise of the product — and
+                wears the same label-above-figure shape as the masthead facts,
+                with the date itself, so nobody reverse-engineers a calendar
+                from a number. */}
+            {daysToMove > 0 && (
+              <span className="brandcount" data-soon={daysToMove <= 21 ? "true" : undefined}>
+                <span className="brandcount-label">
+                  Move-in
+                  {profile.moveInDate
+                    ? ` · ${new Date(`${profile.moveInDate}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+                    : ""}
+                </span>
+                <b>
+                  {daysToMove}
+                  <i>days</i>
+                </b>
+              </span>
+            )}
             <span className="brandstat">
               <i aria-hidden="true" />
               <b>{counts.active}</b> live
@@ -851,14 +869,6 @@ export default function Home() {
                 </>
               )}
             </span>
-            {/* The countdown is the premise of the product — four weeks, then
-                you're either moving or you're not. It reads as a figure. */}
-            {daysToMove > 0 && (
-              <span className="brandcount" data-soon={daysToMove <= 21 ? "true" : undefined}>
-                <b>{daysToMove}</b>
-                <span>days to move-in</span>
-              </span>
-            )}
           </div>
         </div>
 

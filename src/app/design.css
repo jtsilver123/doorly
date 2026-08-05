@@ -1776,23 +1776,32 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .brandmeta {
   display: grid;
-  gap: var(--s2);
+  gap: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
   font-size: var(--t-xs);
   color: var(--text-muted);
 }
 
-/* The countdown, set as a figure with its unit beneath — the one thing in
-   the rail you should be able to read without focusing on it. */
-.brandcount {
-  display: grid;
-  gap: 1px;
-  padding-top: var(--s3);
-  border-top: 1px solid var(--border);
+/* The countdown: the masthead fact pattern, in miniature. Label above,
+   figure below, the date included — a number you can read without doing
+   calendar arithmetic, in the corner of your eye. */
+.brandcount { display: grid; gap: 2px; }
+
+.brandcount-label {
+  font-size: var(--t-2xs);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .brandcount b {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
   font-family: var(--font-display);
-  font-size: var(--t-2xl);
+  font-size: var(--t-3xl);
   font-weight: 400;
   line-height: var(--lh-tight);
   letter-spacing: -0.01em;
@@ -1800,13 +1809,16 @@ button.fact:hover .fact-label { color: var(--accent); }
   color: var(--text);
 }
 
-.brandcount[data-soon="true"] b { color: var(--urgent); }
-
-.brandcount span {
-  font-size: var(--t-2xs);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+.brandcount b i {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text-muted);
 }
+
+/* Three weeks out the number goes coral; the label stays calm. */
+.brandcount[data-soon="true"] b { color: var(--urgent); }
 
 /* Live / changed reads as a status line, not as a second headline. */
 .brandstat { display: flex; align-items: center; gap: 5px; }
