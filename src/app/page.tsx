@@ -29,6 +29,7 @@ import { signOut } from "@/app/auth/actions";
 import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
+import MapView from "@/components/MapView";
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
 
@@ -111,6 +112,9 @@ export default function Home() {
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [readyOnly, setReadyOnly] = useState(false);
   const [goodOnly, setGoodOnly] = useState(false);
+  const [view, setView] = useState<"grid" | "map">("grid");
+  /** Shared between the map and the grid, so hovering either highlights both. */
+  const [linkedId, setLinkedId] = useState<string | null>(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -353,7 +357,7 @@ export default function Home() {
   // With hundreds of listings the bottleneck is triage speed, so the whole
   // feed is drivable without the mouse.
   useEffect(() => {
-    if (tab !== "feed" || open) return;
+    if (tab !== "feed" || open || view === "map") return;
 
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
@@ -409,7 +413,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, visible, focus, pass, star, reachOut]);
+  }, [tab, open, view, visible, focus, pass, star, reachOut]);
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
@@ -742,6 +746,8 @@ export default function Home() {
               onReset={clearFilters}
               lastCheckedAt={api?.lastCheckedAt}
               sourceCount={ALL_SOURCES.length}
+              view={view}
+              onViewChange={setView}
             />
             {loading ? null : visible.length === 0 ? (
               <Empty
@@ -750,6 +756,13 @@ export default function Home() {
                 onAdd={() => setAdding(true)}
                 onClear={clearFilters}
               />
+            ) : view === "map" ? (
+              <MapView
+                listings={visible}
+                onOpen={setOpen}
+                linkedId={linkedId}
+                onHover={setLinkedId}
+              />
             ) : (
               <div className="grid" ref={gridRef}>
                 {visible.map((listing, i) => (
@@ -757,6 +770,8 @@ export default function Home() {
                     key={listing.id}
                     listing={listing}
                     focused={i === focus}
+                    linked={linkedId === listing.id}
+                    onHover={setLinkedId}
                     onOpen={setOpen}
                     onStar={star}
                     onPass={pass}

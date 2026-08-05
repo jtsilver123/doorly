@@ -42,6 +42,9 @@ function relative(iso: string): string {
 interface Props {
   listing: FeedListing;
   focused?: boolean;
+  /** Hovered on the map. Mirrors the card's own hover state so the two link. */
+  linked?: boolean;
+  onHover?: (id: string | null) => void;
   onOpen: (listing: FeedListing) => void;
   onStar: (listing: FeedListing) => void;
   onPass: (listing: FeedListing) => void;
@@ -51,6 +54,8 @@ interface Props {
 export default function ListingCard({
   listing,
   focused,
+  linked,
+  onHover,
   onOpen,
   onStar,
   onPass,
@@ -71,7 +76,10 @@ export default function ListingCard({
     <article
       className="card"
       data-focused={focused ? "true" : undefined}
+      data-linked={linked ? "true" : undefined}
       data-gone={!listing.isActive ? "true" : undefined}
+      onMouseEnter={() => onHover?.(listing.id)}
+      onMouseLeave={() => onHover?.(null)}
     >
       <button
         className="card-media"

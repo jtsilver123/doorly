@@ -181,11 +181,23 @@ textarea {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+/*
+ * Sidebar items.
+ *
+ * Icons show at every width now. On desktop these were six lines of unstyled
+ * text in a 236px column, which read as a placeholder rather than navigation —
+ * the glyph is what gives each row a shape you learn and then aim at.
+ *
+ * The current-page rule is keyed on aria-current="page". It previously matched
+ * "true", which is what the markup used to emit; correcting the markup for
+ * screen readers silently un-styled the active tab, so the two are pinned
+ * together here deliberately.
+ */
 .nav-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   padding: 8px 10px;
   border-radius: 8px;
@@ -195,6 +207,15 @@ textarea {
   font-size: 14px;
   font-weight: 500;
   text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.nav-item .nav-icon {
+  display: block;
+  font-size: 15px;
+  line-height: 1;
+  text-align: center;
+  opacity: 0.75;
 }
 
 .nav-item:hover {
@@ -202,10 +223,18 @@ textarea {
   color: var(--text);
 }
 
-.nav-item[aria-current="true"] {
+.nav-item[aria-current="page"] {
   background: var(--accent-soft);
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 650;
+}
+
+.nav-item[aria-current="page"] .nav-icon { opacity: 1; }
+
+.nav-item[aria-current="page"] .chip {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
 }
 
 /* Slide-over detail panel */

@@ -22,18 +22,29 @@
   --s5: 24px;
   --s6: 32px;
   --s7: 48px;
+  --s8: 64px;
 
-  /* Type ramp. */
+  /*
+   * Type ramp.
+   *
+   * Widened at the top. The old ramp stopped at 20px for a card price, which
+   * left the single most important number on the screen competing with the
+   * address for weight — the listing sites people like all let the price
+   * dominate, and they're right to. The small end barely moved: dense metadata
+   * still needs to be dense.
+   */
   --t-xs: 11px;
-  --t-sm: 12px;
-  --t-md: 13px;
+  --t-sm: 12.5px;
+  --t-md: 13.5px;
   --t-lg: 15px;
-  --t-xl: 20px;
-  --t-2xl: 26px;
+  --t-xl: 17px;
+  --t-2xl: 23px;
+  --t-3xl: 30px;
 
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
+  --r-full: 999px;
 
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
@@ -134,10 +145,18 @@
 
 /* --- cards --------------------------------------------------------------- */
 
+/*
+ * Fewer, larger cards.
+ *
+ * 272px columns fit five across on a wide screen and made every apartment feel
+ * like a database row. At 330px the grid settles at three or four, each card
+ * gets a photo worth looking at, and the whole page stops feeling like a
+ * spreadsheet of places to live.
+ */
 .grid {
   display: grid;
-  gap: var(--s4);
-  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: var(--s5);
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   align-items: start;
 }
 
@@ -153,10 +172,11 @@
   transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 
-.card:hover {
+.card:hover,
+.card[data-linked="true"] {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  box-shadow: 0 6px 20px rgba(16, 24, 40, 0.09);
-  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.11);
+  transform: translateY(-3px);
 }
 
 .card[data-focused="true"] {
@@ -171,7 +191,7 @@
   cursor: pointer;
   position: relative;
   display: block;
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 4 / 3;
   background: var(--surface-2);
   overflow: hidden;
 }
@@ -193,6 +213,16 @@
 
 .card:hover .card-media img { transform: scale(1.03); }
 
+/*
+ * What you see before — or instead of — a photo.
+ *
+ * Verified failure mode: an image the browser can't reach fires neither `load`
+ * nor `error`, it simply hangs. Ad-blockers routinely eat listing-photo CDNs,
+ * so this isn't a hypothetical, and a large empty rectangle reads as a broken
+ * app rather than a missing picture. A soft diagonal weave plus the
+ * neighborhood set in the same style as a caption makes the absence look
+ * intended, and it doubles as the loading state on a slow connection.
+ */
 .card-noimg {
   position: absolute;
   inset: 0;
@@ -201,8 +231,16 @@
   padding: var(--s4);
   text-align: center;
   font-size: var(--t-sm);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
   color: var(--text-muted);
+  opacity: 0.62;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--border) 55%, transparent) 0 1px,
+    transparent 1px 11px
+  );
 }
 
 .card-badges {
@@ -248,8 +286,8 @@
 .card-body {
   display: grid;
   grid-template-rows: auto auto auto auto auto auto 1fr;
-  gap: var(--s1);
-  padding: var(--s3) var(--s3) var(--s3);
+  gap: 3px;
+  padding: var(--s4);
   min-width: 0;
 }
 
@@ -263,15 +301,17 @@
 }
 
 .card-price {
-  font-size: var(--t-xl);
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-size: var(--t-2xl);
+  font-weight: 760;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
 }
 
-.card-size { font-size: var(--t-sm); color: var(--text-muted); white-space: nowrap; }
+.card-size { font-size: var(--t-md); color: var(--text-muted); white-space: nowrap; font-weight: 500; }
 
 .card-sub {
-  font-size: var(--t-sm);
+  font-size: var(--t-md);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -281,7 +321,7 @@
 .card-address {
   all: unset;
   cursor: pointer;
-  font-size: var(--t-md);
+  font-size: var(--t-lg);
   font-weight: 600;
   line-height: 1.3;
   margin-top: var(--s1);
@@ -295,7 +335,7 @@
 .card-address:hover { color: var(--accent); }
 
 .card-where {
-  font-size: var(--t-sm);
+  font-size: var(--t-md);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -345,6 +385,7 @@
   align-items: baseline;
   gap: 1px;
   font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums;
   border-radius: var(--r-sm);
   padding: 3px 7px;
   color: #fff;
@@ -352,7 +393,7 @@
   line-height: 1;
 }
 
-.ratedisc b { font-weight: 750; font-size: var(--t-lg); letter-spacing: -0.02em; }
+.ratedisc b { font-weight: 760; font-size: var(--t-xl); letter-spacing: -0.025em; }
 .ratedisc i { font-style: normal; font-size: 9px; opacity: 0.75; }
 
 .ratedisc[data-size="sm"] { padding: 2px 5px; }
@@ -400,9 +441,9 @@
 
 .proscon {
   display: grid;
-  gap: 2px;
-  margin-top: var(--s1);
-  font-size: var(--t-xs);
+  gap: 3px;
+  margin-top: 5px;
+  font-size: var(--t-sm);
 }
 
 .proscon-row {
@@ -475,7 +516,9 @@
   align-self: end;
   display: grid;
   gap: var(--s2);
-  padding-top: var(--s2);
+  padding-top: var(--s3);
+  margin-top: var(--s1);
+  border-top: 1px solid var(--border);
 }
 
 .card-actions { display: flex; gap: 6px; }
@@ -725,7 +768,10 @@
     gap: 0;
   }
 
+  /* Stacked on a phone. The desktop rule is a three-column grid, so this has
+     to switch display mode rather than just set flex-direction. */
   .mobile-nav .nav-item {
+    display: flex;
     flex-direction: column;
     gap: 2px;
     padding: 6px 4px;
@@ -792,7 +838,7 @@
   .card-star { opacity: 1; width: 34px; height: 34px; }
 }
 
-.nav-icon { display: none; }
+
 
 /* The nav is one component; only its presentation changes at the breakpoint. */
 @media (max-width: 860px) {
@@ -951,3 +997,351 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 .skiplink:focus { top: var(--s3); }
+
+/* --- toolbar, second pass ------------------------------------------------ */
+
+/* One row, wrapping only when it must. The old two-row layout meant the page
+   opened on a block of form controls before a single apartment. */
+.filterbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+.filterbar-more { position: relative; }
+
+/* Transparent on desktop: the controls stay direct participants in the row. */
+.filterbar-controls {
+  display: contents;
+}
+
+.control.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.control-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.control-sort { margin-left: auto; max-width: 210px; }
+
+/* The tucked-away filters. A popover rather than a drawer: it's a refinement
+   of what's on screen, so the results should stay visible behind it. */
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.panel-group { display: grid; gap: var(--s2); }
+
+.panel-label {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.panel-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+/* Segmented control. Reads as one object with two states rather than two
+   buttons that happen to be adjacent. */
+.viewswitch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.viewswitch button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--t-md);
+  font-weight: 600;
+  padding: 5px 13px;
+  border-radius: 7px;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.viewswitch button.is-on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* --- map ----------------------------------------------------------------- */
+
+.mapframe {
+  display: grid;
+  gap: var(--s2);
+}
+
+.mapcanvas {
+  position: relative;
+  aspect-ratio: 5 / 4;
+  max-height: 74vh;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  /* A faint blueprint grid. It gives the eye something to measure against
+     without pretending to be streets. */
+  background:
+    linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 8.3333%,
+    linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 8.3333% 100%,
+    var(--surface);
+  background-blend-mode: normal;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mapcanvas { background-color: var(--surface); }
+}
+
+/* Context, not data. It has to stay readable under a field of pins without
+   ever competing with one, hence the halo rather than more weight. */
+.maphood {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.maphood i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.8;
+}
+
+/* Priced pins, coloured by the same four grades the cards use, so the map
+   carries the identical judgment rather than a second opinion. */
+.mappin {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border: 1.5px solid var(--surface);
+  border-radius: var(--r-full);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  line-height: 1.25;
+  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.mappin b { font-size: 9px; }
+
+.mappin[data-grade="excellent"] { background: #15803d; z-index: 6; }
+.mappin[data-grade="strong"]    { background: #2563eb; z-index: 5; }
+.mappin[data-grade="fair"]      { background: #b45309; z-index: 4; }
+.mappin[data-grade="weak"]      { background: #8b93a1; z-index: 2; opacity: 0.82; }
+
+.mappin[data-saved="true"] { border-color: #fbbf24; }
+
+.mappin:hover,
+.mappin:focus-visible,
+.mappin[data-active="true"] {
+  transform: translate(-50%, -50%) scale(1.22);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.4);
+  z-index: 30;
+}
+
+/* Count bubbles, where several listings collapse into one mark. Sized by area
+   so twenty places don't look four times busier than five. */
+.mapcluster {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface);
+  border-radius: var(--r-full);
+  color: #fff;
+  font-size: var(--t-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  z-index: 7;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.3);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.mapcluster[data-grade="excellent"] { background: #15803d; }
+.mapcluster[data-grade="strong"]    { background: #2563eb; }
+.mapcluster[data-grade="fair"]      { background: #b45309; }
+.mapcluster[data-grade="weak"]      { background: #8b93a1; }
+
+.mapcluster:hover,
+.mapcluster:focus-visible {
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 5px 16px rgba(16, 24, 40, 0.42);
+  z-index: 20;
+}
+
+.mappeek {
+  position: absolute;
+  z-index: 35;
+  display: grid;
+  gap: 2px;
+  min-width: 186px;
+  max-width: 240px;
+  padding: var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
+.mappeek strong { font-size: var(--t-xl); font-weight: 750; letter-spacing: -0.025em; }
+.mappeek span { font-size: var(--t-md); line-height: 1.35; }
+.mappeek-sub { color: var(--text-muted); font-size: var(--t-sm) !important; }
+
+.maplegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
+.mapscale {
+  display: block;
+  border-left: 1px solid var(--text-muted);
+  border-right: 1px solid var(--text-muted);
+  border-bottom: 1px solid var(--text-muted);
+  height: 6px;
+  line-height: 6px;
+  padding-top: 2px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  min-width: 54px;
+}
+
+.mapkey { display: inline-flex; align-items: center; gap: 5px; }
+.maphint { flex: 1; text-align: center; min-width: 0; }
+
+.mapkey i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-full);
+  margin-left: var(--s3);
+}
+
+.mapkey i:first-child { margin-left: 0; }
+.mapkey i[data-grade="excellent"] { background: #15803d; }
+.mapkey i[data-grade="strong"]    { background: #2563eb; }
+.mapkey i[data-grade="fair"]      { background: #b45309; }
+.mapkey i[data-grade="weak"]      { background: #8b93a1; }
+
+@media (max-width: 700px) {
+  .mapcanvas { aspect-ratio: 3 / 4; }
+  .control-sort { margin-left: 0; max-width: none; flex: 1; }
+}
+
+/* --- phones, final word --------------------------------------------------
+ *
+ * This block sits last on purpose. The toolbar and card rules above were added
+ * after the main mobile breakpoint, so they were silently winning the cascade
+ * on phones — the row went back to wrapping and the toolbar grew to three
+ * stacked rows, pushing every apartment below the fold. Ordering is the fix;
+ * !important would only hide the collision.
+ */
+@media (max-width: 860px) {
+  /* Two columns of facts, not four. At 390px a four-across row wrapped every
+     value onto three lines, so the two numbers the product turns on were the
+     ugliest thing on the page. */
+  .searchhead-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s2);
+  }
+
+  .fact { min-width: 0; }
+  .fact-value { font-size: var(--t-lg); }
+  .fact-unit { display: block; }
+
+  /* Search on its own line, everything else on one scrolling line. Two rows
+     total, so a listing is visible without scrolling. */
+  .filterbar-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s2);
+  }
+
+  .filterbar-row > .searchfield { grid-column: 1 / -1; }
+
+  .filterbar-controls {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .filterbar-controls::-webkit-scrollbar { display: none; }
+  .filterbar-controls > * { flex: 0 0 auto; }
+  .control-sort { margin-left: 0; max-width: 158px; }
+
+  /* A 4:3 photo at full phone width is ~290px of the first screen. 3:2 keeps
+     the picture generous while leaving room for the price under it. */
+  .card-media { aspect-ratio: 3 / 2; }
+
+  .grid { grid-template-columns: 1fr; gap: var(--s4); }
+
+  .mapcanvas { aspect-ratio: 3 / 4; }
+  .maphint { display: none; }
+}
