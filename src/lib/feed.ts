@@ -71,6 +71,10 @@ interface StateRow {
   notes: string;
   follow_up_at: string | null;
   events_seen_at: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  contact_name: string | null;
+  tour_at: string | null;
 }
 
 function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
@@ -289,6 +293,10 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       visitedAt: state?.visited_at ?? null,
       notes: state?.notes ?? "",
       followUpAt: state?.follow_up_at ?? null,
+      myContactPhone: state?.contact_phone ?? "",
+      myContactEmail: state?.contact_email ?? "",
+      myContactName: state?.contact_name ?? "",
+      tourAt: state?.tour_at ?? null,
       contactCount: contact?.count ?? 0,
       lastContactAt: contact?.last ?? null,
       lastContactChannel: contact?.channel ?? null,
@@ -470,6 +478,10 @@ export async function setListingFields(
     follow_up_at: string | null;
     visited_at: string | null;
     events_seen_at: string | null;
+    contact_phone: string;
+    contact_email: string;
+    contact_name: string;
+    tour_at: string | null;
   }>
 ): Promise<void> {
   const supabase = await db();

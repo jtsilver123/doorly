@@ -52,6 +52,24 @@ export async function PATCH(request: Request, { params }: Params) {
       case "seen":
         await setListingFields(id, { events_seen_at: new Date().toISOString() });
         break;
+      case "contactDetails":
+        // Yours, not the listing's: a number you dug up isn't a fact about the
+        // apartment, and shouldn't be published to anyone else searching it.
+        await setListingFields(id, {
+          contact_phone: String(body.phone ?? "").slice(0, 40),
+          contact_email: String(body.email ?? "").slice(0, 200),
+          contact_name: String(body.who ?? "").slice(0, 120),
+        });
+        break;
+
+      case "tourAt":
+        await setListingFields(id, {
+          tour_at: body.tourAt ? String(body.tourAt) : null,
+        });
+        // A time implies the tour is booked; saying so saves a second click.
+        if (body.tourAt) await setStage(id, "tour");
+        break;
+
       case "unpass":
         await undoPass(id);
         break;

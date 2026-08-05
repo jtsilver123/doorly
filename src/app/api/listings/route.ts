@@ -5,11 +5,11 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  if (!body.address || !body.price) {
-    return NextResponse.json(
-      { error: "address and price are required" },
-      { status: 400 }
-    );
+  // Only the address is required. Somebody pasting one from a text message
+  // rarely has the rent to hand, and refusing the add until they do is how a
+  // tip stays in the text message it arrived in.
+  if (!body.address) {
+    return NextResponse.json({ error: "An address is required." }, { status: 400 });
   }
   try {
     const id = await addManualListing({

@@ -1894,3 +1894,81 @@ button.fact:hover { border-color: var(--accent); }
   border-radius: 4px;
   padding: 0 4px;
 }
+
+/* --- state-aware actions -------------------------------------------------- */
+
+/* A card in a waiting state has nothing to press. It says where it is instead
+   of offering an action that would only repeat one already taken. */
+.card-state {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Overdue, or happening within the day. */
+.btn-primary.is-urgent { background: var(--warn); border-color: var(--warn); }
+.btn-primary.is-urgent:hover { filter: brightness(0.94); }
+
+.stagenote {
+  display: grid;
+  gap: 1px;
+  padding: 8px var(--s3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.stagenote strong { font-size: var(--t-md); }
+.stagenote span { font-size: var(--t-xs); color: var(--text-muted); }
+
+/* --- contact you added yourself ------------------------------------------ */
+
+.contactedit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  padding: var(--s4);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+
+.contactedit label { display: grid; gap: 4px; }
+.contactedit label > span { font-size: var(--t-xs); font-weight: 600; color: var(--text-muted); }
+.contactedit-wide { grid-column: 1 / -1; }
+.contactedit-actions { grid-column: 1 / -1; display: flex; gap: var(--s2); }
+
+/* --- when the tour is ----------------------------------------------------- */
+
+.tourtime {
+  display: grid;
+  gap: 5px;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.tourtime > span { font-size: var(--t-xs); font-weight: 600; color: var(--text-muted); }
+.tourtime > b { font-size: var(--t-md); color: var(--accent); }
+
+@media (max-width: 560px) {
+  .contactedit { grid-template-columns: 1fr; }
+}
+
+/* Add by address, above the board. */
+.quickadd {
+  display: flex;
+  gap: var(--s2);
+  margin-bottom: var(--s4);
+  max-width: 34rem;
+}
+
+.quickadd .field { flex: 1; }

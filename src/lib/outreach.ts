@@ -230,11 +230,40 @@ export type Reachable = {
   hint: string;
 };
 
+/**
+ * What the listing can be reached on, counting anything you added yourself.
+ *
+ * Your own number wins over the published one. It's usually the only one:
+ * nothing in the live corpus publishes a phone, so a number here came from
+ * calling around or a sign in a window, and it is by definition better than
+ * the nothing the site gave us.
+ */
+export function reachableOn(listing: {
+  contactPhone?: string;
+  contactEmail?: string;
+  contactName?: string;
+  myContactPhone?: string;
+  myContactEmail?: string;
+  myContactName?: string;
+}): { phone: string; email: string; who: string; mine: boolean } {
+  const phone = listing.myContactPhone?.trim() || listing.contactPhone?.trim() || "";
+  const email = listing.myContactEmail?.trim() || listing.contactEmail?.trim() || "";
+  return {
+    phone,
+    email,
+    who: listing.myContactName?.trim() || listing.contactName?.trim() || "",
+    mine: Boolean(listing.myContactPhone?.trim() || listing.myContactEmail?.trim()),
+  };
+}
+
 export function bestChannel(listing: {
   contactPhone: string;
   contactEmail?: string;
+  myContactPhone?: string;
+  myContactEmail?: string;
   url: string;
 }): Reachable {
+  const { phone, email } = reachableOn(listing);
   /**
    * One label across all three channels, on purpose.
    *
@@ -246,14 +275,14 @@ export function bestChannel(listing: {
    * sounded like a chore. The goal is identical every time; only the plumbing
    * differs, and the plumbing belongs in the tooltip.
    */
-  if (listing.contactPhone) {
+  if (phone) {
     return {
       channel: "text",
-      label: "Request a tour",
+      label: "Text for a tour",
       hint: "Opens Messages with your introduction already written",
     };
   }
-  if (listing.contactEmail) {
+  if (email) {
     return {
       channel: "email",
       label: "Request a tour",

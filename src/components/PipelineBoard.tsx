@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FeedListing, Stage } from "@/types";
 import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
+import { nextAction } from "@/lib/nextAction";
 
 /**
  * The pipeline board.
@@ -28,30 +29,6 @@ import { RatingDisc } from "@/components/Rating";
 
 const money = (n: number) => `$${n.toLocaleString()}`;
 
-/**
- * The single next action for a listing, given where it sits.
- *
- * A board that only shows position makes you re-derive the action every time
- * you look at it. This states it, and turns amber when it has waited too long.
- */
-function nextStep(l: FeedListing): string {
-  if (l.needsFollowUp) return "Chase — no reply yet";
-  switch (l.stage) {
-    case "interested":
-      return "Ask for a viewing";
-    case "contacted":
-      return "Waiting on their reply";
-    case "tour":
-      return "Tour booked — go see it";
-    case "toured":
-      return "Decide, then apply";
-    case "applied":
-      return "Waiting on the landlord";
-    default:
-      return "";
-  }
-}
-
 /** What an empty column means, rather than a bare "Nothing here". */
 const STAGE_HINT: Record<string, string> = {
   interested: "Star a place to start it here",
@@ -65,13 +42,17 @@ export default function PipelineBoard({
   listings,
   onOpen,
   onMove,
+  onQuickAdd,
 }: {
   listings: FeedListing[];
   onOpen: (listing: FeedListing) => void;
   onMove: (listing: FeedListing, stage: Stage) => void;
+  /** Address typed into the quick-add box. Resolved by the page. */
+  onQuickAdd: (address: string) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
+  const [quick, setQuick] = useState("");
 
   function moveBy(listing: FeedListing, delta: number) {
     const at = PIPELINE_STAGES.indexOf(listing.stage);
@@ -81,6 +62,33 @@ export default function PipelineBoard({
   }
 
   return (
+    <>
+      {/*
+        Somebody sends you an address. Before this, getting it onto the board
+        meant opening a modal and filling in a form — enough friction that the
+        tip stayed in the text message it arrived in.
+      */}
+      <form
+        className="quickadd"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!quick.trim()) return;
+          onQuickAdd(quick.trim());
+          setQuick("");
+        }}
+      >
+        <input
+          className="field"
+          value={quick}
+          placeholder="Paste an address to add it — 91 East Third Street"
+          aria-label="Add a place by address"
+          onChange={(e) => setQuick(e.target.value)}
+        />
+        <button className="btn btn-primary" type="submit" disabled={!quick.trim()}>
+          Add
+        </button>
+      </form>
+
     <div className="board">
       {PIPELINE_STAGES.map((stage) => {
         const column = listings.filter((l) => l.stage === stage);
@@ -150,8 +158,14 @@ export default function PipelineBoard({
                     {l.unit ? ` #${l.unit}` : ""}
                   </span>
                   <span className="muted board-where">{l.neighborhood}</span>
-                  <span className={l.needsFollowUp ? "board-next is-due" : "board-next"}>
-                    {nextStep(l)}
+                  {/* One source of truth with the cards and the panel, so the
+                      board can never disagree about what comes next. */}
+                  <span
+                    className={
+                      nextAction(l).urgent ? "board-next is-due" : "board-next"
+                    }
+                  >
+                    {nextAction(l).label}
                   </span>
                 </button>
               ))}
@@ -166,5 +180,6 @@ export default function PipelineBoard({
         );
       })}
     </div>
+    </>
   );
 }

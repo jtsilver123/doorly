@@ -164,6 +164,15 @@ export interface FeedListing extends Listing {
   notes: string;
   /** Next thing you told yourself to do, and when. */
   followUpAt: string | null;
+  /**
+   * Contact details you supplied yourself, which win over whatever the listing
+   * published — usually because the listing published nothing.
+   */
+  myContactPhone: string;
+  myContactEmail: string;
+  myContactName: string;
+  /** When the viewing actually is. A booked tour without a time is just a label. */
+  tourAt: string | null;
   contactCount: number;
   lastContactAt: string | null;
   /** How you last reached out — shown on the card so it's visible at a glance. */

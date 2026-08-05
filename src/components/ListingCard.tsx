@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { FeedListing } from "@/types";
 import type { Source } from "@/types";
 import { linkPreference, SOURCE_LABEL, STAGE_LABEL } from "@/types";
-import { CONTACT_ICON, CONTACT_LABEL, bestChannel } from "@/lib/outreach";
+import { CONTACT_ICON, CONTACT_LABEL } from "@/lib/outreach";
+import { nextAction } from "@/lib/nextAction";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { RatingDisc, ProsConsLine } from "@/components/Rating";
@@ -71,7 +72,7 @@ export default function ListingCard({
   const dropped = listing.price < listing.originalPrice;
   const rose = listing.price > listing.originalPrice;
   const delta = listing.price - listing.originalPrice;
-  const reach = bestChannel(listing);
+  const action = nextAction(listing);
   const sources = orderedSources(listing, preferredSource);
   const primary = sources[0];
   const warn = listing.flags.find((f) => f.severity === "warn");
@@ -211,13 +212,24 @@ export default function ListingCard({
                 <SourceMark key={s.source} source={s.source} href={s.url} />
               ))}
             </span>
-            <button
-              className="btn btn-primary btn-block"
-              onClick={() => onReach(listing)}
-              title={reach.hint}
-            >
-              {reach.label}
-            </button>
+            {/* The action follows the state. A card at "Tour booked" shows
+                when the tour is; one you've applied to doesn't invite you to
+                ask for a viewing again. */}
+            {action.kind === "wait" || action.kind === "done" ? (
+              <span className="card-state">{action.label}</span>
+            ) : (
+              <button
+                className={
+                  action.urgent
+                    ? "btn btn-primary btn-block is-urgent"
+                    : "btn btn-primary btn-block"
+                }
+                onClick={() => onReach(listing)}
+                title={action.hint}
+              >
+                {action.label}
+              </button>
+            )}
             {primary && (
               <a
                 className="btn btn-icon"

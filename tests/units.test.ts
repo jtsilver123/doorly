@@ -12,8 +12,10 @@ import {
   draftTourMessage,
   smsLink,
   normalizePhone,
+  reachableOn,
   DEFAULT_PROFILE,
 } from "@/lib/outreach";
+import { nextAction } from "@/lib/nextAction";
 import {
   effectiveRent,
   allInMonthly,
@@ -309,6 +311,10 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     visitedAt: null,
     notes: "",
     followUpAt: null,
+    myContactPhone: "",
+    myContactEmail: "",
+    myContactName: "",
+    tourAt: null,
     contactCount: 0,
     lastContactAt: null,
     lastContactChannel: null,
@@ -1070,4 +1076,77 @@ test("dedupe keys on the whole conflict target, not one column", () => {
   ];
   const out = dedupeForUpsert(rows, (r) => `${r.source}:${r.source_id}`);
   assert.equal(out.length, 2, "same id on two sites is two different rows");
+});
+
+// --- what to offer, given the state ---------------------------------------
+
+test("a booked tour with no time asks for the time, not another message", () => {
+  const a = nextAction(feed({ stage: "tour", tourAt: null }));
+  assert.equal(a.kind, "schedule");
+  assert.match(a.label, /time/i);
+  assert.ok(a.urgent, "a tour without a time is the thing to fix now");
+});
+
+test("a booked tour with a time shows the time", () => {
+  const at = new Date(Date.now() + 3 * 86_400_000);
+  at.setHours(15, 30, 0, 0);
+  const a = nextAction(feed({ stage: "tour", tourAt: at.toISOString() }));
+  assert.equal(a.kind, "tour");
+  assert.match(a.label, /\d/, `expected a time, got "${a.label}"`);
+  assert.ok(!/request a tour/i.test(a.label), "must not re-offer a tour already booked");
+});
+
+test("a passed tour offers the next step rather than the old one", () => {
+  const a = nextAction(feed({ stage: "tour", tourAt: new Date(Date.now() - 86_400_000).toISOString() }));
+  assert.equal(a.becomes, "toured");
+});
+
+test("nothing already done is ever offered again", () => {
+  for (const stage of ["contacted", "applied", "closed"] as const) {
+    const a = nextAction(feed({ stage }));
+    assert.ok(
+      !/request a tour|text for a tour/i.test(a.label),
+      `${stage} offered "${a.label}"`
+    );
+  }
+});
+
+test("silence after contacting turns into a chase", () => {
+  const quiet = nextAction(feed({ stage: "contacted", needsFollowUp: true }));
+  assert.equal(quiet.kind, "chase");
+  assert.ok(quiet.urgent);
+  const waiting = nextAction(feed({ stage: "contacted", needsFollowUp: false }));
+  assert.equal(waiting.kind, "wait");
+});
+
+test("a listing with no way to reach anyone asks for a number", () => {
+  const a = nextAction(feed({ stage: "interested", contactPhone: "", contactEmail: "" }));
+  assert.equal(a.kind, "add-contact");
+});
+
+// --- contact details you supplied yourself --------------------------------
+
+test("your own number wins over whatever the listing published", () => {
+  const both = reachableOn({ contactPhone: "212-000-0000", myContactPhone: "212-555-0134" });
+  assert.equal(both.phone, "212-555-0134");
+  assert.ok(both.mine);
+
+  // And it turns a dead-end listing into a textable one, which is the whole
+  // point: nothing in the live corpus publishes a phone number.
+  const rescued = feed({ contactPhone: "", myContactPhone: "212-555-0134" });
+  assert.equal(bestChannel(rescued).channel, "text");
+  assert.equal(nextAction(rescued).kind, "reach");
+});
+
+test("a published number is still used when you haven't added one", () => {
+  const from = reachableOn({ contactPhone: "212-000-0000", contactName: "Jane" });
+  assert.equal(from.phone, "212-000-0000");
+  assert.equal(from.who, "Jane");
+  assert.ok(!from.mine);
+});
+
+test("whitespace is not a contact", () => {
+  const blank = reachableOn({ contactPhone: "", myContactPhone: "   " });
+  assert.equal(blank.phone, "");
+  assert.equal(nextAction(feed({ stage: "interested", myContactPhone: "  " })).kind, "add-contact");
 });

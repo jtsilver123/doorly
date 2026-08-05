@@ -18,8 +18,10 @@ import {
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { RatingDisc, ProsConsList } from "@/components/Rating";
+import { nextAction, tourWhen } from "@/lib/nextAction";
 import {
   bestChannel,
+  reachableOn,
   draftTourMessage,
   mailtoLink,
   smsLink,
@@ -38,6 +40,18 @@ interface Props {
   profile: Profile;
   onClose: () => void;
   onChanged: () => void;
+}
+
+/**
+ * A timestamp as `datetime-local` wants it: local wall time, no zone.
+ * Slicing the ISO string would show UTC, which is an hour or five wrong.
+ */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
 function money(n: number) {
@@ -96,6 +110,11 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [imageBroken, setImageBroken] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
+  const [phone, setPhone] = useState(listing.myContactPhone);
+  const [who, setWho] = useState(listing.myContactName);
+  const [email, setEmail] = useState(listing.myContactEmail);
+  const [tourAt, setTourAt] = useState(toLocalInput(listing.tourAt));
   /**
    * Stage moves paint immediately and reconcile behind the scenes.
    *
@@ -112,6 +131,13 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
 
   // A different listing in the same panel starts from its own stage.
   useEffect(() => setStage(listing.stage), [listing.id, listing.stage]);
+  useEffect(() => {
+    setPhone(listing.myContactPhone);
+    setWho(listing.myContactName);
+    setEmail(listing.myContactEmail);
+    setTourAt(toLocalInput(listing.tourAt));
+    setEditingContact(false);
+  }, [listing.id, listing.myContactPhone, listing.myContactName, listing.myContactEmail, listing.tourAt]);
 
   useEffect(() => {
     let live = true;
@@ -184,6 +210,8 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   }
 
   const reach = bestChannel(listing);
+  const action = nextAction(listing);
+  const contact = reachableOn(listing);
 
   /** The stage almost everyone moves to next, or null at the end of the line. */
   const ORDER: Stage[] = ["inbox", "interested", "contacted", "tour", "toured", "applied", "closed"];
@@ -359,6 +387,34 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
           {/* --- outreach ------------------------------------------------ */}
           <section style={{ display: "grid", gap: 8 }}>
             <div style={{ display: "flex", gap: 8 }}>
+              {/* What this offers depends on where the listing is. Proposing a
+                  tour on something already booked, or already applied to, makes
+                  you check whether the app has lost track of you. */}
+              {action.kind === "add-contact" ? (
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditingContact(true)}
+                >
+                  {action.label}
+                </button>
+              ) : action.kind === "schedule" ? (
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => document.getElementById("tour-at")?.focus()}
+                >
+                  {action.label}
+                </button>
+              ) : action.kind === "apply" ? (
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => move("applied")}
+                >
+                  {action.label}
+                </button>
+              ) : action.kind === "reach" || action.kind === "chase" ? (
               <button
                 className="btn btn-primary"
                 style={{ flex: 1 }}
@@ -367,8 +423,14 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                 }
                 title={reach.hint}
               >
-                {reach.label}
+                {action.kind === "chase" ? "Send a follow-up" : reach.label}
               </button>
+              ) : (
+                <div className="stagenote" style={{ flex: 1 }}>
+                  <strong>{action.label}</strong>
+                  <span>{action.hint}</span>
+                </div>
+              )}
               {reach.channel !== "email" && (
                 <button
                   className="btn"
@@ -383,10 +445,78 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
               </button>
             </div>
             <div className="muted" style={{ fontSize: 12 }}>
-              {listing.contactPhone
-                ? `Texts ${listing.contactPhone}${listing.contactName ? ` · ${listing.contactName}` : ""}. Sending logs it and moves this to Contacted.`
-                : "No phone or email published — the button copies the message and opens the listing, where their contact form lives. Either way it's logged and moved to Contacted."}
+              {contact.phone
+                ? `Texts ${contact.phone}${contact.who ? ` · ${contact.who}` : ""}${contact.mine ? " (you added this)" : ""}. Sending logs it and moves this to Contacted.`
+                : contact.email
+                  ? `Emails ${contact.email}${contact.who ? ` · ${contact.who}` : ""}. Sending logs it and moves this to Contacted.`
+                  : "No phone or email published. The button copies your message and opens the listing, where their contact form lives — or add a number below if you have one."}
             </div>
+
+            {/*
+              Nothing in the live corpus publishes a phone number, so the one
+              you got by calling around is usually the only one there is. It
+              belongs on the listing, where the app can act on it, rather than
+              in a notes field it can't read.
+            */}
+            {editingContact ? (
+              <div className="contactedit">
+                <label>
+                  <span>Their number</span>
+                  <input
+                    className="field"
+                    value={phone}
+                    inputMode="tel"
+                    placeholder="(212) 555-0134"
+                    autoFocus
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Who is it?</span>
+                  <input
+                    className="field"
+                    value={who}
+                    placeholder="Jane at Corcoran"
+                    onChange={(e) => setWho(e.target.value)}
+                  />
+                </label>
+                <label className="contactedit-wide">
+                  <span>Their email, if you have one</span>
+                  <input
+                    className="field"
+                    value={email}
+                    inputMode="email"
+                    placeholder="jane@example.com"
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+                <div className="contactedit-actions">
+                  <button
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      await patch({
+                        action: "contactDetails",
+                        phone: phone.trim(),
+                        email: email.trim(),
+                        who: who.trim(),
+                      });
+                      setEditingContact(false);
+                    }}
+                  >
+                    Save contact
+                  </button>
+                  <button className="btn" onClick={() => setEditingContact(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button className="linkish" onClick={() => setEditingContact(true)}>
+                {contact.phone || contact.email
+                  ? "Edit their contact details"
+                  : "I have their number — add it"}
+              </button>
+            )}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {listing.contactPhone && (
                 <a
@@ -516,6 +646,29 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                 ))}
               </select>
             </div>
+
+            {/* Only once a tour exists to have a time. "Tour booked" without
+                one is a label rather than a plan, and it's the thing you'll
+                want to look up on the morning of. */}
+            {stage === "tour" && (
+              <label className="tourtime">
+                <span>When is it?</span>
+                <input
+                  id="tour-at"
+                  className="field"
+                  type="datetime-local"
+                  value={tourAt}
+                  onChange={(e) => {
+                    setTourAt(e.target.value);
+                    patch({
+                      action: "tourAt",
+                      tourAt: e.target.value ? new Date(e.target.value).toISOString() : null,
+                    });
+                  }}
+                />
+                {listing.tourAt && <b>{tourWhen(listing.tourAt)}</b>}
+              </label>
+            )}
           </section>
 
           {/* --- price history ------------------------------------------- */}

@@ -16,6 +16,7 @@ import {
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
 import { applyFilters } from "@/lib/filters";
+import { nextAction } from "@/lib/nextAction";
 import { runwayDays } from "@/lib/runway";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import SearchEditor from "@/components/SearchEditor";
@@ -324,6 +325,40 @@ export default function Home() {
     [patch, loadFeed]
   );
 
+  /**
+   * Add a place by address.
+   *
+   * Matches against what's already tracked first. Somebody sending you an
+   * address usually means a listing the poll already has, and creating a second
+   * copy of it would split its price history and its notes in two.
+   */
+  const quickAdd = useCallback(
+    async (address: string) => {
+      const needle = address.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const hit = listings.find(
+        (l) => l.address.toLowerCase().replace(/[^a-z0-9]/g, "").includes(needle) && needle.length > 5
+      );
+      if (hit) {
+        moveStage(hit, "interested");
+        setOpen(hit);
+        toast({ message: `Found it — ${hit.address} is in your pipeline`, tone: "good" });
+        return;
+      }
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address, price: 0, url: "" }),
+      });
+      const body = await res.json();
+      if (body.error) toast({ message: body.error, tone: "warn" });
+      else {
+        await loadFeed();
+        toast({ message: `Added ${address}. Open it to fill in the rest.`, tone: "good" });
+      }
+    },
+    [listings, moveStage, loadFeed, toast]
+  );
+
   const pass = useCallback(
     (listing: FeedListing) => {
       setListings((list) => list.filter((l) => l.id !== listing.id));
@@ -350,6 +385,22 @@ export default function Home() {
    */
   const reachOut = useCallback(
     async (listing: FeedListing) => {
+      // Anything that isn't "send them a message" belongs in the panel, where
+      // the control for it lives.
+      const action = nextAction(listing);
+      if (action.kind !== "reach" && action.kind !== "chase") {
+        if (action.becomes) {
+          patch(listing.id, { action: "stage", stage: action.becomes }, false).catch(() =>
+            loadFeed()
+          );
+          setListings((list) =>
+            list.map((l) => (l.id === listing.id ? { ...l, stage: action.becomes! } : l))
+          );
+          return;
+        }
+        setOpen(listing);
+        return;
+      }
       const { channel } = bestChannel(listing);
       const message = draftTourMessage(listing, profile);
 
@@ -499,6 +550,20 @@ export default function Home() {
   useEffect(() => {
     if (focus >= pageSize - 4) setPageSize((n) => Math.min(visible.length, n + PAGE));
   }, [focus, pageSize, visible.length]);
+
+  /**
+   * The open listing, always re-read from the current feed.
+   *
+   * `open` used to hold the object captured at click time, so a change made
+   * inside the panel updated the grid behind it and left the panel showing the
+   * old values — a number you had just saved still read as "no phone
+   * published". Resolving by id each render means the panel sees every write
+   * the moment the feed reloads.
+   */
+  const openListing = useMemo(
+    () => (open ? listings.find((l) => l.id === open.id) ?? open : null),
+    [open, listings]
+  );
 
   const finalistCount = useMemo(
     () =>
@@ -941,7 +1006,12 @@ export default function Home() {
         )}
 
         {!loading && tab === "pipeline" && (
-          <PipelineBoard listings={listings} onOpen={setOpen} onMove={moveStage} />
+          <PipelineBoard
+            listings={listings}
+            onOpen={setOpen}
+            onMove={moveStage}
+            onQuickAdd={quickAdd}
+          />
         )}
 
         {!loading && tab === "compare" && (
@@ -983,9 +1053,9 @@ export default function Home() {
         )}
       </main>
 
-      {open && (
+      {openListing && (
         <ListingDrawer
-          listing={open}
+          listing={openListing}
           profile={profile}
           onClose={() => setOpen(null)}
           onChanged={loadFeed}
