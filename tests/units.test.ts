@@ -1034,3 +1034,40 @@ test("keyHint identifies a key without exposing it", () => {
   // would be counted against a new one.
   assert.notEqual(keyHint("rt_aaaaaaaaaaaaaaaaaaaa"), keyHint("rt_bbbbbbbbbbbbbbbbbbbb"));
 });
+
+// --- upsert batches --------------------------------------------------------
+
+/** Mirror of ingest.ts's dedupeBy — see the note on that function. */
+function dedupeForUpsert<T>(rows: T[], key: (row: T) => string): T[] {
+  const byKey = new Map<string, T>();
+  for (const row of rows) byKey.set(key(row), row);
+  return [...byKey.values()];
+}
+
+test("an upsert batch never carries the same conflict key twice", () => {
+  // Postgres rejects an ON CONFLICT DO UPDATE that would touch one row twice,
+  // and rejects the entire statement with it — so a single collision used to
+  // discard a whole poll. Two fingerprint groups collapse onto one id whenever
+  // their sources already point at the same stored listing.
+  const rows = [
+    { id: "a", price: 3000 },
+    { id: "b", price: 3100 },
+    { id: "a", price: 3200 },
+  ];
+  const out = dedupeForUpsert(rows, (r) => r.id);
+  assert.equal(out.length, 2);
+  assert.deepEqual(out.map((r) => r.id).sort(), ["a", "b"]);
+  // Last wins: both rows describe the same apartment, and the later one came
+  // from the richer source after merging.
+  assert.equal(out.find((r) => r.id === "a")!.price, 3200);
+});
+
+test("dedupe keys on the whole conflict target, not one column", () => {
+  const rows = [
+    { source: "zillow", source_id: "1" },
+    { source: "hotpads", source_id: "1" },
+    { source: "zillow", source_id: "1" },
+  ];
+  const out = dedupeForUpsert(rows, (r) => `${r.source}:${r.source_id}`);
+  assert.equal(out.length, 2, "same id on two sites is two different rows");
+});

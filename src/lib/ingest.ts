@@ -138,6 +138,18 @@ export function pickCanonicalUrl(group: Listing[]): string {
   return group.find((l) => l.url)?.url ?? "";
 }
 
+/**
+ * Last occurrence of each key wins.
+ *
+ * Needed before any upsert with an ON CONFLICT target: Postgres rejects a
+ * statement that would update one row twice, and rejects all of it.
+ */
+function dedupeBy<T>(rows: T[], key: (row: T) => string): T[] {
+  const byKey = new Map<string, T>();
+  for (const row of rows) byKey.set(key(row), row);
+  return [...byKey.values()];
+}
+
 export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
   // Shared market data is written once for everyone, so it needs the service
   // role: RLS deliberately gives users read-only access to it.
@@ -231,6 +243,8 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
   const observations: Record<string, unknown>[] = [];
   const seenSourceKeys = new Set<string>(sourceKeys);
   let newListings = 0;
+  /** Rows that collapsed onto an existing id before writing — see step 3. */
+  let mergedInBatch = 0;
 
   for (const [fp, group] of groups) {
     const primary = pickPrimary(group);
@@ -372,11 +386,55 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
   }
 
   // 3. Write. Listings first so the foreign keys resolve.
-  for (const batch of chunk(listingUpserts, 300)) {
+  //
+  // Deduplicated by conflict key first. Postgres refuses an ON CONFLICT DO
+  // UPDATE that would touch the same row twice in one statement, and it
+  // refuses the *whole* statement — so a single collision silently discarded
+  // an entire poll. Two fingerprint groups land on one id whenever their
+  // sources already point at the same stored listing, which is common: it is
+  // the cross-site dedupe working, arriving one scrape too late to have merged
+  // the groups. Later wins; they describe the same apartment.
+  const dedupedListings = dedupeBy(listingUpserts, (r) => String(r.id));
+  const dedupedSources = dedupeBy(sourceUpserts, (r) => `${r.source}:${r.source_id}`);
+  const collapsed =
+    listingUpserts.length - dedupedListings.length +
+    (sourceUpserts.length - dedupedSources.length);
+  mergedInBatch += collapsed;
+  if (mergedInBatch > 0) {
+    allReports.push({
+      source: "manual",
+      ok: true,
+      fetched: 0,
+      kept: 0,
+      message: `${mergedInBatch} rows merged onto listings already stored`,
+    });
+  }
+
+  let wrote = 0;
+  for (const batch of chunk(dedupedListings, 300)) {
     const { error } = await supabase.from("listings").upsert(batch, { onConflict: "id" });
     if (error) errors.push(`listings upsert: ${error.message}`);
+    else wrote += batch.length;
   }
-  for (const batch of chunk(sourceUpserts, 300)) {
+
+  // Nothing downstream can reference a listing that failed to save, so a
+  // failure here would only produce a cascade of foreign-key errors that bury
+  // the real one.
+  if (wrote === 0 && dedupedListings.length > 0) {
+    // Report what persisted, not what was computed. The counts below are
+    // derived in memory before any write; returning them after a failed write
+    // is how a poll that stored nothing kept reporting a hundred new listings.
+    return {
+      searches: distinct.size,
+      fetched,
+      newListings: 0,
+      events: 0,
+      reports: allReports,
+      errors,
+    };
+  }
+
+  for (const batch of chunk(dedupedSources, 300)) {
     const { error } = await supabase
       .from("listing_sources")
       .upsert(batch, { onConflict: "source,source_id" });
