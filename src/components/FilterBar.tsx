@@ -39,7 +39,7 @@ export interface Filters {
 }
 
 const TOGGLES: { key: keyof Filters; label: string; hint: string }[] = [
-  { key: "goodOnly", label: "Good deals only", hint: "Only places rated 70 or above for your search" },
+  { key: "goodOnly", label: "Good deals only", hint: "Only places the rating says are worth a tour" },
   { key: "noFeeOnly", label: "No broker fee", hint: "Skip listings that charge a fee" },
   { key: "readyOnly", label: "Ready by my date", hint: "Available in time for your move-in" },
   { key: "changedOnly", label: "Price changed", hint: "Only listings whose price moved" },

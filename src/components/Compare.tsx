@@ -3,6 +3,8 @@
 import type { FeedListing } from "@/types";
 import { STAGE_LABEL } from "@/types";
 import { CONTACT_LABEL } from "@/lib/outreach";
+import { AMENITIES } from "@/lib/amenities";
+import { RatingDisc } from "@/components/Rating";
 
 /**
  * Decision night.
@@ -72,7 +74,17 @@ const ROWS: Row[] = [
         l.lastContactChannel ? ` · ${CONTACT_LABEL[l.lastContactChannel].toLowerCase()}` : ""
       }`,
   },
-  { label: "Fit score", value: (l) => `${l.score ?? "—"}%`, num: (l) => l.score, invert: true },
+  {
+    label: "What you get",
+    value: (l) =>
+      l.perks.length ? l.perks.map((k) => AMENITIES[k].label).join(", ") : "nothing listed",
+    num: (l) => l.perks.length,
+    invert: true,
+  },
+  {
+    label: "Biggest catch",
+    value: (l) => l.cons[0] ?? "none found",
+  },
 ];
 
 export default function Compare({
@@ -84,7 +96,7 @@ export default function Compare({
 }) {
   const finalists = listings
     .filter((l) => l.starred || !["inbox", "passed", "closed"].includes(l.stage))
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .sort((a, b) => b.rating - a.rating)
     .slice(0, 5);
 
   if (finalists.length < 2) {
@@ -98,6 +110,26 @@ export default function Compare({
         </div>
       </div>
     );
+  }
+
+  /**
+   * A comparison table's only job is to show what differs.
+   *
+   * A row identical down every column costs a line of vertical scan and
+   * returns nothing — and on live data most rows were like that: size all
+   * "Studio/1ba", availability all "yes", the biggest catch word-for-word the
+   * same on all five. Those rows are folded away rather than deleted, with a
+   * line saying what they agreed on, so nothing is silently lost.
+   */
+  const rows: Row[] = [];
+  const agreed: string[] = [];
+  for (const row of ROWS) {
+    const values = finalists.map((l) => row.value(l));
+    if (new Set(values).size === 1) {
+      agreed.push(`${row.label.toLowerCase()}: ${values[0]}`);
+    } else {
+      rows.push(row);
+    }
   }
 
   // Best value per row: min by default, max when invert is set.
@@ -115,7 +147,8 @@ export default function Compare({
   }
 
   return (
-    <div className="surface" style={{ overflowX: "auto" }}>
+    <div className="compare-wrap">
+      <div className="surface" style={{ overflowX: "auto" }}>
       <table className="compare">
         <thead>
           <tr>
@@ -123,6 +156,10 @@ export default function Compare({
             {finalists.map((l) => (
               <th key={l.id}>
                 <button className="compare-head" onClick={() => onOpen(l)}>
+                  <span className="compare-rating">
+                    <RatingDisc rating={l.rating} grade={l.grade} size="sm" />
+                    <span className="muted">{l.ratingHeadline}</span>
+                  </span>
                   <span style={{ fontWeight: 600 }}>
                     {l.address}
                     {l.unit ? ` #${l.unit}` : ""}
@@ -134,7 +171,7 @@ export default function Compare({
           </tr>
         </thead>
         <tbody>
-          {ROWS.map((row) => {
+          {rows.map((row) => {
             const best = bestIn(row);
             return (
               <tr key={row.label}>
@@ -158,6 +195,12 @@ export default function Compare({
           </tr>
         </tbody>
       </table>
+      </div>
+      {agreed.length > 0 && (
+        <p className="compare-same">
+          Identical on all {finalists.length} — {agreed.join(" · ")}
+        </p>
+      )}
     </div>
   );
 }

@@ -386,10 +386,10 @@ export default function MapView({ listings, onOpen, linkedId, onHover }: Props) 
               : "Scroll to zoom · numbered circles hold several places"}
         </span>
         <span className="mapkey">
-          <i data-grade="excellent"></i> 78+
-          <i data-grade="strong"></i> 62+
-          <i data-grade="fair"></i> 45+
-          <i data-grade="weak"></i> under 45
+          <i data-grade="excellent"></i> Excellent
+          <i data-grade="strong"></i> Strong
+          <i data-grade="fair"></i> Fair
+          <i data-grade="weak"></i> Weak
         </span>
       </div>
     </div>

@@ -29,6 +29,7 @@ import { signOut } from "@/app/auth/actions";
 import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
+import { RatingDisc } from "@/components/Rating";
 import MapView from "@/components/MapView";
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
@@ -72,8 +73,48 @@ const money = (n: number) => `$${n.toLocaleString()}`;
 /** Cards mounted per page. Two full rows beyond a tall viewport. */
 const PAGE = 36;
 
-/** What "good deal" means when the filter is on. Above this is worth a tour. */
-const GOOD_DEAL_RATING = 70;
+/**
+ * What the "good deals only" filter means.
+ *
+ * Pinned to the rating at which the verdict starts saying "worth a tour", so
+ * the filter and the words on the cards agree. On the live corpus that's about
+ * a sixth of what's tracked — a shortlist you could actually work through in
+ * an evening, rather than a different-sized wall of cards.
+ */
+const GOOD_DEAL_RATING = 64;
+
+/**
+ * The single next action for a listing, given where it sits.
+ *
+ * A board that only shows position makes you re-derive the action every time
+ * you look at it. This states it, and turns amber when it has waited too long.
+ */
+function nextStep(l: FeedListing): string {
+  if (l.needsFollowUp) return "Chase — no reply yet";
+  switch (l.stage) {
+    case "interested":
+      return "Ask for a viewing";
+    case "contacted":
+      return "Waiting on their reply";
+    case "tour":
+      return "Tour booked — go see it";
+    case "toured":
+      return "Decide, then apply";
+    case "applied":
+      return "Waiting on the landlord";
+    default:
+      return "";
+  }
+}
+
+/** What an empty column means, rather than a bare "Nothing here". */
+const STAGE_HINT: Record<string, string> = {
+  interested: "Star a place to start it here",
+  contacted: "Nothing waiting on a reply",
+  tour: "No viewings booked yet",
+  toured: "Nothing seen in person yet",
+  applied: "No applications in",
+};
 
 function sinceText(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -581,10 +622,10 @@ export default function Home() {
             [
               ["today", "Today", actions.length],
               ["feed", "Listings", counts.active],
-              ["changes", "What changed", changes.length],
-              ["pipeline", "My pipeline", counts.pipeline],
-              ["compare", "Compare finalists", finalistCount],
-              ["profile", "My details", 0],
+              ["changes", "Changes", changes.length],
+              ["pipeline", "Pipeline", counts.pipeline],
+              ["compare", "Compare", finalistCount],
+              ["profile", "Settings", 0],
             ] as [Tab, string, number][]
           ).map(([key, label, count]) => (
             <button
@@ -851,11 +892,20 @@ export default function Home() {
         )}
 
         {!loading && tab === "changes" && (
-          <div className="surface" style={{ overflow: "hidden" }}>
+          <div className={changes.length ? "surface" : undefined} style={{ overflow: "hidden" }}>
             {changes.length === 0 && (
-              <div className="muted" style={{ padding: 16, fontSize: 13 }}>
-                Nothing has changed yet. Price drops, relists and places going off
-                market will appear here after the next check.
+              <div className="empty">
+                <div className="empty-title">No changes yet</div>
+                <p className="empty-body">
+                  This is where a place dropping its price, coming back on the
+                  market, or disappearing shows up — the things no listing site
+                  will tell you. Nothing has moved since the last check.
+                </p>
+                <div className="empty-actions">
+                  <button className="btn btn-primary" onClick={refresh} disabled={refreshing}>
+                    {refreshing ? "Checking…" : "Check now"}
+                  </button>
+                </div>
               </div>
             )}
             {changes.map((c) => (
@@ -907,29 +957,25 @@ export default function Home() {
                   <div style={{ display: "grid", gap: 8 }}>
                     {column.map((l) => (
                       <button key={l.id} className="surface board-card" onClick={() => setOpen(l)}>
-                        <strong style={{ fontSize: 14 }}>{money(l.price)}</strong>
-                        <span style={{ fontSize: 12 }}>
+                        <span className="board-top">
+                          <strong>{money(l.price)}</strong>
+                          <RatingDisc rating={l.rating} grade={l.grade} size="sm" />
+                        </span>
+                        <span className="board-addr">
                           {l.address}
                           {l.unit ? ` #${l.unit}` : ""}
                         </span>
-                        <span className="muted" style={{ fontSize: 11 }}>
-                          {l.neighborhood}
-                        </span>
-                        <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                          {l.lastContactChannel && (
-                            <span className="chip">
-                              {CONTACT_ICON[l.lastContactChannel]}{" "}
-                              {CONTACT_LABEL[l.lastContactChannel]}
-                            </span>
-                          )}
-                          {l.needsFollowUp && <span className="chip chip-warn">follow up</span>}
+                        <span className="muted board-where">{l.neighborhood}</span>
+                        {/* The pipeline's job is to say what to do next, not
+                            just where things are. Without this each column is
+                            a pile you still have to think about. */}
+                        <span className={l.needsFollowUp ? "board-next is-due" : "board-next"}>
+                          {nextStep(l)}
                         </span>
                       </button>
                     ))}
                     {column.length === 0 && (
-                      <div className="muted" style={{ fontSize: 12, padding: 8 }}>
-                        Nothing here
-                      </div>
+                      <div className="board-empty">{STAGE_HINT[stage]}</div>
                     )}
                   </div>
                 </div>
@@ -1263,6 +1309,7 @@ function ApiSettings({
         </span>
       </label>
 
+      <div className="fieldgrid">
       <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
         <span className="muted">New API key</span>
         <input
@@ -1273,7 +1320,6 @@ function ApiSettings({
         />
       </label>
 
-      <div style={{ display: "flex", gap: 8 }}>
         <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>
           <span className="muted">Pages per source</span>
           <select className="field" value={pages} onChange={(e) => setPages(e.target.value)}>
@@ -1388,17 +1434,23 @@ function ProfileForm({
         )}
       </div>
 
-      {text.map(([key, label, placeholder]) => (
-        <label key={key} style={{ display: "grid", gap: 4, fontSize: 12 }}>
-          <span className="muted">{label}</span>
-          <input
-            className="field"
-            value={String(draft[key] ?? "")}
-            placeholder={placeholder}
-            onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-          />
-        </label>
-      ))}
+      <div className="fieldgrid">
+        {text.map(([key, label, placeholder]) => (
+          <label
+            key={key}
+            className={key === "creditNote" ? "field-wide" : undefined}
+            style={{ display: "grid", gap: 4, fontSize: 12 }}
+          >
+            <span className="muted">{label}</span>
+            <input
+              className="field"
+              value={String(draft[key] ?? "")}
+              placeholder={placeholder}
+              onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+            />
+          </label>
+        ))}
+      </div>
 
       <div style={{ display: "grid", gap: 6 }}>
         <span className="muted" style={{ fontSize: 12 }}>

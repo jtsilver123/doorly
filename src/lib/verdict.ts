@@ -53,10 +53,24 @@ export const GRADE_LABEL: Record<Grade, string> = {
   weak: "Weak",
 };
 
+/**
+ * Where the four bands sit.
+ *
+ * These were guessed before there was a distribution to look at, and the guess
+ * was wrong in a way that mattered: measured across 324 in-criteria listings
+ * they put 54% of the market in the bottom band and one single listing in the
+ * top one. A scale on which most of what you can afford reads as "weak" tells
+ * you nothing — it just makes the grid grey.
+ *
+ * Re-cut against the observed spread (p25 38, median 48, p75 59, p90 68) so
+ * the bottom band is roughly the worst quarter and the top is the standout
+ * few. They are calibrated, not derived, and they will want revisiting if the
+ * corpus shifts — which is the honest cost of grading a market against itself.
+ */
 export function gradeOf(rating: number): Grade {
-  if (rating >= 78) return "excellent";
-  if (rating >= 62) return "strong";
-  if (rating >= 45) return "fair";
+  if (rating >= 72) return "excellent";
+  if (rating >= 58) return "strong";
+  if (rating >= 38) return "fair";
   return "weak";
 }
 
@@ -103,25 +117,47 @@ export function verdictFor(listing: FeedListing, criteria: SearchCriteria): Verd
   }
 
   // --- what you get for the money ---------------------------------------
-  available += WEIGHTS.amenities;
-  const quality = qualityScore(listing.perks);
-  // 45/100 on the amenity scale is already a well-equipped apartment in NYC —
-  // scoring against a theoretical maximum would rate almost everything zero.
-  points += ramp(quality, 0, 45) * WEIGHTS.amenities;
+  /*
+   * Only judged when the listing actually said something.
+   *
+   * Scoring every listing on amenities meant a place that published no
+   * amenities and a two-line description lost most of 25 points for *our*
+   * missing data rather than for being a bad apartment — the same mistake the
+   * price component above explicitly avoids. On the live corpus that put 54%
+   * of an in-criteria market in the bottom band and left exactly one listing
+   * in the top one, which is a scale nobody can act on.
+   *
+   * A listing that describes itself and mentions nothing is real evidence of a
+   * bare unit and is scored. A listing that describes nothing is not evidence
+   * of anything, so the component sits out and the rating normalises over what
+   * remains.
+   */
+  const described =
+    (listing.amenities?.length ?? 0) > 0 || (listing.description?.length ?? 0) >= 80;
+
+  if (described) {
+    available += WEIGHTS.amenities;
+    // 45/100 on the amenity scale is already a well-equipped apartment in NYC —
+    // scoring against a theoretical maximum would rate almost everything zero.
+    points += ramp(qualityScore(listing.perks), 0, 45) * WEIGHTS.amenities;
+  }
 
   const has = (key: AmenityKey) => listing.perks.includes(key);
   if (has("laundry_unit")) pro(78, "Washer/dryer in the unit");
   else if (has("laundry_building")) pro(45, "Laundry in the building");
-  else con(55, "No laundry mentioned");
+  else if (described) con(55, "No laundry mentioned");
 
   if (has("outdoor")) pro(62, "Private outdoor space");
   if (has("dishwasher")) pro(44, "Dishwasher");
-  else con(32, "No dishwasher listed");
+  else if (described) con(32, "No dishwasher listed");
   if (has("light")) pro(52, "Described as bright");
   if (has("elevator")) pro(42, "Elevator building");
   else if (has("doorman")) pro(38, "Doorman building");
-  else con(38, "No elevator — could be a walk-up");
+  else if (described) con(38, "No elevator — could be a walk-up");
   if (has("pets")) pro(26, "Pets allowed");
+
+  // Say so plainly rather than implying the apartment is bare.
+  if (!described) con(20, "The listing says almost nothing about it");
 
   // --- does it fit the budget -------------------------------------------
   // Measured on all-in monthly, so a cheap rent with a fat broker fee can't
@@ -209,11 +245,11 @@ export function verdictFor(listing: FeedListing, criteria: SearchCriteria): Verd
 /** The two or three words that go on the badge. */
 function headlineFor(rating: number, listing: FeedListing): string {
   if (listing.flags.some((f) => f.kind === "too-cheap")) return "Verify first";
-  if (rating >= 85) return "Go see it today";
-  if (rating >= 78) return "Great find";
-  if (rating >= 70) return "Worth a tour";
-  if (rating >= 62) return "Solid option";
-  if (rating >= 45) return "Decent, some trade-offs";
+  if (rating >= 80) return "Go see it today";
+  if (rating >= 72) return "Great find";
+  if (rating >= 64) return "Worth a tour";
+  if (rating >= 58) return "Solid option";
+  if (rating >= 38) return "Decent, some trade-offs";
   if (listing.dealDelta >= 10) return "Overpriced for what it is";
   return "Probably skip";
 }

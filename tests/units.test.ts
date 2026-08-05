@@ -27,7 +27,7 @@ import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
 import { amenitiesOf, qualityScore } from "@/lib/amenities";
-import { verdictFor } from "@/lib/verdict";
+import { verdictFor, gradeOf } from "@/lib/verdict";
 import { applyFilters } from "@/lib/filters";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
@@ -841,13 +841,54 @@ test("a cheap well-equipped flat rates above an expensive bare one", () => {
   assert.ok(bad.cons.some((c) => /over budget/i.test(c)));
 });
 
-test("price alone can't carry a listing with nothing in it", () => {
-  const base = { dealVerdict: "steal" as const, dealDelta: -22, allInMonthly: 3000 };
-  const loaded = verdictFor(feed({ ...base, perks: ["laundry_unit", "dishwasher", "elevator"] }), DEFAULT_CRITERIA);
+test("price alone can't carry a listing that describes itself and has nothing", () => {
+  // Both listings say plenty about themselves, so the amenity component is
+  // judged on both and the comparison is about the apartment, not about our
+  // missing data.
+  const blurb = "A".repeat(120);
+  const base = {
+    dealVerdict: "steal" as const,
+    dealDelta: -22,
+    allInMonthly: 3000,
+    description: blurb,
+  };
+  const loaded = verdictFor(
+    feed({ ...base, perks: ["laundry_unit", "dishwasher", "elevator"] }),
+    DEFAULT_CRITERIA
+  );
   const bare = verdictFor(feed({ ...base, perks: [] }), DEFAULT_CRITERIA);
 
   assert.ok(loaded.rating > bare.rating, "amenities have to move the number");
   assert.ok(bare.cons.some((c) => /laundry/i.test(c)));
+});
+
+test("a listing that says nothing isn't punished for our missing data", () => {
+  // A sparse listing and a described-but-bare one are different claims. Only
+  // the second is evidence the apartment lacks anything.
+  const base = { dealVerdict: "good" as const, dealDelta: -10, allInMonthly: 3000, perks: [] };
+  const silent = verdictFor(feed({ ...base, description: "", amenities: [] }), DEFAULT_CRITERIA);
+  const describedBare = verdictFor(
+    feed({ ...base, description: "A".repeat(120) }),
+    DEFAULT_CRITERIA
+  );
+
+  assert.ok(
+    silent.rating > describedBare.rating,
+    `silent ${silent.rating} should not score below described-bare ${describedBare.rating}`
+  );
+  assert.ok(silent.cons.some((c) => /says almost nothing/i.test(c)));
+  assert.ok(!silent.cons.some((c) => /No laundry/i.test(c)), "can't claim an absence we never saw");
+});
+
+test("the grade bands put most of the market in the middle", () => {
+  // The bands exist to separate a market, not to condemn it. Guard the shape:
+  // the bottom band must not be where most listings land.
+  assert.equal(gradeOf(80), "excellent");
+  assert.equal(gradeOf(60), "strong");
+  assert.equal(gradeOf(48), "fair");
+  assert.equal(gradeOf(30), "weak");
+  // The observed median of the live corpus sits at 48 and must not read weak.
+  assert.notEqual(gradeOf(48), "weak");
 });
 
 test("a bait-priced listing is penalised rather than rewarded", () => {
