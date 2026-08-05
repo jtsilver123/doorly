@@ -21,6 +21,7 @@ import { nextAction } from "@/lib/nextAction";
 import { runwayDays } from "@/lib/runway";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import { formatPhone } from "@/lib/phone";
+import { usePush } from "@/lib/usePush";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
@@ -36,6 +37,7 @@ import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
 import Changes, { type Change } from "@/components/Changes";
 import PassDialog from "@/components/PassDialog";
+import NotificationBell from "@/components/NotificationBell";
 import { icsFor, icsFilename } from "@/lib/calendar";
 import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
@@ -851,6 +853,14 @@ export default function Home() {
           ))}
         </div>
 
+        <NotificationBell
+          onOpenListing={(id) => {
+            const hit = listings.find((l) => l.id === id);
+            if (hit) setOpen(hit);
+            else toast({ message: "That place isn't in your search any more.", tone: "warn" });
+          }}
+        />
+
         {counts.followUp > 0 && (
           <button
             className="callout"
@@ -1560,6 +1570,40 @@ function ApiSettings({
   );
 }
 
+/** The device switch: service worker + permission + subscription, one button. */
+function PushToggle() {
+  const { state, enable, disable } = usePush();
+  if (state === "unsupported") {
+    return (
+      <span className="muted" style={{ fontSize: 11 }}>
+        This browser can&apos;t do device notifications. On iPhone, add Doorly
+        to your Home Screen first — Safari only allows push for installed apps.
+      </span>
+    );
+  }
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <button
+        className={state === "on" ? "btn" : "btn btn-primary"}
+        style={{ fontSize: 12 }}
+        disabled={state === "pending"}
+        onClick={state === "on" ? disable : enable}
+      >
+        {state === "on"
+          ? "Turn off on this device"
+          : state === "pending"
+            ? "Asking…"
+            : "Notify me on this device"}
+      </button>
+      <span className="muted" style={{ fontSize: 11 }}>
+        {state === "on"
+          ? "This device gets a push when something above happens."
+          : "Your browser will ask permission once."}
+      </span>
+    </div>
+  );
+}
+
 /**
  * The details every outreach message is built from. Filling this in once is
  * what makes reaching out a single keystroke afterwards.
@@ -1708,6 +1752,44 @@ function ProfileForm({
             </button>
           ))}
         </div>
+      </div>
+
+      {/*
+        Which pushes reach the device. The bell in the rail records everything
+        regardless — muting your phone shouldn't make the app forget.
+      */}
+      <div style={{ display: "grid", gap: 6 }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          Notifications
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {(
+            [
+              ["crewAdds", "Crew adds a place"],
+              ["watched", "A place I'm on changes"],
+              ["goodDrops", "A price drops hard"],
+            ] as const
+          ).map(([key, label]) => {
+            const on = draft.notify?.[key] ?? true;
+            return (
+              <button
+                key={key}
+                className={on ? "btn btn-primary" : "btn"}
+                style={{ fontSize: 12, padding: "4px 9px" }}
+                aria-pressed={on}
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    notify: { ...draft.notify, [key]: !on },
+                  })
+                }
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <PushToggle />
       </div>
 
       <div style={{ display: "grid", gap: 4 }}>

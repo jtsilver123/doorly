@@ -9,12 +9,14 @@ import type {
   Source,
   Stage,
 } from "@/types";
+import { PIPELINE_STAGES } from "@/types";
 import { db, adminDb, currentUserId } from "@/lib/supabase";
-import { pipelineOwnerId } from "@/lib/crew";
+import { pipelineOwnerId, crewOf } from "@/lib/crew";
 import { DEFAULT_CRITERIA, searchKey, normalizeCriteria } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
 import { fingerprint, extractUnit } from "@/lib/dedupe";
 import { boroughFor } from "@/lib/areas";
+import { deliver } from "@/lib/notify";
 import { DEFAULT_PROFILE, type Profile } from "@/lib/outreach";
 import {
   moveInCost,
@@ -469,7 +471,7 @@ export async function setStage(listingId: string, stage: Stage): Promise<void> {
   // the pipeline stays its "added by", however far it travels after that.
   const { data: existing } = await supabase
     .from("user_listing_state")
-    .select("added_by")
+    .select("added_by, stage")
     .eq("user_id", owner)
     .eq("listing_id", listingId)
     .maybeSingle();
@@ -485,6 +487,47 @@ export async function setStage(listingId: string, stage: Stage): Promise<void> {
     },
     { onConflict: "user_id,listing_id" }
   );
+
+  /*
+   * Tag-team: a place entering the shared pipeline is news to everyone who
+   * didn't put it there. Only on the *entry* transition — advancing a card
+   * through stages is work, not news, and a channel that reports work gets
+   * muted inside a week.
+   */
+  const wasIn = existing != null && !["inbox", "passed"].includes((existing as { stage?: string }).stage ?? "inbox");
+  const entering = PIPELINE_STAGES.includes(stage) && !wasIn;
+  if (entering) {
+    try {
+      const crew = await crewOf(me);
+      if (crew && crew.members.length > 1) {
+        const { data: listing } = await supabase
+          .from("listings")
+          .select("address, unit, neighborhood, price")
+          .eq("id", listingId)
+          .maybeSingle();
+        const who =
+          crew.members.find((m) => m.userId === me)?.name ?? "Someone";
+        const name = listing
+          ? `${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`
+          : "a place";
+        await deliver(
+          crew.members
+            .filter((m) => m.userId !== me)
+            .map((m) => ({
+              userId: m.userId,
+              kind: "crew_add" as const,
+              listingId,
+              title: `${who} added ${name}`,
+              body: listing
+                ? `$${Number(listing.price).toLocaleString()}/mo · ${listing.neighborhood ?? ""}`
+                : "",
+            }))
+        );
+      }
+    } catch {
+      /* the stage change already saved; the bell can miss one */
+    }
+  }
 
   // Moving a card is itself a preference signal, so mirror it into feedback.
   // Feedback is the mover's own — taste stays personal even in a crew.

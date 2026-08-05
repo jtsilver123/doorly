@@ -36,7 +36,8 @@ export type IconName =
   | "chevron"
   | "plus"
   | "calendar"
-  | "people";
+  | "people"
+  | "bell";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // A door with an arch — the same shape as the mark, so the home tab and the
@@ -141,6 +142,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
       <path d="M3.5 10h17M8 3.5v4M16 3.5v4" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M12 4a5.5 5.5 0 0 0-5.5 5.5c0 4.2-1.5 5.6-2.5 6.5h16c-1-0.9-2.5-2.3-2.5-6.5A5.5 5.5 0 0 0 12 4Z" />
+      <path d="M10 19.5a2 2 0 0 0 4 0" />
     </>
   ),
   people: (

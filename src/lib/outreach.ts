@@ -34,6 +34,15 @@ export interface Profile {
   /** What you assume it costs to move in. Tunable — the rules vary. */
   costs: CostAssumptions;
   /**
+   * Which pushes to feel. The in-app bell always records everything; these
+   * only gate what reaches the device. Absent keys mean on.
+   */
+  notify?: {
+    crewAdds?: boolean;
+    watched?: boolean;
+    goodDrops?: boolean;
+  };
+  /**
    * Which listing site to open when the same apartment is on several. Personal
    * enough to be worth asking rather than assuming.
    */

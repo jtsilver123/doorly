@@ -2,6 +2,7 @@ import type { Listing, SavedSearch, Source } from "@/types";
 import { LINK_PREFERENCE } from "@/types";
 import { adminDb } from "@/lib/supabase";
 import { fingerprint, contentHash, matchConfidence } from "@/lib/dedupe";
+import { deliver, noticesForEvents } from "@/lib/notify";
 import { runSearch, type SourceReport } from "@/lib/sources";
 
 /**
@@ -506,6 +507,15 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
   for (const batch of chunk(events, 300)) {
     const { error } = await supabase.from("events").insert(batch);
     if (error) errors.push(`events insert: ${error.message}`);
+  }
+
+  // Tell the people who'd want to know — watchers about their listings,
+  // everyone hunting about a real drop. Never lets a notification failure
+  // fail the poll: the data is already safe, and the bell can catch up.
+  try {
+    await deliver(await noticesForEvents(events));
+  } catch (err) {
+    errors.push(`notify: ${err instanceof Error ? err.message : "failed"}`);
   }
 
   if (runId) {

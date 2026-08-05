@@ -3401,3 +3401,96 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .passnote b { color: var(--warn); }
 .passnote > span { flex: 1; min-width: 0; line-height: var(--lh-body); }
+
+/* --- the bell -------------------------------------------------------------- */
+
+.bell { position: relative; }
+
+.bell-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--t-lg);
+  font-weight: 500;
+  text-align: left;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.bell-btn:hover { background: var(--surface-2); color: var(--text); }
+.bell-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+.bell-btn .icon { opacity: 0.75; }
+
+/* The badge is coral because unseen news is the one urgent thing in the rail. */
+.bell-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  background: var(--urgent);
+  color: #fff;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.bellpanel {
+  position: absolute;
+  left: 0;
+  right: -8px;
+  top: calc(100% + 4px);
+  z-index: 50;
+  max-height: 26rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 1px;
+  padding: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.bellpanel-empty { margin: 0; padding: var(--s3); font-size: var(--t-sm); line-height: var(--lh-body); }
+
+.bellrow {
+  display: grid;
+  gap: 2px;
+  padding: var(--s2) var(--s3);
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  text-align: left;
+  color: inherit;
+}
+
+.bellrow:hover:not(:disabled) { background: var(--surface-2); }
+.bellrow:focus-visible { outline: none; box-shadow: inset var(--ring); }
+.bellrow:disabled { cursor: default; }
+.bellrow[data-fresh="true"] { background: var(--accent-soft); }
+.bellrow > b { font-size: var(--t-sm); font-weight: 600; line-height: 1.3; }
+.bellrow > .muted { font-size: var(--t-xs); }
+
+.bellrow-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); }
+.bellrow-top .muted { font-size: var(--t-2xs); }
+
+.bellrow-kind {
+  font-style: normal;
+  font-size: var(--t-2xs);
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.bellrow-kind[data-kind="good_drop"] { color: var(--good); }
+.bellrow-kind[data-kind="crew_add"] { color: var(--accent); }
+
+/* Phones reach the bell through the bottom bar's Today/You tabs; in the rail
+   layout it's hidden along with the rest of the desktop-only rail parts. */
