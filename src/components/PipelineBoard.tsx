@@ -110,6 +110,22 @@ export default function PipelineBoard({
     <div className="board">
       {PIPELINE_STAGES.map((stage) => {
         const column = listings.filter((l) => l.stage === stage);
+        /*
+         * The Tour column is a schedule, so it reads like one: soonest
+         * viewing first. Cards with no time yet sort after the timed ones —
+         * they carry their own coral "Set the time" flag, and a schedule
+         * interleaved with unscheduled entries stops being scannable as a
+         * day. Other columns keep the rating order the feed arrived in.
+         */
+        if (stage === "tour") {
+          column.sort((a, b) => {
+            if (a.tourAt && b.tourAt)
+              return new Date(a.tourAt).getTime() - new Date(b.tourAt).getTime();
+            if (a.tourAt) return -1;
+            if (b.tourAt) return 1;
+            return 0;
+          });
+        }
         return (
           <div
             key={stage}
