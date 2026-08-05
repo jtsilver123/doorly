@@ -35,6 +35,7 @@ import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
 import Logo from "@/components/Logo";
+import Icon, { type IconName } from "@/components/Icon";
 // Client-only: Leaflet reads `window` the moment its module loads, which
 // detonates the server prerender. The map has no server-renderable form anyway.
 const CityMap = dynamic(() => import("@/components/CityMap"), {
@@ -71,14 +72,14 @@ interface ApiStatus {
   perPollEstimate: number;
 }
 
-/** Bottom-bar glyphs. Text-only on desktop; these only surface on phones. */
-const NAV_ICON: Record<string, string> = {
-  today: "◎",
-  feed: "▤",
-  changes: "↯",
-  pipeline: "▦",
-  compare: "⇄",
-  profile: "◍",
+/** Drawn marks, one per section. Shown at every width. */
+const NAV_ICON: Record<string, IconName> = {
+  today: "today",
+  feed: "listings",
+  changes: "changes",
+  pipeline: "pipeline",
+  compare: "compare",
+  profile: "profile",
 };
 
 /** Cards mounted per page. Two full rows beyond a tall viewport. */
@@ -764,9 +765,7 @@ export default function Home() {
               aria-current={tab === key ? "page" : undefined}
               onClick={() => setTab(key)}
             >
-              <span className="nav-icon" aria-hidden="true">
-                {NAV_ICON[key]}
-              </span>
+              <Icon name={NAV_ICON[key]} size={18} className="nav-icon" />
               <span>{label}</span>
               {count > 0 && <span className="chip">{count}</span>}
             </button>

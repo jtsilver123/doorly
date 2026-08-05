@@ -21,6 +21,7 @@ import Perks from "@/components/Perks";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
+import Icon from "@/components/Icon";
 import {
   bestChannel,
   reachableOn,
@@ -578,7 +579,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 title={message}
               >
                 <span className="textnow-go" aria-hidden="true">
-                  💬
+                  <Icon name="message" size={20} />
                 </span>
                 <span className="textnow-copy">
                   <b>Text {formatPhone(contact.phone) || contact.phone}</b>
@@ -605,7 +606,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                     })
                   }
                 >
-                  📞 Call
+                  <Icon name="phone" size={14} /> Call
                 </a>
               )}
               {/* Anything that happened outside the app still belongs in the log. */}
@@ -631,7 +632,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 target="_blank"
                 rel="noreferrer"
               >
-                Listing ↗
+                Listing <Icon name="external" size={13} />
               </a>
             </div>
             <details>
@@ -678,7 +679,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               <ul className="flags">
                 {listing.flags.map((flag) => (
                   <li key={flag.kind} className={`flag flag-${flag.severity}`}>
-                    <span>{flag.severity === "warn" ? "⚠" : "·"}</span>
+                    <Icon name="alert" size={14} />
                     <span>{flag.message}</span>
                   </li>
                 ))}

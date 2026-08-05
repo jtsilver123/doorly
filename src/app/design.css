@@ -33,6 +33,7 @@
    * dominate, and they're right to. The small end barely moved: dense metadata
    * still needs to be dense.
    */
+  --t-2xs: 10px;
   --t-xs: 11px;
   --t-sm: 12.5px;
   --t-md: 13.5px;
@@ -41,6 +42,28 @@
   --t-2xl: 23px;
   --t-3xl: 30px;
 
+  /*
+   * Line heights, which the file never had — every block inherited 1.5 or
+   * whatever the browser felt like, so a price and a paragraph of body copy
+   * were set with the same leading. Headlines want tight, prose wants loose.
+   */
+  --lh-tight: 1.08;
+  --lh-snug: 1.3;
+  --lh-body: 1.55;
+
+  /* Two durations. Anything that moves uses one of them. */
+  --t-fast: 0.12s;
+  --t-slow: 0.22s;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /*
+   * Four radii, and only four.
+   *
+   * The file had drifted to sixteen distinct values — 4, 5, 6, 8, 9, 10, 12,
+   * 14, 50%, 999px and the tokens — which is the sort of thing nobody can
+   * point at but everybody feels: nothing quite rhymes with anything else.
+   * Every literal below is now routed through one of these.
+   */
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
@@ -56,7 +79,7 @@
   align-items: center;
   gap: 3px;
   padding: 2px var(--s2);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   font-size: var(--t-xs);
   font-weight: 650;
   letter-spacing: 0.01em;
@@ -73,7 +96,7 @@
 /* Pills are toggles; tags are labels. Different affordance, different element. */
 .pill {
   padding: 5px var(--s3);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
@@ -103,6 +126,9 @@
 
 .linkish:hover { text-decoration: underline; }
 
+/* `button.control` carries an icon and a label now, so it needs to be a flex
+   row — as a plain block the icon stacked on top of the word and the button
+   went square. `select.control` keeps the browser's own layout. */
 .control {
   padding: 7px var(--s3);
   border-radius: var(--r-sm);
@@ -112,6 +138,18 @@
   font-size: var(--t-md);
   outline: none;
 }
+
+button.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-weight: 500;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+button.control:hover { background: var(--surface-2); border-color: var(--border-strong); }
+button.control.is-on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
 .control:focus { border-color: var(--accent); box-shadow: var(--ring); }
 .control-sm { padding: 5px var(--s2); font-size: var(--t-sm); max-width: 130px; }
@@ -289,7 +327,7 @@
   background: rgba(20, 20, 26, 0.55);
   backdrop-filter: blur(6px);
   color: #fff;
-  font-size: 15px;
+  font-size: var(--t-lg);
   line-height: 1;
   transition: background 0.14s ease, color 0.14s ease, opacity 0.14s ease;
 }
@@ -302,7 +340,7 @@
    the whole button keeps the two chips the same weight while making only the
    ✕ recede; fading the button itself lightened the disc and made it *more*
    conspicuous than the star against a pale photo. */
-.card-pass { font-size: 13px; color: rgba(255, 255, 255, 0.66); }
+.card-pass { font-size: var(--t-md); color: rgba(255, 255, 255, 0.66); }
 .card-pass:hover { color: #fff; background: var(--warn); }
 
 /* The body is a fixed stack: each row has a job and a reserved place. */
@@ -396,7 +434,7 @@
   background: rgba(20, 20, 26, 0.62);
   backdrop-filter: blur(6px);
   padding: 3px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   white-space: nowrap;
   max-width: 128px;
   overflow: hidden;
@@ -417,7 +455,7 @@
 }
 
 .ratedisc b { font-weight: 760; font-size: var(--t-xl); letter-spacing: -0.025em; }
-.ratedisc i { font-style: normal; font-size: 9px; opacity: 0.75; }
+.ratedisc i { font-style: normal; font-size: var(--t-2xs); opacity: 0.75; }
 
 .ratedisc[data-size="sm"] { padding: 2px 5px; }
 .ratedisc[data-size="sm"] b { font-size: var(--t-sm); }
@@ -694,7 +732,7 @@
   border: none;
   background: none;
   color: inherit;
-  font-size: 10px;
+  font-size: var(--t-2xs);
   padding: 0 2px;
   opacity: 0.7;
 }
@@ -801,12 +839,12 @@
     flex-direction: column;
     gap: 2px;
     padding: 6px 4px;
-    font-size: 10px;
+    font-size: var(--t-2xs);
     text-align: center;
     border-radius: var(--r-sm);
   }
 
-  .mobile-nav .nav-icon { font-size: 17px; line-height: 1; }
+  .mobile-nav .nav-icon { font-size: var(--t-xl); line-height: 1; }
   .mobile-nav .chip { display: none; }
 
   .main { padding: var(--s3) var(--s3) var(--s6); }
@@ -1058,7 +1096,7 @@ button.fact:hover { border-color: var(--accent); }
   border-radius: var(--r-full);
   background: var(--accent);
   color: #fff;
-  font-size: 10px;
+  font-size: var(--t-2xs);
   font-weight: 700;
 }
 
@@ -1586,7 +1624,7 @@ button.fact:hover { border-color: var(--accent); }
   font-size: 0.9em;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   padding: 0 4px;
 }
 
@@ -1727,7 +1765,7 @@ button.fact:hover { border-color: var(--accent); }
   display: flex;
   justify-content: space-between;
   gap: var(--s2);
-  font-size: 10px;
+  font-size: var(--t-2xs);
   color: var(--text-muted);
 }
 
@@ -1904,7 +1942,7 @@ button.fact:hover { border-color: var(--accent); }
   display: inline-flex;
   align-items: center;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   border: 1.5px solid rgba(255, 255, 255, 0.9);
   color: #fff;
   font-size: 11.5px;
@@ -1965,7 +2003,7 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 .myscore b { font-weight: 760; font-size: var(--t-lg); letter-spacing: -0.025em; }
-.myscore i { font-style: normal; font-size: 9px; opacity: 0.8; text-transform: uppercase; }
+.myscore i { font-style: normal; font-size: var(--t-2xs); opacity: 0.8; text-transform: uppercase; }
 .myscore[data-size="sm"] { padding: 1px 4px; }
 .myscore[data-size="sm"] b { font-size: var(--t-sm); }
 .myscore[data-size="lg"] { padding: 5px 9px; border-radius: var(--r-md); }
@@ -2154,7 +2192,7 @@ button.fact:hover { border-color: var(--accent); }
     gap: 0;
   }
 
-  .fact-label { font-size: 9.5px; letter-spacing: 0.06em; }
+  .fact-label { font-size: var(--t-2xs); letter-spacing: 0.06em; }
   .fact-value { font-size: var(--t-md); gap: 4px; flex-wrap: nowrap; min-width: 0; }
   .fact-value > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -2206,7 +2244,7 @@ button.fact:hover { border-color: var(--accent); }
     width: 40px;
     height: 40px;
     line-height: 40px;
-    font-size: 20px;
+    font-size: var(--t-2xl);
   }
 
   /* Source marks are links out to StreetEasy et al. — 24px was a miss. */
@@ -2305,3 +2343,119 @@ button.fact:hover { border-color: var(--accent); }
    anchored to its left edge hangs off the side of the window. Anchor right. */
 .filterbar-more { position: relative; }
 .filterbar-more .panel { left: auto; right: 0; }
+
+/* --- the type system, applied ---------------------------------------------
+ *
+ * Everything above is machinery. This is where it becomes a voice.
+ *
+ * The serif carries identity and headlines only — the brand, page titles, the
+ * price on a card, the score. It never appears in dense UI, where an
+ * editorial face would cost legibility for nothing. Everywhere else is the
+ * sans, with tabular figures so a column of rents lines up on the decimal
+ * instead of shimmering as you scroll.
+ */
+
+/*
+ * Where the serif is allowed.
+ *
+ * Identity and headlines, plus the one number on a card you read as a
+ * headline — the rent. Deliberately NOT the score discs or the header facts:
+ * those are instruments, read at a glance in a small coloured pill, and an
+ * editorial face there costs legibility while looking like the serif escaped.
+ */
+.brand,
+.landing-brand,
+.auth-pitch h1,
+.landing-hero h1,
+.joincard h1,
+.timeline-phase,
+.profilehead h1,
+.welcome-card .brand,
+.card-price {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* The serif is drawn light; at brand sizes it needs no extra weight, and
+   faux-bolding a serif is the fastest way to make it look counterfeit. */
+.brand,
+.landing-brand { font-weight: 400; letter-spacing: -0.02em; }
+
+.landing-hero h1,
+.auth-pitch h1 { line-height: var(--lh-tight); }
+
+/* Numbers you compare down a column: same width per digit, always. */
+.card-price,
+.fact-value,
+.ratedisc b,
+.myscore b,
+.usage-foot,
+.timeline-stat strong,
+.board-top strong,
+.compare td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Prose gets real leading; the app previously set body copy at heading
+   tightness, which is why long hints read as walls. */
+.landing-steps p,
+.landing-team p,
+.timeline-advice,
+.empty-body,
+.auth-lede,
+.welcome-hint,
+.crew-pitch li {
+  line-height: var(--lh-body);
+}
+
+/* --- depth ----------------------------------------------------------------
+ *
+ * One elevation language. Cards sit on the page with a hairline and the
+ * faintest lift; only things that float above the page (menus, the drawer,
+ * popovers) get a real shadow. Previously everything had the same soft glow,
+ * which flattens the hierarchy it was meant to create.
+ */
+.surface { box-shadow: none; border-color: var(--border); }
+
+.card,
+.surface {
+  transition:
+    border-color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+/* Interactive surfaces lift on hover. Static ones don't — the movement is
+   the affordance, so spending it on a panel you can't click is a lie. */
+.card:hover { box-shadow: var(--shadow); border-color: var(--border-strong); }
+
+.panel,
+.accountmenu,
+.drawer { box-shadow: var(--shadow-lg); }
+
+/* --- focus ----------------------------------------------------------------
+ *
+ * One ring, on everything focusable, and never `outline: none` without a
+ * replacement. Keyboard users were relying on the browser default in some
+ * places and getting nothing at all in others.
+ */
+.btn:focus-visible,
+.control:focus-visible,
+.pill:focus-visible,
+.nav-item:focus-visible,
+.card:focus-visible,
+.fact:focus-visible,
+.linkish:focus-visible,
+.board-card:focus-visible,
+.welcome-pick:focus-visible,
+.srcmark-link:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-md);
+}
+
+/* Icons sit on the text baseline rather than floating above it, and never
+   shrink when a flex row runs out of room. */
+.icon { flex-shrink: 0; display: block; }
+.btn .icon { margin-block: -2px; }

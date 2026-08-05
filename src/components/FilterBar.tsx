@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ALL_SOURCES, SOURCE_LABEL, type Source } from "@/types";
 import SourceMark from "@/components/SourceMark";
 import { SORT_OPTIONS } from "@/lib/filters";
+import Icon from "@/components/Icon";
 
 /**
  * The toolbar.
@@ -120,7 +121,7 @@ export default function FilterBar({
     <div className="filterbar">
       <div className="filterbar-row">
         <div className="searchfield">
-          <span aria-hidden="true">⌕</span>
+          <Icon name="search" size={16} />
           <input
             value={filters.query}
             placeholder="Search address, neighborhood or your notes"
@@ -129,7 +130,7 @@ export default function FilterBar({
           />
           {filters.query && (
             <button onClick={() => onChange({ query: "" })} aria-label="Clear search">
-              ✕
+              <Icon name="close" size={14} />
             </button>
           )}
         </div>
@@ -152,7 +153,7 @@ export default function FilterBar({
             aria-expanded={openPanel}
             aria-haspopup="dialog"
           >
-            <span aria-hidden="true">☰</span> Filters
+            <Icon name="filter" size={16} /> Filters
             {filterCount > 0 && <b className="control-count">{filterCount}</b>}
           </button>
 

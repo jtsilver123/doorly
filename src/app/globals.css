@@ -14,8 +14,11 @@
  */
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* next/font self-hosts these and hands us the variables. The stack behind
+     each is only what renders in the ~80ms before the woff2 lands. */
+  --font-sans: var(--font-sans-real), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-display), Georgia, "Times New Roman", serif;
 }
 
 :root {
@@ -47,6 +50,7 @@
   --grade-strong: #16324f;
   --grade-fair: #b9821d;
   --grade-weak: #737b84;
+  --border-strong: #cfcabb;
   --gone: #98a2b3;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
   --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
@@ -74,6 +78,7 @@
     --grade-strong: #3c6a94;
     --grade-fair: #c08e2a;
     --grade-weak: #5d656e;
+    --border-strong: #3d4c5b;
     --gone: #6b7280;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
@@ -123,7 +128,7 @@ textarea {
 .surface {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow);
 }
 
@@ -136,8 +141,8 @@ textarea {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--r-full);
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.01em;
   background: var(--surface-2);
@@ -170,11 +175,11 @@ textarea {
   justify-content: center;
   gap: 6px;
   padding: 7px 12px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--t-md);
   font-weight: 500;
   transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
 }
@@ -207,10 +212,10 @@ textarea {
 .field {
   width: 100%;
   padding: 7px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--surface);
-  font-size: 13px;
+  font-size: var(--t-md);
   outline: none;
 }
 
@@ -238,11 +243,11 @@ textarea {
   gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--t-lg);
   font-weight: 500;
   text-align: left;
   transition: background 0.12s ease, color 0.12s ease;
@@ -250,7 +255,7 @@ textarea {
 
 .nav-item .nav-icon {
   display: block;
-  font-size: 15px;
+  font-size: var(--t-lg);
   line-height: 1;
   text-align: center;
   opacity: 0.75;
@@ -322,7 +327,7 @@ textarea {
 /* Score meter on each card */
 .meter {
   height: 3px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--surface-2);
   overflow: hidden;
 }
@@ -374,7 +379,7 @@ textarea {
 }
 
 .brand {
-  font-size: 17px;
+  font-size: var(--t-xl);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -393,7 +398,7 @@ textarea {
 }
 
 .section-label {
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -401,13 +406,13 @@ textarea {
 .check {
   display: flex;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--t-md);
   align-items: center;
   cursor: pointer;
 }
 
 .keyhint {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   line-height: 1.7;
   padding-top: 4px;
   border-top: 1px solid var(--border);
@@ -416,11 +421,11 @@ textarea {
 kbd {
   display: inline-block;
   padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: var(--t-2xs);
 }
 
 /* Things that need chasing, and the request budget: both are nagging state,
@@ -432,10 +437,10 @@ kbd {
   width: 100%;
   text-align: left;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--surface-2);
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: inherit;
 }
 
@@ -445,13 +450,13 @@ kbd {
 }
 
 .callout span {
-  font-size: 11px;
+  font-size: var(--t-xs);
 }
 
 .usage-top {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 600;
 }
 
@@ -493,7 +498,7 @@ kbd {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: var(--t-sm);
   font-weight: 600;
 }
 
@@ -520,10 +525,10 @@ kbd {
 
 .preview {
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: var(--t-sm);
   background: var(--surface-2);
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   font-family: inherit;
   margin: 0;
   line-height: 1.45;
@@ -549,11 +554,11 @@ kbd {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
-  font-size: 13px;
+  font-size: var(--t-md);
   animation: toast-in 0.16s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
@@ -570,7 +575,7 @@ kbd {
   background: none;
   color: var(--accent);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--t-md);
   padding: 0;
 }
 
@@ -582,7 +587,7 @@ kbd {
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--t-xs);
   padding: 0 2px;
 }
 
@@ -601,7 +606,7 @@ kbd {
 
 /* The grid's shape appears immediately, so nothing jumps when data lands. */
 .skeleton {
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: linear-gradient(
     90deg,
     var(--surface-2) 25%,
@@ -650,7 +655,7 @@ kbd {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -682,7 +687,7 @@ kbd {
 }
 
 .timeline-phase {
-  font-size: 19px;
+  font-size: var(--t-2xl);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -700,12 +705,12 @@ kbd {
 }
 
 .timeline-stat strong {
-  font-size: 17px;
+  font-size: var(--t-xl);
   line-height: 1.1;
 }
 
 .timeline-stat span {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -725,10 +730,10 @@ kbd {
   place-items: center;
   flex-basis: 0;
   min-width: 0;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--t-2xs);
   font-weight: 600;
   overflow: hidden;
   transition: background 0.2s ease, color 0.2s ease;
@@ -754,7 +759,7 @@ kbd {
   bottom: -4px;
   width: 2px;
   background: var(--text);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   transform: translateX(-1px);
   transition: left 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
@@ -765,14 +770,14 @@ kbd {
   left: 50%;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--text);
   transform: translateX(-50%);
 }
 
 .timeline-advice {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.5;
 }
 
@@ -780,7 +785,7 @@ kbd {
   display: grid;
   gap: 6px;
   padding: 10px 12px;
-  border-radius: 9px;
+  border-radius: var(--r-md);
   background: var(--surface-2);
 }
 
@@ -1208,11 +1213,11 @@ kbd {
 .welcome-field {
   display: grid;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--t-sm);
 }
 
 .welcome-hint {
-  font-size: 11px;
+  font-size: var(--t-xs);
   line-height: 1.45;
 }
 
@@ -1229,7 +1234,7 @@ kbd {
   overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--surface-2);
 }
 
@@ -1237,7 +1242,7 @@ kbd {
   border: none;
   background: none;
   padding: 0 0 6px;
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1264,9 +1269,9 @@ kbd {
 
 .pricecheck {
   padding: 10px 12px;
-  border-radius: 9px;
+  border-radius: var(--r-md);
   background: var(--surface-2);
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.45;
 }
 
@@ -1296,7 +1301,7 @@ kbd {
 .flag {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--t-sm);
   line-height: 1.45;
   color: var(--text-muted);
 }
@@ -1310,7 +1315,7 @@ kbd {
 .compare {
   border-collapse: collapse;
   width: 100%;
-  font-size: 13px;
+  font-size: var(--t-md);
 }
 
 .compare th,
@@ -1336,7 +1341,7 @@ kbd {
   cursor: pointer;
   display: grid;
   gap: 2px;
-  font-size: 13px;
+  font-size: var(--t-md);
 }
 
 .compare-head:hover span:first-child {
@@ -1344,7 +1349,7 @@ kbd {
 }
 
 .compare-label {
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -1357,5 +1362,5 @@ kbd {
 }
 
 .compare-tick {
-  font-size: 11px;
+  font-size: var(--t-xs);
 }

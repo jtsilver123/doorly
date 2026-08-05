@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/auth/actions";
+import Icon from "@/components/Icon";
 
 /**
  * The account button, bottom-left.
@@ -84,9 +85,7 @@ export default function AccountMenu({
           <b>{name.trim() || "Your account"}</b>
           <span>{email || "Signed in"}</span>
         </span>
-        <span className="account-caret" aria-hidden="true">
-          ⌃
-        </span>
+        <Icon name="chevron" size={14} className="account-caret" />
       </button>
 
       {open && (

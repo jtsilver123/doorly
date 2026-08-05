@@ -5,6 +5,7 @@ import type { Profile } from "@/lib/outreach";
 import { DEFAULT_COSTS, type CostAssumptions } from "@/lib/cost";
 import { DOCUMENT_CHECKLIST, buildPacket, packetText, readiness } from "@/lib/packet";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
+import Icon from "@/components/Icon";
 
 /**
  * The application packet, and the assumptions behind the cost figures.
@@ -115,7 +116,7 @@ export default function ApplicationPacket({
               style={{ fontSize: 12, padding: "4px 9px" }}
               onClick={() => toggleDoc(doc)}
             >
-              {documents.includes(doc) ? "✓ " : ""}
+              {documents.includes(doc) && <Icon name="check" size={13} />}
               {doc}
             </button>
           ))}
