@@ -10,7 +10,7 @@ import type {
 } from "@/types";
 import {
   EVENT_LABEL,
-  LINK_PREFERENCE,
+  linkPreference,
   SOURCE_LABEL,
   STAGES,
   STAGE_LABEL,
@@ -595,10 +595,10 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {[...listing.alsoOn]
                 .filter((s) => s.url)
-                .sort(
-                  (a, b) =>
-                    LINK_PREFERENCE.indexOf(a.source) - LINK_PREFERENCE.indexOf(b.source)
-                )
+                .sort((a, b) => {
+                  const order = linkPreference(profile.preferredSource);
+                  return order.indexOf(a.source) - order.indexOf(b.source);
+                })
                 .map((s) => (
                   <a
                     key={s.source}

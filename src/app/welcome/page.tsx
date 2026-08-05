@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AreaPicker from "@/components/AreaPicker";
-import { LAYOUT_PRESETS } from "@/types";
+import type { Source } from "@/types";
+import {
+  ALL_SOURCES,
+  DEFAULT_PREFERRED_SOURCE,
+  LAYOUT_PRESETS,
+  SOURCE_LABEL,
+} from "@/types";
 
 /**
  * Setup, in one screen.
@@ -24,6 +30,8 @@ export default function Welcome() {
   const [bedMax, setBedMax] = useState("1");
   const [bathMin, setBathMin] = useState("0");
   const [moveIn, setMoveIn] = useState(defaultMoveIn());
+  const [apiKey, setApiKey] = useState("");
+  const [preferred, setPreferred] = useState<Source>(DEFAULT_PREFERRED_SOURCE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,11 +63,28 @@ export default function Welcome() {
       }),
     });
     const body = await res.json();
-    setBusy(false);
     if (body.error) {
+      setBusy(false);
       setError(body.error);
       return;
     }
+
+    // The key is what makes the next screen have anything in it, so it's saved
+    // here rather than left for the user to find in settings afterwards.
+    if (apiKey.trim()) {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ realtyApiKey: apiKey.trim() }),
+      }).catch(() => {});
+    }
+    await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profile: { name, moveInDate: moveIn, preferredSource: preferred } }),
+    }).catch(() => {});
+
+    setBusy(false);
     router.push("/");
     router.refresh();
   }
@@ -125,6 +150,65 @@ export default function Welcome() {
           <span className="muted welcome-hint">
             Or set it exactly below. Bathrooms are a minimum — a 2-bath place
             still shows up in a 1-bath search.
+          </span>
+        </div>
+
+        <div className="welcome-field">
+          <span className="muted">
+            When a place is on several sites, which should we open?
+          </span>
+          <div className="welcome-chips">
+            {ALL_SOURCES.map((source) => (
+              <button
+                key={source}
+                type="button"
+                className={preferred === source ? "btn btn-primary" : "btn"}
+                style={{ fontSize: 12, padding: "5px 10px" }}
+                onClick={() => setPreferred(source)}
+              >
+                {SOURCE_LABEL[source]}
+              </button>
+            ))}
+          </div>
+          <span className="muted welcome-hint">
+            The same apartment is usually listed three or four times. Every card
+            still shows which sites carry it.
+          </span>
+        </div>
+
+        {/*
+          The listing data comes from one aggregator, and nothing works without
+          a key for it. Burying that in settings means a new account lands on an
+          empty screen with no idea why — so it's asked for here, with the two
+          minutes of instruction it actually needs.
+        */}
+        <div className="welcome-field welcome-key">
+          <span className="muted">
+            Last thing — a data key <strong>(about a minute)</strong>
+          </span>
+          <ol className="welcome-steps">
+            <li>
+              Open{" "}
+              <a href="https://realtyapi.io" target="_blank" rel="noreferrer">
+                realtyapi.io
+              </a>{" "}
+              and sign up. The free tier is 250 requests a month.
+            </li>
+            <li>Copy the key from your dashboard — it starts with <code>rt_</code>.</li>
+            <li>Paste it here.</li>
+          </ol>
+          <input
+            className="field"
+            value={apiKey}
+            placeholder="rt_…"
+            spellCheck={false}
+            autoComplete="off"
+            onChange={(e) => setApiKey(e.target.value.trim())}
+          />
+          <span className="muted welcome-hint">
+            One key covers StreetEasy, Zillow, Apartments.com and HotPads.
+            Craigslist needs none, so you&apos;ll see listings either way — just
+            fewer. You can add or change this later under your account.
           </span>
         </div>
 

@@ -804,137 +804,158 @@ kbd {
 
 /* --- auth --------------------------------------------------------------- */
 
-.auth-shell {
+/* --- sign in and sign up ------------------------------------------------- */
+
+.auth {
   min-height: 100dvh;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  grid-template-columns: 1.15fr 1fr;
 }
 
-.auth-card {
-  width: min(380px, 100%);
-  padding: 26px;
-  display: grid;
-  gap: 15px;
-}
-
-.auth-card a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.auth-card a:hover {
-  text-decoration: underline;
-}
-
-.auth-error,
-.auth-note {
-  font-size: 12px;
-  padding: 9px 11px;
-  border-radius: 8px;
-  line-height: 1.45;
-}
-
-.auth-error {
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-
-.auth-note {
-  background: var(--good-soft);
-  color: var(--good);
-}
-
-/* --- account button ------------------------------------------------------ */
-
-.account {
+/* Left: the city, and why this exists. */
+.auth-pitch {
   position: relative;
-  padding-top: var(--s3);
-  border-top: 1px solid var(--border);
-}
-
-.account-btn {
-  display: grid;
-  grid-template-columns: 30px 1fr auto;
-  align-items: center;
-  gap: var(--s2);
-  width: 100%;
-  padding: 6px;
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
-  background: transparent;
-  text-align: left;
-  color: inherit;
-}
-
-.account-btn:hover { background: var(--surface-2); }
-.account-btn[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
-
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--r-full);
-  background: var(--accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.account-who { display: grid; min-width: 0; }
-.account-who b { font-size: var(--t-md); font-weight: 600; }
-
-.account-who b,
-.account-who span {
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: grid;
+  align-items: center;
+  padding: 6vh 5vw;
+  color: #f4f4f7;
+  background: linear-gradient(150deg, #241f4d 0%, #16162a 48%, #0b0b14 100%);
+}
+
+.authart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
+}
+
+.authart-area { fill: rgba(255, 255, 255, 0.045); stroke: rgba(255, 255, 255, 0.09); stroke-width: 0.8; }
+
+/* The neighborhoods the app is pointed at, lit from underneath. */
+.authart-lit {
+  fill: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 90%, #fff);
+  stroke-width: 1.1;
+}
+
+.auth-pitch-inner { position: relative; max-width: 30rem; display: grid; gap: var(--s5); }
+
+.auth-mark {
+  font-size: var(--t-md);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 40%, #fff);
+}
+
+.auth-pitch h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 4.2vw, 3.6rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  font-weight: 750;
+  text-wrap: balance;
+}
+
+.auth-lede {
+  margin: 0;
+  max-width: 34rem;
+  font-size: var(--t-lg);
+  line-height: 1.55;
+  color: rgba(244, 244, 247, 0.72);
+}
+
+.auth-claims { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s4); }
+
+.auth-claims li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s4);
+  align-items: baseline;
+  padding-top: var(--s4);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.auth-claims b {
+  font-size: var(--t-2xl);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
   white-space: nowrap;
 }
 
-.account-who span { font-size: var(--t-xs); color: var(--text-muted); }
-.account-caret { color: var(--text-muted); font-size: 10px; }
+.auth-claims span { font-size: var(--t-md); line-height: 1.5; color: rgba(244, 244, 247, 0.66); }
+.auth-claims strong { display: block; color: #fff; font-weight: 600; font-size: var(--t-lg); }
 
-/* Opens upward: the button is the last thing in the rail, so a dropdown would
-   fall off the bottom of the window. */
-.accountmenu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 60;
+/* Right: the form, and nothing competing with it. */
+.auth-panel {
   display: grid;
-  padding: var(--s1);
+  place-items: center;
+  padding: 6vh var(--s5);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
 }
 
-.accountmenu-item {
-  display: grid;
-  gap: 1px;
-  width: 100%;
-  padding: 7px var(--s2);
-  border: none;
-  border-radius: var(--r-sm);
-  background: transparent;
-  text-align: left;
-  color: inherit;
+.auth-form { width: min(26rem, 100%); display: grid; gap: var(--s4); }
+.auth-form-head { display: grid; gap: var(--s2); margin-bottom: var(--s2); }
+
+.auth-form-head h2 {
+  margin: 0;
+  font-size: var(--t-2xl);
+  font-weight: 720;
+  letter-spacing: -0.028em;
 }
 
-.accountmenu-item:hover { background: var(--surface-2); }
-.accountmenu-item b { font-size: var(--t-md); font-weight: 600; }
-.accountmenu-item span { font-size: var(--t-xs); color: var(--text-muted); }
+.auth-form-head p { margin: 0; font-size: var(--t-lg); color: var(--text-muted); line-height: 1.5; }
 
-.accountmenu-out {
-  margin-top: var(--s1);
-  padding-top: var(--s1);
+.auth-field { display: grid; gap: 6px; }
+.auth-field > span { font-size: var(--t-md); font-weight: 600; }
+.auth-field .field { height: 46px; font-size: var(--t-lg); }
+
+.auth-submit { height: 48px; font-size: var(--t-lg); font-weight: 650; }
+
+.auth-error {
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--t-md);
+  line-height: 1.45;
+}
+
+.auth-note {
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: var(--t-md);
+  line-height: 1.45;
+}
+
+.auth-alt { font-size: var(--t-md); color: var(--text-muted); text-align: center; }
+.auth-alt a { color: var(--accent); font-weight: 600; }
+
+.auth-fineprint {
+  margin: 0;
+  padding-top: var(--s3);
   border-top: 1px solid var(--border);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
-.accountmenu-out .accountmenu-item b { color: var(--warn); }
+/* On a phone the pitch becomes a header the form sits under, rather than a
+   screen of marketing you have to scroll past to sign in. */
+@media (max-width: 900px) {
+  .auth { grid-template-columns: 1fr; }
+  .auth-pitch { padding: var(--s6) var(--s5) var(--s7); align-items: end; }
+  .auth-pitch h1 { font-size: clamp(1.9rem, 8vw, 2.6rem); }
+  .auth-claims { display: none; }
+  .auth-lede { font-size: var(--t-md); }
+  .auth-panel { padding: var(--s6) var(--s5) var(--s7); }
+}
 
 /* --- onboarding --------------------------------------------------------- */
 

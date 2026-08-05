@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedListing, Source } from "@/types";
 import type { Stage } from "@/types";
-import { ALL_SOURCES } from "@/types";
+import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
 import {
   DEFAULT_PROFILE,
   PROOF_OPTIONS,
@@ -389,7 +389,7 @@ export default function Home() {
         } catch {
           toast({ message: "Opened listing — copy the message from the detail panel" });
         }
-        const target = orderedSources(listing)[0]?.url ?? listing.url;
+        const target = orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
         if (target) window.open(target, "_blank", "noopener");
       }
     },
@@ -448,7 +448,8 @@ export default function Home() {
         case "o":
           if (current) {
             e.preventDefault();
-            const target = orderedSources(current)[0]?.url ?? current.url;
+            const target =
+              orderedSources(current, profile.preferredSource)[0]?.url ?? current.url;
             if (target) window.open(target, "_blank", "noopener");
           }
           break;
@@ -456,7 +457,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, view, visible, focus, pass, star, reachOut]);
+  }, [tab, open, view, visible, focus, pass, star, reachOut, profile.preferredSource]);
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
@@ -860,6 +861,7 @@ export default function Home() {
                     listing={listing}
                     focused={i === focus}
                     linked={linkedId === listing.id}
+                    preferredSource={profile.preferredSource}
                     onHover={setLinkedId}
                     onOpen={setOpen}
                     onStar={star}
@@ -1433,6 +1435,33 @@ function ProfileForm({
             />
           </label>
         ))}
+      </div>
+
+      <div style={{ display: "grid", gap: 6 }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          When a place is on several sites, open
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {ALL_SOURCES.map((source) => (
+            <button
+              key={source}
+              className={
+                (draft.preferredSource ?? DEFAULT_PREFERRED_SOURCE) === source
+                  ? "btn btn-primary"
+                  : "btn"
+              }
+              style={{ fontSize: 12, padding: "4px 9px" }}
+              onClick={() => setDraft({ ...draft, preferredSource: source })}
+            >
+              {SOURCE_LABEL[source]}
+            </button>
+          ))}
+        </div>
+        <span className="muted" style={{ fontSize: 11 }}>
+          The same apartment is often listed three or four times. This decides
+          which one the buttons open — the badges on each card still show every
+          site carrying it.
+        </span>
       </div>
 
       <div style={{ display: "grid", gap: 6 }}>

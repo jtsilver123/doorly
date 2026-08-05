@@ -1,4 +1,5 @@
-import type { ContactChannel, FeedListing } from "@/types";
+import type { ContactChannel, FeedListing, Source } from "@/types";
+import { DEFAULT_PREFERRED_SOURCE } from "@/types";
 import { DEFAULT_COSTS, type CostAssumptions } from "@/lib/cost";
 
 /**
@@ -32,6 +33,11 @@ export interface Profile {
   documents: string[];
   /** What you assume it costs to move in. Tunable — the rules vary. */
   costs: CostAssumptions;
+  /**
+   * Which listing site to open when the same apartment is on several. Personal
+   * enough to be worth asking rather than assuming.
+   */
+  preferredSource: Source;
 }
 
 /** The documents a NYC landlord actually asks for. */
@@ -59,6 +65,7 @@ export const DEFAULT_PROFILE: Profile = {
   extra: "",
   documents: [],
   costs: DEFAULT_COSTS,
+  preferredSource: DEFAULT_PREFERRED_SOURCE,
 };
 
 function formatMoveIn(iso: string): string {

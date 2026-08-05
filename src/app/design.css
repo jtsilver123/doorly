@@ -1861,3 +1861,36 @@ button.fact:hover { border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .board-card[data-dragging="true"] { opacity: 0.7; }
 }
+
+/* --- onboarding: the data key -------------------------------------------- */
+
+/* Set apart, because it's the one step that sends you somewhere else and
+   comes back. Everything above it can be answered from memory. */
+.welcome-key {
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.welcome-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 5px;
+  font-size: var(--t-md);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.welcome-steps li::marker { font-weight: 700; color: var(--accent); }
+.welcome-steps a { color: var(--accent); font-weight: 600; }
+
+.welcome-steps code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}

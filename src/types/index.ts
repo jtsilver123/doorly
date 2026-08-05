@@ -29,17 +29,34 @@ export const SOURCE_LABEL: Record<Source, string> = {
 
 /**
  * Which site to link to when the same apartment is on several.
- * Zillow first by preference — the listing pages are the nicest to actually use.
+ *
+ * StreetEasy leads because it's the one New Yorkers actually use and the one
+ * most likely to carry a real broker contact. This is only the default, though
+ * — the choice is genuinely personal, so it's a setting, and `linkPreference`
+ * below reorders this list around whatever the reader picked.
  */
+export const DEFAULT_PREFERRED_SOURCE: Source = "streeteasy";
+
 export const LINK_PREFERENCE: Source[] = [
-  "zillow",
   "streeteasy",
+  "zillow",
   "apartments",
   "hotpads",
   "craigslist",
   "email",
   "manual",
 ];
+
+/**
+ * The link order with one site promoted to the front.
+ *
+ * Everything after the favourite keeps its default ranking, so choosing
+ * HotPads doesn't silently demote StreetEasy below Craigslist.
+ */
+export function linkPreference(favourite?: Source | null): Source[] {
+  if (!favourite || !LINK_PREFERENCE.includes(favourite)) return LINK_PREFERENCE;
+  return [favourite, ...LINK_PREFERENCE.filter((s) => s !== favourite)];
+}
 
 /**
  * A listing as a source adapter returns it. Every adapter normalizes into this

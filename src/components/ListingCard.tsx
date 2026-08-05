@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { FeedListing } from "@/types";
-import { LINK_PREFERENCE, SOURCE_LABEL, STAGE_LABEL } from "@/types";
+import type { Source } from "@/types";
+import { linkPreference, SOURCE_LABEL, STAGE_LABEL } from "@/types";
 import { CONTACT_ICON, CONTACT_LABEL, bestChannel } from "@/lib/outreach";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
@@ -23,10 +24,11 @@ import { RatingDisc, ProsConsLine } from "@/components/Rating";
  * footer so they can never push the numbers around.
  */
 
-export function orderedSources(listing: FeedListing) {
+export function orderedSources(listing: FeedListing, favourite?: Source | null) {
+  const order = linkPreference(favourite);
   return [...listing.alsoOn]
     .filter((s) => s.url)
-    .sort((a, b) => LINK_PREFERENCE.indexOf(a.source) - LINK_PREFERENCE.indexOf(b.source));
+    .sort((a, b) => order.indexOf(a.source) - order.indexOf(b.source));
 }
 
 const money = (n: number) => `$${n.toLocaleString()}`;
@@ -44,6 +46,8 @@ interface Props {
   focused?: boolean;
   /** Hovered on the map. Mirrors the card's own hover state so the two link. */
   linked?: boolean;
+  /** Which site to open first when the apartment is on several. */
+  preferredSource?: Source;
   onHover?: (id: string | null) => void;
   onOpen: (listing: FeedListing) => void;
   onStar: (listing: FeedListing) => void;
@@ -55,6 +59,7 @@ export default function ListingCard({
   listing,
   focused,
   linked,
+  preferredSource,
   onHover,
   onOpen,
   onStar,
@@ -67,7 +72,7 @@ export default function ListingCard({
   const rose = listing.price > listing.originalPrice;
   const delta = listing.price - listing.originalPrice;
   const reach = bestChannel(listing);
-  const sources = orderedSources(listing);
+  const sources = orderedSources(listing, preferredSource);
   const primary = sources[0];
   const warn = listing.flags.find((f) => f.severity === "warn");
   const size = listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms} bed`;
