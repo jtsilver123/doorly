@@ -41,7 +41,12 @@ export async function proxy(request: NextRequest) {
   // The cron endpoint authenticates with a shared secret, not a session.
   const isCron = path.startsWith("/api/cron");
 
-  if (!user && !isAuthRoute && !isCron) {
+  // The root is the marketing site when signed out — the one page a stranger
+  // from a group chat is allowed to see. The social card rides along: link
+  // unfurlers have no session and give up on a redirect.
+  const isLanding = path === "/" || path === "/opengraph-image";
+
+  if (!user && !isAuthRoute && !isCron && !isLanding) {
     const to = request.nextUrl.clone();
     to.pathname = "/login";
     const redirectResponse = NextResponse.redirect(to);

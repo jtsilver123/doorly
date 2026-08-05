@@ -97,7 +97,7 @@ export default function Welcome() {
             Let&apos;s set up your search
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
-            Homefinder watches StreetEasy, Zillow, Apartments.com, HotPads and
+            Doorly watches StreetEasy, Zillow, Apartments.com, HotPads and
             Craigslist for you, and tells you when something changes.
           </div>
         </header>

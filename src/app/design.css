@@ -424,10 +424,10 @@
 
 /* Four steps, not a gradient. A continuous colour scale reads as decoration;
    four distinct ones read as a judgment you can act on. */
-.ratedisc[data-grade="excellent"] { background: #15803d; }
-.ratedisc[data-grade="strong"]    { background: #2563eb; }
-.ratedisc[data-grade="fair"]      { background: #b45309; }
-.ratedisc[data-grade="weak"]      { background: #6b7280; }
+.ratedisc[data-grade="excellent"] { background: var(--grade-excellent); }
+.ratedisc[data-grade="strong"]    { background: var(--grade-strong); }
+.ratedisc[data-grade="fair"]      { background: var(--grade-fair); }
+.ratedisc[data-grade="weak"]      { background: var(--grade-weak); }
 
 /* --- amenity badges ------------------------------------------------------ */
 
@@ -1126,297 +1126,6 @@ button.fact:hover { border-color: var(--accent); }
   box-shadow: var(--shadow);
 }
 
-/* --- map ----------------------------------------------------------------- */
-
-.mapframe {
-  display: grid;
-  gap: var(--s2);
-}
-
-.mapcanvas {
-  position: relative;
-  aspect-ratio: 5 / 4;
-  /* Guards the same collapse; harmless where the parent isn't constrained. */
-  min-height: fit-content;
-  max-height: 74vh;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  background: var(--bg);
-  cursor: grab;
-  touch-action: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  .mapcanvas { background-color: var(--surface); }
-}
-
-/* Context, not data. It has to stay readable under a field of pins without
-   ever competing with one, hence the halo rather than more weight. */
-.maphood {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: grid;
-  justify-items: center;
-  gap: 1px;
-  padding: 4px 10px;
-  border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--surface) 74%, transparent);
-  font-size: var(--t-sm);
-  font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 1;
-}
-
-.maphood i {
-  font-style: normal;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  opacity: 0.8;
-}
-
-/* Priced pins, coloured by the same four grades the cards use, so the map
-   carries the identical judgment rather than a second opinion. */
-.mappin {
-  position: absolute;
-  z-index: 3;
-  transform: translate(-50%, -50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
-  border: 1.5px solid var(--surface);
-  border-radius: var(--r-full);
-  font-size: var(--t-sm);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #fff;
-  line-height: 1.25;
-  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.28);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-
-.mappin b { font-size: 9px; }
-
-.mappin[data-grade="excellent"] { background: #15803d; z-index: 6; }
-.mappin[data-grade="strong"]    { background: #2563eb; z-index: 5; }
-.mappin[data-grade="fair"]      { background: #b45309; z-index: 4; }
-.mappin[data-grade="weak"]      { background: #8b93a1; z-index: 2; opacity: 0.82; }
-
-.mappin[data-saved="true"] { border-color: #fbbf24; }
-
-.mappin:hover,
-.mappin:focus-visible,
-.mappin[data-active="true"] {
-  transform: translate(-50%, -50%) scale(1.22);
-  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.4);
-  z-index: 30;
-}
-
-/* Count bubbles, where several listings collapse into one mark. Sized by area
-   so twenty places don't look four times busier than five. */
-.mapcluster {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  border: 2px solid var(--surface);
-  border-radius: var(--r-full);
-  color: #fff;
-  font-size: var(--t-md);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  z-index: 7;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.3);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-
-.mapcluster[data-grade="excellent"] { background: #15803d; }
-.mapcluster[data-grade="strong"]    { background: #2563eb; }
-.mapcluster[data-grade="fair"]      { background: #b45309; }
-.mapcluster[data-grade="weak"]      { background: #8b93a1; }
-
-.mapcluster:hover,
-.mapcluster:focus-visible {
-  transform: translate(-50%, -50%) scale(1.12);
-  box-shadow: 0 5px 16px rgba(16, 24, 40, 0.42);
-  z-index: 20;
-}
-
-.mappeek {
-  position: absolute;
-  z-index: 35;
-  display: grid;
-  gap: 2px;
-  min-width: 186px;
-  max-width: 240px;
-  padding: var(--s3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-lg);
-  pointer-events: none;
-}
-
-.mappeek strong { font-size: var(--t-xl); font-weight: 750; letter-spacing: -0.025em; }
-.mappeek span { font-size: var(--t-md); line-height: 1.35; }
-.mappeek-sub { color: var(--text-muted); font-size: var(--t-sm) !important; }
-
-.maplegend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s4);
-  flex-wrap: wrap;
-  font-size: var(--t-xs);
-  color: var(--text-muted);
-}
-
-.mapscale {
-  display: block;
-  border-left: 1px solid var(--text-muted);
-  border-right: 1px solid var(--text-muted);
-  border-bottom: 1px solid var(--text-muted);
-  height: 6px;
-  line-height: 6px;
-  padding-top: 2px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  min-width: 54px;
-}
-
-.mapkey { display: inline-flex; align-items: center; gap: 5px; }
-.maphint { flex: 1; text-align: center; min-width: 0; }
-
-.mapkey i {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: var(--r-full);
-  margin-left: var(--s3);
-}
-
-.mapkey i:first-child { margin-left: 0; }
-.mapkey i[data-grade="excellent"] { background: #15803d; }
-.mapkey i[data-grade="strong"]    { background: #2563eb; }
-.mapkey i[data-grade="fair"]      { background: #b45309; }
-.mapkey i[data-grade="weak"]      { background: #8b93a1; }
-
-@media (max-width: 700px) {
-  .mapcanvas { aspect-ratio: 3 / 4; }
-  .control-sort { margin-left: 0; max-width: none; flex: 1; }
-}
-
-/* --- phones, final word --------------------------------------------------
- *
- * This block sits last on purpose. The toolbar and card rules above were added
- * after the main mobile breakpoint, so they were silently winning the cascade
- * on phones — the row went back to wrapping and the toolbar grew to three
- * stacked rows, pushing every apartment below the fold. Ordering is the fix;
- * !important would only hide the collision.
- */
-@media (max-width: 860px) {
-  /* Two columns of facts, not four. At 390px a four-across row wrapped every
-     value onto three lines, so the two numbers the product turns on were the
-     ugliest thing on the page. */
-  .searchhead-facts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--s2);
-  }
-
-  .fact { min-width: 0; }
-  .fact-value { font-size: var(--t-lg); }
-  .fact-unit { display: block; }
-
-  /* Search on its own line, everything else on one scrolling line. Two rows
-     total, so a listing is visible without scrolling. */
-  /* Search and the view switch share the first line; everything else scrolls
-     underneath. Two rows, and nothing important off-screen. */
-  .filterbar-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--s2);
-  }
-
-  .filterbar-row > .filterbar-controls { grid-column: 1 / -1; }
-
-  .filterbar-controls {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-
-  .filterbar-controls::-webkit-scrollbar { display: none; }
-  .filterbar-controls > * { flex: 0 0 auto; }
-  .control-sort { margin-left: 0; max-width: 158px; }
-
-  /* A 4:3 photo at full phone width is ~290px of the first screen. 3:2 keeps
-     the picture generous while leaving room for the price under it. */
-  .card-media { aspect-ratio: 3 / 2; }
-
-  .grid { grid-template-columns: 1fr; gap: var(--s4); }
-
-  .mapcanvas { aspect-ratio: 3 / 4; }
-  .maphint { display: none; }
-}
-
-/* --- map basemap and zoom ------------------------------------------------ */
-
-.mapworld {
-  position: absolute;
-  inset: 0;
-  transform-origin: 50% 50%;
-  will-change: transform;
-}
-
-.mapcanvas[data-dragging="true"] { cursor: grabbing; }
-
-/* The city's own neighborhood boundaries. Quiet enough to sit under three
-   hundred pins, present enough to orient you. */
-.mapshapes {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.mapshape {
-  fill: var(--surface-2);
-  stroke: var(--border);
-  stroke-width: 1;
-}
-
-/* Neighborhoods you actually have listings in are lifted out of the ground. */
-.mapshape[data-live="true"] {
-  fill: color-mix(in srgb, var(--accent) 9%, var(--surface));
-  stroke: color-mix(in srgb, var(--accent) 30%, var(--border));
-}
-
-.mapreset {
-  position: absolute;
-  top: var(--s3);
-  right: var(--s3);
-  z-index: 40;
-  padding: 5px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  box-shadow: var(--shadow);
-}
-
-.mapreset:hover { border-color: var(--accent); color: var(--accent); }
 
 /* --- page widths ---------------------------------------------------------
  *
@@ -1913,7 +1622,7 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 /* Overdue, or happening within the day. */
-.btn-primary.is-urgent { background: var(--warn); border-color: var(--warn); }
+.btn-primary.is-urgent { background: var(--urgent); border-color: var(--urgent); }
 .btn-primary.is-urgent:hover { filter: brightness(0.94); }
 
 .stagenote {
@@ -2223,10 +1932,10 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 /* The same four grades as the discs — one judgment, two projections. */
-.mappin[data-grade="excellent"] { background: #15803d; }
-.mappin[data-grade="strong"]    { background: #2563eb; }
-.mappin[data-grade="fair"]      { background: #b45309; }
-.mappin[data-grade="weak"]      { background: #6b7280; }
+.mappin[data-grade="excellent"] { background: var(--grade-excellent); }
+.mappin[data-grade="strong"]    { background: var(--grade-strong); }
+.mappin[data-grade="fair"]      { background: var(--grade-fair); }
+.mappin[data-grade="weak"]      { background: var(--grade-weak); }
 
 .mappin.is-linked,
 .mappin:hover { transform: translate(-50%, -50%) scale(1.22); }
