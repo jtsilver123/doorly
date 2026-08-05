@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FeedListing, Stage } from "@/types";
 import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
@@ -20,14 +20,21 @@ import Icon from "@/components/Icon";
  *
  *   pointer   drag it to another column
  *   keyboard  focus a card, ← and → move it a stage at a time
- *   touch     open it and use the status control in the panel
+ *   touch     hold a card for a beat, then drag — see below
  *
- * HTML5 drag-and-drop deliberately, rather than a pointer-event
- * reimplementation: it is what screen readers and browsers already understand,
- * and it costs no library. It does not fire on touch — but on a phone this
- * board is a horizontally scrolling strip, where a drag gesture would be
- * fighting the scroll anyway, so the panel is the better answer there.
+ * Mouse drags use HTML5 drag-and-drop: it is what screen readers and browsers
+ * already understand, and it costs no library. But those events never fire on
+ * touch, and on a phone the board is a horizontally scrolling strip where an
+ * immediate drag would fight the scroll. So touch gets its own gesture with a
+ * long-press to disambiguate: a swipe scrolls the board, a hold lifts the
+ * card. Once lifted, a ghost follows the finger, columns light up as targets,
+ * and holding near either edge scrolls the strip so every column is reachable.
  */
+
+/** How long a finger must hold still before a touch becomes a drag. */
+const LIFT_MS = 300;
+/** Movement past this many pixels before the hold elapses means a scroll. */
+const WOBBLE_PX = 12;
 
 const money = (n: number) => `$${n.toLocaleString()}`;
 
@@ -71,6 +78,19 @@ export default function PipelineBoard({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
   const [quick, setQuick] = useState("");
+  /** A touch-lifted card: what's being dragged and where the finger is. */
+  const [lifted, setLifted] = useState<{ listing: FeedListing; x: number; y: number } | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const touch = useRef<{
+    timer: ReturnType<typeof setTimeout> | null;
+    startX: number;
+    startY: number;
+    listing: FeedListing | null;
+    lifted: boolean;
+    overStage: Stage | null;
+    /** Swallow the click that some browsers fire after a drag's touchend. */
+    justDropped: boolean;
+  }>({ timer: null, startX: 0, startY: 0, listing: null, lifted: false, overStage: null, justDropped: false });
 
   function moveBy(listing: FeedListing, delta: number) {
     const at = PIPELINE_STAGES.indexOf(listing.stage);
@@ -78,6 +98,111 @@ export default function PipelineBoard({
     const next = PIPELINE_STAGES[at + delta];
     if (next) onMove(listing, next);
   }
+
+  /** A finger down on a card arms the hold timer; nothing lifts yet. */
+  function armTouch(listing: FeedListing, e: React.TouchEvent) {
+    const t = e.touches[0];
+    if (!t || e.touches.length > 1) return;
+    const state = touch.current;
+    state.startX = t.clientX;
+    state.startY = t.clientY;
+    state.listing = listing;
+    state.lifted = false;
+    state.overStage = null;
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      state.lifted = true;
+      navigator.vibrate?.(10);
+      setLifted({ listing, x: state.startX, y: state.startY });
+      setDragging(listing.id);
+    }, LIFT_MS);
+  }
+
+  /*
+   * The move/end handlers are native, not React props: React registers touch
+   * listeners as passive, and a passive touchmove cannot preventDefault —
+   * which is the only way to stop the page scrolling under a lifted card.
+   */
+  useEffect(() => {
+    const state = touch.current;
+
+    /*
+     * Which column the finger is over, by lane rather than by point.
+     * elementFromPoint was the first attempt and it missed constantly: the
+     * columns are short (min-height 200), so a finger below a sparse column
+     * or in the gutter between two resolved to nothing and the drop
+     * cancelled. On a horizontal strip the honest model is that a column
+     * owns its full vertical lane.
+     */
+    function columnAt(x: number): Stage | null {
+      const cols = boardRef.current?.querySelectorAll<HTMLElement>(".board-col");
+      for (const col of cols ?? []) {
+        const r = col.getBoundingClientRect();
+        if (x >= r.left - 6 && x <= r.right + 6)
+          return col.getAttribute("data-stage") as Stage | null;
+      }
+      return null;
+    }
+
+    function onMoveTouch(e: TouchEvent) {
+      const t = e.touches[0];
+      if (!t) return;
+      if (state.timer) {
+        // Still deciding: real movement before the hold elapses is a scroll.
+        const wobble = Math.hypot(t.clientX - state.startX, t.clientY - state.startY);
+        if (wobble > WOBBLE_PX) {
+          clearTimeout(state.timer);
+          state.timer = null;
+          state.listing = null;
+        }
+        return;
+      }
+      if (!state.lifted || !state.listing) return;
+      e.preventDefault();
+      setLifted({ listing: state.listing, x: t.clientX, y: t.clientY });
+      const stage = columnAt(t.clientX);
+      state.overStage = stage;
+      setOver(stage);
+      // Near either edge, scroll the strip so far columns stay reachable.
+      const board = boardRef.current;
+      if (board) {
+        const box = board.getBoundingClientRect();
+        if (t.clientX < box.left + 56) board.scrollLeft -= 14;
+        else if (t.clientX > box.right - 56) board.scrollLeft += 14;
+      }
+    }
+
+    function onEndTouch() {
+      if (state.timer) {
+        // Short tap: let the ordinary click open the card.
+        clearTimeout(state.timer);
+        state.timer = null;
+        state.listing = null;
+        return;
+      }
+      if (!state.lifted) return;
+      const { listing, overStage } = state;
+      state.lifted = false;
+      state.listing = null;
+      state.justDropped = true;
+      setTimeout(() => {
+        state.justDropped = false;
+      }, 350);
+      setLifted(null);
+      setDragging(null);
+      setOver(null);
+      if (listing && overStage && listing.stage !== overStage) onMove(listing, overStage);
+    }
+
+    document.addEventListener("touchmove", onMoveTouch, { passive: false });
+    document.addEventListener("touchend", onEndTouch);
+    document.addEventListener("touchcancel", onEndTouch);
+    return () => {
+      document.removeEventListener("touchmove", onMoveTouch);
+      document.removeEventListener("touchend", onEndTouch);
+      document.removeEventListener("touchcancel", onEndTouch);
+    };
+  }, [onMove]);
 
   return (
     <>
@@ -108,7 +233,15 @@ export default function PipelineBoard({
         </button>
       </form>
 
-    <div className="board">
+    <div
+      className="board"
+      ref={boardRef}
+      // Android fires a context menu on a stationary long-press — the same
+      // gesture that lifts a card here.
+      onContextMenu={(e) => {
+        if (touch.current.lifted) e.preventDefault();
+      }}
+    >
       {PIPELINE_STAGES.map((stage) => {
         const column = listings.filter((l) => l.stage === stage);
         /*
@@ -189,7 +322,13 @@ export default function PipelineBoard({
                     setDragging(null);
                     setOver(null);
                   }}
-                  onClick={() => onOpen(l)}
+                  onTouchStart={(e) => armTouch(l, e)}
+                  onClick={() => {
+                    // The click that trails a touch-drop would open the card
+                    // you just filed somewhere else.
+                    if (touch.current.justDropped) return;
+                    onOpen(l);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight") {
                       e.preventDefault();
@@ -290,6 +429,22 @@ export default function PipelineBoard({
           </div>
         );
       })}
+
+      {/* The lifted card's ghost, riding under the finger. */}
+      {lifted && (
+        <div
+          className="board-ghost"
+          style={{ left: lifted.x, top: lifted.y }}
+          aria-hidden="true"
+        >
+          <strong>{money(lifted.listing.price)}</strong>
+          <span>
+            {lifted.listing.address}
+            {lifted.listing.unit ? ` #${lifted.listing.unit}` : ""}
+          </span>
+          <i>{over ? `→ ${STAGE_LABEL[over]}` : "Drag to a column"}</i>
+        </div>
+      )}
     </div>
     </>
   );

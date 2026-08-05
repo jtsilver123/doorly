@@ -1633,6 +1633,40 @@ button.fact:hover .fact-label { color: var(--accent); }
 .board-card { cursor: grab; }
 .board-card:active { cursor: grabbing; }
 
+/* Long-press is the lift gesture on touch, so the platform's own long-press
+   behaviors — text selection, the iOS callout — have to stand down. */
+.board-card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* The touch-drag ghost: rides above the finger (never under it — it would
+   swallow the elementFromPoint hit test even so, hence pointer-events none). */
+.board-ghost {
+  position: fixed;
+  z-index: 90;
+  transform: translate(-50%, -115%);
+  pointer-events: none;
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  max-width: 240px;
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  box-shadow: 0 12px 32px rgba(15, 40, 30, 0.28);
+}
+.board-ghost strong { font-size: var(--t-lg); letter-spacing: -0.02em; }
+.board-ghost span { font-size: var(--t-sm); line-height: 1.3; }
+.board-ghost i {
+  font-style: normal;
+  font-size: var(--t-xs);
+  font-weight: 650;
+  color: var(--accent);
+}
+
 .board-card[data-dragging="true"] {
   opacity: 0.4;
   border-color: var(--accent);
