@@ -291,20 +291,37 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
           </button>
         </header>
 
-        <div style={{ overflowY: "auto", padding: 16, display: "grid", gap: 18 }}>
+        {/*
+          Block flow, not grid.
+          
+          This was a grid, and inside a height-constrained scroll container its
+          auto rows collapsed to zero — children rendered at their natural size
+          and overlapped each other, so the photo painted over the figures and
+          the figures over the verdict. Patching each child with a minimum
+          height only moved the problem to the next one I added. Normal flow
+          cannot compress a child below its content, so the whole class of bug
+          goes away with the layout mode.
+        */}
+        <div className="drawer-body">
           {/* The panel never showed the apartment. A detail view of a home
               that omits the photo and the cost of getting in is a summary of
               everything except what you opened it for. */}
-          {listing.imageUrl && !imageBroken && (
-            <div className="drawer-photo">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div className="drawer-photo">
+            {/* Same under-layer the cards use: an image that never resolves
+                fires no error event, so swapping on error leaves a blank box.
+                Something readable always sits behind it. */}
+            <span className="drawer-photo-alt" aria-hidden="true">
+              {listing.neighborhood || listing.borough || "No photo"}
+            </span>
+            {listing.imageUrl && !imageBroken && (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={listing.imageUrl}
                 alt={`Photo of ${listing.address}`}
                 onError={() => setImageBroken(true)}
               />
-            </div>
-          )}
+            )}
+          </div>
 
           <dl className="drawer-facts">
             <div>

@@ -257,6 +257,11 @@ export default function FilterBar({
           ))}
         </select>
 
+        </div>
+
+        {/* Outside the scrolling strip on purpose: switching between photos and
+            the map is a top-level choice, and on a phone it was parked off the
+            right-hand edge behind a horizontal scroll nobody would find. */}
         <div className="viewswitch" role="group" aria-label="View">
           <button
             className={view === "grid" ? "is-on" : undefined}
@@ -272,7 +277,6 @@ export default function FilterBar({
           >
             Map
           </button>
-        </div>
         </div>
       </div>
 
