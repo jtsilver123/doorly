@@ -799,24 +799,34 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
 /* Below this the sidebar becomes a bottom tab bar: thumbs reach the bottom of
    a phone, not the top-left corner. */
 @media (max-width: 860px) {
-  .shell { flex-direction: column; padding-bottom: 68px; }
+  .shell { flex-direction: column; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
 
+  /*
+   * The tab bar outranks everything.
+   *
+   * It sat at z-index 40 with the drawer at 50, so opening a listing buried
+   * the only navigation a phone has — and it ignored the home-indicator
+   * inset, so on an iPhone the bottom row of targets sat half under the
+   * system bar. It's the floor of the app: always visible, always tappable,
+   * and everything else (drawer included) ends above it.
+   */
   .shell > .sidebar {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     top: auto;
-    z-index: 40;
+    z-index: 70;
     width: 100%;
     height: auto;
     flex-direction: row;
     align-items: center;
     gap: 0;
-    padding: 6px var(--s2);
+    padding: 6px var(--s2) calc(6px + env(safe-area-inset-bottom, 0px));
     border-right: none;
     border-top: 1px solid var(--border);
     overflow-x: auto;
+    background: var(--surface);
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
   }
 
@@ -3519,4 +3529,40 @@ button.fact:hover .fact-label { color: var(--accent); }
   .drawer-share-label { display: none; }
   .drawer-share { padding: 5px 8px; }
   .drawer-head-price > span { display: none; }
+}
+
+/* On a phone the drawer and dialogs stop above the tab bar instead of
+   burying it — the bar is the floor. */
+@media (max-width: 860px) {
+  /* aside.drawer, not .drawer: design.css is imported ahead of globals'
+     own rules, so the base `height: 100dvh` wins a class-for-class tie.
+     The element selector settles it without !important. */
+  aside.drawer {
+    height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px));
+  }
+
+  .passdialog {
+    max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px));
+    top: calc(50% - 28px);
+  }
+}
+
+/* On a phone the filter panel is a bottom sheet, not a popover. Anchored to
+   the button's right edge it hung mostly off-screen left — the rent field
+   wasn't even visible. It rises from above the tab bar instead, full width,
+   scrolling inside itself. */
+@media (max-width: 700px) {
+  .filterbar-more .panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    z-index: 65;
+    width: auto;
+    max-height: 62dvh;
+    overflow-y: auto;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    box-shadow: 0 -12px 32px rgba(16, 24, 40, 0.18);
+  }
 }

@@ -245,9 +245,22 @@ export default function FilterBar({
                 <button className="linkish" onClick={onReset}>
                   Reset everything
                 </button>
-                <button className="btn btn-primary" onClick={() => setOpenPanel(false)}>
-                  Show {total.toLocaleString()}
-                </button>
+                {/* "Show 0" is a dead end with the exit hidden in a corner —
+                    at zero, the one big button becomes the way back. */}
+                {total === 0 ? (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      onReset();
+                    }}
+                  >
+                    Nothing matches — clear filters
+                  </button>
+                ) : (
+                  <button className="btn btn-primary" onClick={() => setOpenPanel(false)}>
+                    Show {total.toLocaleString()}
+                  </button>
+                )}
               </div>
             </div>
           )}

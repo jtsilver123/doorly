@@ -892,7 +892,12 @@ export default function Home() {
               className="nav-item"
               data-key={key}
               aria-current={tab === key ? "page" : undefined}
-              onClick={() => setTab(key)}
+              onClick={() => {
+                // The bar stays above the drawer on phones; switching
+                // sections is also how you leave the panel.
+                setOpen(null);
+                setTab(key);
+              }}
             >
               <Icon name={NAV_ICON[key]} size={18} className="nav-icon" />
               <span>{label}</span>
