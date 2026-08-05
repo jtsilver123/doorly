@@ -2047,6 +2047,115 @@ button.fact:hover { border-color: var(--accent); }
 .savestate[data-state="saving"] { color: var(--accent); }
 .savestate[data-state="saved"] { color: var(--good); font-weight: 600; }
 
+/* --- tag-team -------------------------------------------------------------- */
+
+/* The invite's landing page: one card, one decision. */
+.joinpage {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--s5);
+  background: var(--bg);
+}
+
+.joincard {
+  max-width: 26rem;
+  padding: var(--s6);
+  display: grid;
+  gap: var(--s4);
+  justify-items: start;
+}
+
+.joincard h1 { font-size: var(--t-2xl); letter-spacing: -0.02em; }
+.joincard h1 b { color: var(--accent); }
+.joinauth { display: grid; gap: var(--s2); justify-items: start; }
+
+/* The two pitches, before a crew exists. */
+.crew-pitch {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s3);
+}
+
+.crew-pitch li {
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.crew-pitch b { display: block; color: var(--text); margin-bottom: 2px; }
+
+/* The roster. */
+.crew-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s2);
+}
+
+.crew-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.crew-who { display: grid; gap: 1px; min-width: 0; }
+.crew-who > b { font-size: var(--t-sm); font-weight: 600; }
+.crew-who > span {
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-invite {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+
+.crew-invite code {
+  font-size: var(--t-xs);
+  word-break: break-all;
+  color: var(--text-muted);
+}
+
+/* On a board card: "Emma has point" / "via Dad". */
+.board-crew {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* In the drawer: attribution + point-person, one quiet row. */
+.crewline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.crewline-poc { display: inline-flex; align-items: center; gap: var(--s2); }
+
 /* --- the split map view ---------------------------------------------------- */
 
 /* Zillow's arrangement, because it's correct: the map holds still while the

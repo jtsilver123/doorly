@@ -49,6 +49,8 @@ interface Props {
   linked?: boolean;
   /** Which site to open first when the apartment is on several. */
   preferredSource?: Source;
+  /** Tag-team attribution — "via Emma" — when someone else found it. */
+  via?: string | null;
   onHover?: (id: string | null) => void;
   onOpen: (listing: FeedListing) => void;
   onStar: (listing: FeedListing) => void;
@@ -61,6 +63,7 @@ export default function ListingCard({
   focused,
   linked,
   preferredSource,
+  via,
   onHover,
   onOpen,
   onStar,
@@ -195,11 +198,13 @@ export default function ListingCard({
         <div className="card-foot">
           {/* Status only shows when there is a status; an empty row of its own
               was costing every card a line to say nothing. */}
-          {(listing.stage !== "inbox" || listing.lastContactChannel) && (
+          {(listing.stage !== "inbox" || listing.lastContactChannel || via) && (
             <span className="srcrow">
               {listing.stage !== "inbox" && (
                 <b className="tag tag-accent">{STAGE_LABEL[listing.stage]}</b>
               )}
+              {/* Tag-team attribution: who found this one for you. */}
+              {via && <b className="tag tag-grey">{via}</b>}
               {listing.lastContactChannel && (
                 <b
                   className="tag tag-grey"

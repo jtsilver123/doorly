@@ -190,6 +190,13 @@ export interface FeedListing extends Listing {
   /** The far end of an open-house window. Null for a private viewing. */
   tourEndsAt: string | null;
   /**
+   * Tag-team attribution. Who first put this in the pipeline, and who owns
+   * talking to the agent. User ids — the crew roster maps them to names.
+   * Null outside a crew, and for anything that predates one.
+   */
+  addedById: string | null;
+  pocId: string | null;
+  /**
    * Your own 1-100, sitting beside the computed one rather than replacing it.
    * The rating can weigh price against comparables; it cannot know the block
    * was loud or that you walked in and knew. Null until you say.

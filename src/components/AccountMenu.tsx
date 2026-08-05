@@ -18,11 +18,12 @@ import { signOut } from "@/app/auth/actions";
  * dropping down would put it off-screen.
  */
 
-export type ProfileSection = "search" | "details" | "packet" | "api";
+export type ProfileSection = "search" | "details" | "packet" | "api" | "crew";
 
 const ITEMS: { key: ProfileSection; label: string; hint: string }[] = [
   { key: "details", label: "Your details", hint: "Name, income, what you can show" },
   { key: "search", label: "Your search", hint: "Neighborhoods, budget, size" },
+  { key: "crew", label: "Search together", hint: "Invite helpers or a roommate" },
   { key: "packet", label: "Application packet", hint: "Documents to get ready" },
   { key: "api", label: "Data & refresh", hint: "API key, how often we check" },
 ];

@@ -29,6 +29,7 @@ import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
 import AccountMenu, { type ProfileSection } from "@/components/AccountMenu";
+import CrewPanel, { type CrewView } from "@/components/CrewPanel";
 import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
@@ -112,6 +113,7 @@ export default function Home() {
 
   const [open, setOpen] = useState<FeedListing | null>(null);
   const [api, setApi] = useState<ApiStatus | null>(null);
+  const [crew, setCrew] = useState<CrewView | null>(null);
   const [email, setEmail] = useState("");
   const [budget, setBudget] = useState(0);
   const [focus, setFocus] = useState(0);
@@ -236,9 +238,39 @@ export default function Home() {
     }
   }, []);
 
+  // Tag-team attribution. First names, because a card footer is small and
+  // everyone in a crew already knows which Emma.
+  const meId = crew?.members.find((m) => m.isYou)?.userId ?? null;
+  const crewName = useCallback(
+    (id: string | null): string | null => {
+      if (!crew || !id) return null;
+      const member = crew.members.find((m) => m.userId === id);
+      return member ? member.name.split(" ")[0] : null;
+    },
+    [crew]
+  );
+  const via = useCallback(
+    (l: FeedListing): string | null => {
+      if (!crew || !l.addedById || l.addedById === meId) return null;
+      const name = crewName(l.addedById);
+      return name ? `via ${name}` : null;
+    },
+    [crew, meId, crewName]
+  );
+
+  const loadCrew = useCallback(async () => {
+    try {
+      const body = await fetch("/api/crew").then((r) => r.json());
+      setCrew(body.crew ?? null);
+    } catch {
+      /* solo is the default; attribution UI simply stays hidden */
+    }
+  }, []);
+
   useEffect(() => {
     loadChanges();
     loadApi();
+    loadCrew();
     fetch("/api/searches")
       .then((r) => r.json())
       .then((b) => {
@@ -865,6 +897,7 @@ export default function Home() {
                     <ListingCard
                       key={listing.id}
                       listing={listing}
+                      via={via(listing)}
                       onOpen={setOpen}
                       onStar={star}
                       onPass={pass}
@@ -943,6 +976,7 @@ export default function Home() {
                     <ListingCard
                       key={listing.id}
                       listing={listing}
+                      via={via(listing)}
                       linked={linkedId === listing.id}
                       preferredSource={profile.preferredSource}
                       onHover={setLinkedId}
@@ -965,6 +999,7 @@ export default function Home() {
                   <ListingCard
                     key={listing.id}
                     listing={listing}
+                    via={via(listing)}
                     focused={i === focus}
                     linked={linkedId === listing.id}
                     preferredSource={profile.preferredSource}
@@ -1052,6 +1087,14 @@ export default function Home() {
             onOpen={setOpen}
             onMove={moveStage}
             onQuickAdd={quickAdd}
+            crewTag={(l) => {
+              if (!crew) return null;
+              // Point person first — on a working board, "who's on this" beats
+              // "who found it".
+              const poc = crewName(l.pocId);
+              if (poc) return `${poc} has point`;
+              return via(l);
+            }}
           />
         )}
 
@@ -1068,6 +1111,7 @@ export default function Home() {
                   [
                     ["details", "Your details"],
                     ["search", "What you're looking for"],
+                    ["crew", "Search together"],
                     ["packet", "Application packet"],
                     ["api", "Data & refresh"],
                   ] as [ProfileSection, string][]
@@ -1086,6 +1130,14 @@ export default function Home() {
             </div>
             {section === "details" && <ProfileForm profile={profile} onSave={saveProfile} />}
             {section === "search" && <SearchEditor onSaved={loadFeed} />}
+            {section === "crew" && (
+              <CrewPanel
+                onChanged={() => {
+                  loadCrew();
+                  loadFeed();
+                }}
+              />
+            )}
             {section === "packet" && (
               <ApplicationPacket profile={profile} onSave={saveProfile} />
             )}
@@ -1100,6 +1152,7 @@ export default function Home() {
           profile={profile}
           onClose={() => setOpen(null)}
           onChanged={loadFeed}
+          crew={crew}
         />
       )}
 

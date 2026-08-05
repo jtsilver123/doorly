@@ -42,6 +42,10 @@ interface Props {
   profile: Profile;
   onClose: () => void;
   onChanged: () => void;
+  /** The tag-team roster, when there is one. Drives attribution + point person. */
+  crew?: {
+    members: { userId: string; name: string; isYou: boolean; role: string }[];
+  } | null;
 }
 
 /**
@@ -106,7 +110,7 @@ function PriceChart({ points }: { points: PricePoint[] }) {
   );
 }
 
-export default function ListingDrawer({ listing, profile, onClose, onChanged }: Props) {
+export default function ListingDrawer({ listing, profile, onClose, onChanged, crew }: Props) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
@@ -714,6 +718,43 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                 ))}
               </select>
             </div>
+
+            {/* Tag-team: whose find, and who owns talking to the agent. The
+                point person exists so two people never both text the same
+                broker about the same apartment. */}
+            {crew && crew.members.length > 1 && (
+              <div className="crewline">
+                {listing.addedById && (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Found by{" "}
+                    {crew.members.find((m) => m.userId === listing.addedById)?.isYou
+                      ? "you"
+                      : (crew.members.find((m) => m.userId === listing.addedById)?.name ??
+                        "a former member")}
+                  </span>
+                )}
+                <label className="crewline-poc">
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Point person
+                  </span>
+                  <select
+                    className="control control-sm"
+                    value={listing.pocId ?? ""}
+                    onChange={(e) =>
+                      patch({ action: "poc", userId: e.target.value || null })
+                    }
+                    aria-label="Who talks to the agent for this one"
+                  >
+                    <option value="">Nobody yet</option>
+                    {crew.members.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.isYou ? `${m.name} (you)` : m.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
 
             {/* Only once a tour exists to have a time. "Tour booked" without
                 one is a label rather than a plan, and it's the thing you'll

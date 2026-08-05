@@ -318,6 +318,8 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     tourKind: "private" as const,
     tourEndsAt: null,
     myScore: null,
+    addedById: null,
+    pocId: null,
     contactCount: 0,
     lastContactAt: null,
     lastContactChannel: null,

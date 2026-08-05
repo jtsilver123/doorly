@@ -43,12 +43,18 @@ export default function PipelineBoard({
   onOpen,
   onMove,
   onQuickAdd,
+  crewTag,
 }: {
   listings: FeedListing[];
   onOpen: (listing: FeedListing) => void;
   onMove: (listing: FeedListing, stage: Stage) => void;
   /** Address typed into the quick-add box. Resolved by the page. */
   onQuickAdd: (address: string) => void;
+  /**
+   * Tag-team line for a card — "Emma has point", "via Dad" — or null when
+   * solo. Computed by the page, which holds the roster.
+   */
+  crewTag?: (listing: FeedListing) => string | null;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
@@ -159,6 +165,7 @@ export default function PipelineBoard({
                     {l.unit ? ` #${l.unit}` : ""}
                   </span>
                   <span className="muted board-where">{l.neighborhood}</span>
+                  {crewTag?.(l) && <span className="board-crew">{crewTag(l)}</span>}
                   {/* One source of truth with the cards and the panel, so the
                       board can never disagree about what comes next. */}
                   <span

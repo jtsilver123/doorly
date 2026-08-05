@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
@@ -26,11 +27,29 @@ async function landingPath(): Promise<string> {
   const supabase = await supabaseServer();
   const { data } = await supabase.auth.getUser();
   if (!data.user) return "/login";
+
+  // An invite link that bounced through signup finishes its journey first —
+  // the person clicked "join Emma's search", not "set up your own".
+  const jar = await cookies();
+  const invite = jar.get("pending_invite")?.value;
+  if (invite) {
+    jar.delete("pending_invite");
+    return `/join/${invite}`;
+  }
+
   const { count } = await supabase
     .from("saved_searches")
     .select("id", { count: "exact", head: true })
     .eq("user_id", data.user.id);
-  return count ? "/" : "/welcome";
+  if (count) return "/";
+
+  // No search of their own, but a crew to work: scouts and partners came for
+  // somebody else's pipeline, and setup would ask them to start their own.
+  const { count: crews } = await supabase
+    .from("crew_members")
+    .select("crew_id", { count: "exact", head: true })
+    .eq("user_id", data.user.id);
+  return crews ? "/" : "/welcome";
 }
 
 export async function signIn(_prev: AuthResult, formData: FormData): Promise<AuthResult> {

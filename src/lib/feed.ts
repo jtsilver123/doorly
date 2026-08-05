@@ -10,6 +10,7 @@ import type {
   Stage,
 } from "@/types";
 import { db, adminDb, currentUserId } from "@/lib/supabase";
+import { pipelineOwnerId } from "@/lib/crew";
 import { DEFAULT_CRITERIA, searchKey, normalizeCriteria } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
 import { fingerprint, extractUnit } from "@/lib/dedupe";
@@ -78,6 +79,8 @@ interface StateRow {
   my_score: number | null;
   tour_kind: string | null;
   tour_ends_at: string | null;
+  added_by: string | null;
+  poc_user_id: string | null;
 }
 
 function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
@@ -135,6 +138,10 @@ function daysBetween(from: string, to = new Date().toISOString()): number {
 export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedListing[]> {
   const supabase = await db();
   const userId = await currentUserId();
+  // In a crew, the pipeline you see is the crew's — the owner's rows. Taste
+  // (feedback) stays yours: what to look for is an opinion, the pipeline is
+  // the shared work.
+  const ownerId = await pipelineOwnerId();
 
   let query = supabase.from("listings").select("*");
 
@@ -157,7 +164,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   const ids = listings.map((r) => r.id);
 
   const [states, sources, events, contacts, feedbackRows] = await Promise.all([
-    supabase.from("user_listing_state").select("*").eq("user_id", userId),
+    supabase.from("user_listing_state").select("*").eq("user_id", ownerId),
     supabase.from("listing_sources").select("listing_id, source, url, is_active"),
     supabase
       .from("events")
@@ -167,7 +174,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     supabase
       .from("contact_log")
       .select("listing_id, occurred_at, channel, direction")
-      .eq("user_id", userId),
+      .eq("user_id", ownerId),
     supabase.from("feedback").select("listing_id, action").eq("user_id", userId),
   ]);
 
@@ -303,6 +310,8 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       myScore: state?.my_score ?? null,
       tourKind: state?.tour_kind === "open_house" ? "open_house" : "private",
       tourEndsAt: state?.tour_ends_at ?? null,
+      addedById: state?.added_by ?? null,
+      pocId: state?.poc_user_id ?? null,
       contactCount: contact?.count ?? 0,
       lastContactAt: contact?.last ?? null,
       lastContactChannel: contact?.channel ?? null,
@@ -358,7 +367,6 @@ export async function loadListingDetail(id: string): Promise<{
   priceHistory: PricePoint[];
 } | null> {
   const supabase = await db();
-  const userId = await currentUserId();
 
   const [events, contacts, observations] = await Promise.all([
     supabase
@@ -370,7 +378,7 @@ export async function loadListingDetail(id: string): Promise<{
       .from("contact_log")
       .select("*")
       .eq("listing_id", id)
-      .eq("user_id", userId)
+      .eq("user_id", await pipelineOwnerId())
       .order("occurred_at", { ascending: false }),
     supabase
       .from("observations")
@@ -449,24 +457,38 @@ export async function loadChanges(limit = 200): Promise<
 
 export async function setStage(listingId: string, stage: Stage): Promise<void> {
   const supabase = await db();
+  const owner = await pipelineOwnerId();
+  const me = await currentUserId();
   const now = new Date().toISOString();
+
+  // Attribution survives every later move: whoever first put the place in
+  // the pipeline stays its "added by", however far it travels after that.
+  const { data: existing } = await supabase
+    .from("user_listing_state")
+    .select("added_by")
+    .eq("user_id", owner)
+    .eq("listing_id", listingId)
+    .maybeSingle();
+
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: await currentUserId(),
+      user_id: owner,
       listing_id: listingId,
       stage,
       stage_changed_at: now,
       updated_at: now,
+      added_by: existing?.added_by ?? me,
     },
     { onConflict: "user_id,listing_id" }
   );
 
   // Moving a card is itself a preference signal, so mirror it into feedback.
+  // Feedback is the mover's own — taste stays personal even in a crew.
   const implied = stageImpliesLike(stage);
   if (implied != null) {
     await supabase.from("feedback").upsert(
       {
-        user_id: await currentUserId(),
+        user_id: me,
         listing_id: listingId,
         action: implied ? "like" : "pass",
         created_at: now,
@@ -491,12 +513,13 @@ export async function setListingFields(
     my_score: number | null;
     tour_kind: string;
     tour_ends_at: string | null;
+    poc_user_id: string | null;
   }>
 ): Promise<void> {
   const supabase = await db();
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: await currentUserId(),
+      user_id: await pipelineOwnerId(),
       listing_id: listingId,
       ...fields,
       updated_at: new Date().toISOString(),
@@ -520,6 +543,23 @@ export async function recordFeedback(
     { onConflict: "user_id,listing_id" }
   );
   if (action === "pass") await setStage(listingId, "passed");
+
+  // A like is a pipeline event, not just a training signal: anything you
+  // liked belongs on the board as interested — unless it's already further
+  // along, in which case there's nothing to promote.
+  if (action === "like") {
+    const owner = await pipelineOwnerId();
+    const { data: state } = await supabase
+      .from("user_listing_state")
+      .select("stage")
+      .eq("user_id", owner)
+      .eq("listing_id", listingId)
+      .maybeSingle();
+    const stage = state?.stage ?? "inbox";
+    if (stage === "inbox" || stage === "passed") {
+      await setStage(listingId, "interested");
+    }
+  }
 }
 
 /**
@@ -539,7 +579,7 @@ export async function undoPass(listingId: string): Promise<void> {
     .eq("listing_id", listingId);
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: await currentUserId(),
+      user_id: await pipelineOwnerId(),
       listing_id: listingId,
       stage: "inbox",
       stage_changed_at: new Date().toISOString(),
@@ -560,7 +600,7 @@ export async function addContact(
 ): Promise<void> {
   const supabase = await db();
   await supabase.from("contact_log").insert({
-    user_id: await currentUserId(),
+    user_id: await pipelineOwnerId(),
     listing_id: listingId,
     channel: entry.channel,
     direction: entry.direction,

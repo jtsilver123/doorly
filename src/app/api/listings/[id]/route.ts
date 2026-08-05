@@ -35,8 +35,20 @@ export async function PATCH(request: Request, { params }: Params) {
       case "stage":
         await setStage(id, body.stage as Stage);
         break;
-      case "star":
-        await setListingFields(id, { starred: Boolean(body.starred) });
+      case "star": {
+        const starred = Boolean(body.starred);
+        await setListingFields(id, { starred });
+        // Starring is liking, and anything liked belongs on the board:
+        // recordFeedback trains the ranker and promotes inbox → interested.
+        if (starred) await recordFeedback(id, "like");
+        break;
+      }
+
+      case "poc":
+        // Who owns talking to the agent for this one — tag-team only.
+        await setListingFields(id, {
+          poc_user_id: body.userId ? String(body.userId) : null,
+        });
         break;
       case "notes":
         await setListingFields(id, { notes: String(body.notes ?? "") });
