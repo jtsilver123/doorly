@@ -1826,3 +1826,38 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 .drawer-body > * + * { margin-top: var(--s5); }
+
+/* --- dragging on the board ------------------------------------------------ */
+
+/* Cards are draggable, so say so before the pointer is pressed. */
+.board-card { cursor: grab; }
+.board-card:active { cursor: grabbing; }
+
+.board-card[data-dragging="true"] {
+  opacity: 0.4;
+  border-color: var(--accent);
+}
+
+/* The column being dragged over lights up as a whole, rather than showing an
+   insertion line — position within a stage carries no meaning here, only which
+   stage you land in. */
+.board-col[data-over="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.board-col[data-over="true"] .board-empty { color: var(--accent); font-weight: 600; }
+
+/* A column has to stay a drop target when it holds nothing, so the stack keeps
+   height even while empty. */
+.board-stack {
+  display: grid;
+  gap: var(--s2);
+  align-content: start;
+  min-height: 72px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card[data-dragging="true"] { opacity: 0.7; }
+}

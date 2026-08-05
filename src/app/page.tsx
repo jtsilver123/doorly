@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedListing, Source } from "@/types";
-import { PIPELINE_STAGES, SOURCE_LABEL, STAGE_LABEL, ALL_SOURCES } from "@/types";
+import type { Stage } from "@/types";
+import { ALL_SOURCES } from "@/types";
 import {
-  CONTACT_ICON,
-  CONTACT_LABEL,
   DEFAULT_PROFILE,
   PROOF_OPTIONS,
   bestChannel,
@@ -29,7 +28,7 @@ import AccountMenu, { type ProfileSection } from "@/components/AccountMenu";
 import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
-import { RatingDisc } from "@/components/Rating";
+import PipelineBoard from "@/components/PipelineBoard";
 import MapView from "@/components/MapView";
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
@@ -68,8 +67,6 @@ const NAV_ICON: Record<string, string> = {
   profile: "◍",
 };
 
-const money = (n: number) => `$${n.toLocaleString()}`;
-
 /** Cards mounted per page. Two full rows beyond a tall viewport. */
 const PAGE = 36;
 
@@ -83,38 +80,6 @@ const PAGE = 36;
  */
 const GOOD_DEAL_RATING = 64;
 
-/**
- * The single next action for a listing, given where it sits.
- *
- * A board that only shows position makes you re-derive the action every time
- * you look at it. This states it, and turns amber when it has waited too long.
- */
-function nextStep(l: FeedListing): string {
-  if (l.needsFollowUp) return "Chase — no reply yet";
-  switch (l.stage) {
-    case "interested":
-      return "Ask for a viewing";
-    case "contacted":
-      return "Waiting on their reply";
-    case "tour":
-      return "Tour booked — go see it";
-    case "toured":
-      return "Decide, then apply";
-    case "applied":
-      return "Waiting on the landlord";
-    default:
-      return "";
-  }
-}
-
-/** What an empty column means, rather than a bare "Nothing here". */
-const STAGE_HINT: Record<string, string> = {
-  interested: "Star a place to start it here",
-  contacted: "Nothing waiting on a reply",
-  tour: "No viewings booked yet",
-  toured: "Nothing seen in person yet",
-  applied: "No applications in",
-};
 
 function sinceText(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -333,6 +298,28 @@ export default function Home() {
       patch(listing.id, { action: "star", starred: next }, false).catch(() =>
         loadFeed()
       );
+    },
+    [patch, loadFeed]
+  );
+
+  /**
+   * Move a listing along the pipeline, from a drag or an arrow key.
+   *
+   * Optimistic like star and pass: a drag that snaps back while a round trip
+   * finishes reads as a failed drop, and people re-drag. On failure the whole
+   * feed reloads, which puts the card back where it really is.
+   */
+  const moveStage = useCallback(
+    (listing: FeedListing, stage: Stage) => {
+      if (listing.stage === stage) return;
+      setListings((list) =>
+        list.map((l) =>
+          l.id === listing.id
+            ? { ...l, stage, stageChangedAt: new Date().toISOString() }
+            : l
+        )
+      );
+      patch(listing.id, { action: "stage", stage }, false).catch(() => loadFeed());
     },
     [patch, loadFeed]
   );
@@ -952,43 +939,7 @@ export default function Home() {
         )}
 
         {!loading && tab === "pipeline" && (
-          <div className="board">
-            {PIPELINE_STAGES.map((stage) => {
-              const column = listings.filter((l) => l.stage === stage);
-              return (
-                <div key={stage} className="board-col">
-                  <div className="board-head">
-                    <span>{STAGE_LABEL[stage]}</span>
-                    <span className="muted">{column.length}</span>
-                  </div>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {column.map((l) => (
-                      <button key={l.id} className="surface board-card" onClick={() => setOpen(l)}>
-                        <span className="board-top">
-                          <strong>{money(l.price)}</strong>
-                          <RatingDisc rating={l.rating} grade={l.grade} size="sm" />
-                        </span>
-                        <span className="board-addr">
-                          {l.address}
-                          {l.unit ? ` #${l.unit}` : ""}
-                        </span>
-                        <span className="muted board-where">{l.neighborhood}</span>
-                        {/* The pipeline's job is to say what to do next, not
-                            just where things are. Without this each column is
-                            a pile you still have to think about. */}
-                        <span className={l.needsFollowUp ? "board-next is-due" : "board-next"}>
-                          {nextStep(l)}
-                        </span>
-                      </button>
-                    ))}
-                    {column.length === 0 && (
-                      <div className="board-empty">{STAGE_HINT[stage]}</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <PipelineBoard listings={listings} onOpen={setOpen} onMove={moveStage} />
         )}
 
         {!loading && tab === "compare" && (
