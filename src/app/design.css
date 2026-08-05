@@ -3694,20 +3694,141 @@ button.fact:hover .fact-label { color: var(--accent); }
   .drawer-head-price > span { display: none; }
 }
 
-/* On a phone the drawer and dialogs stop above the tab bar instead of
-   burying it — the bar is the floor. */
+/* On a phone dialogs stop above the tab bar instead of burying it — the bar
+   is the floor. The listing detail is the one exception: it goes full-screen
+   over the bar, the way every listing app's detail page does, and its photo
+   overlay's back button is the way home. */
 @media (max-width: 860px) {
   /* aside.drawer, not .drawer: design.css is imported ahead of globals'
      own rules, so the base `height: 100dvh` wins a class-for-class tie.
      The element selector settles it without !important. */
   aside.drawer {
-    height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px));
+    height: 100dvh;
+    z-index: 80;
+    border-radius: 0;
+    border-top: none;
   }
 
   .passdialog {
     max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px));
     top: calc(50% - 28px);
   }
+}
+
+/* --- the listing detail on a phone: the Zillow shape ----------------------
+ *
+ * Photo first and full-bleed with the controls floating on it, price and
+ * vitals directly beneath, one fat CTA pinned to the bottom. The desktop
+ * header row duplicates all of it, so it stands down at this width.
+ */
+
+/* Desktop: the phone-only pieces don't exist. */
+.drawer-photo-bar,
+.drawer-title-m,
+.cta-sub { display: none; }
+
+.drawer-photo-wrap { position: relative; }
+
+@media (max-width: 700px) {
+  /* header.drawer-head, not .drawer-head: globals.css re-declares the class
+     after this file is imported, so a bare class tie goes to it. */
+  header.drawer-head { display: none; }
+
+  /* Edge-to-edge photo: cancel the body padding on three sides and go
+     taller — 4:3 reads as a listing page, 16:10 reads as a thumbnail. */
+  .drawer-photo-wrap {
+    margin: calc(-1 * var(--s4)) calc(-1 * var(--s4)) 0;
+  }
+  .drawer-photo-wrap .drawer-photo {
+    border-radius: 0;
+    aspect-ratio: 4 / 3;
+  }
+
+  .drawer-photo-bar {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: max(var(--s3), env(safe-area-inset-top, 0px)) var(--s3) 0;
+    pointer-events: none;
+  }
+  .drawer-photo-bar > * { pointer-events: auto; }
+
+  .photo-btn {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: var(--r-full);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--text);
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.18);
+    cursor: pointer;
+  }
+  .photo-pill {
+    display: flex;
+    border-radius: var(--r-full);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.18);
+  }
+  .photo-btn-flat { background: transparent; box-shadow: none; }
+
+  /* Price block under the photo, listing-page sized. */
+  .drawer-title-m { display: grid; gap: 3px; }
+  .drawer-title-m-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .drawer-title-m-price {
+    font-family: var(--font-display);
+    font-size: var(--t-3xl, 34px);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .drawer-title-m-price > span {
+    font-family: var(--font-sans);
+    font-size: var(--t-md);
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 3px;
+  }
+  .drawer-title-m-specs { display: flex; gap: var(--s3); font-size: var(--t-md); }
+  .drawer-title-m-specs b { font-weight: 650; }
+  .drawer-title-m-addr { font-size: var(--t-md); color: var(--text-muted); }
+
+  /* Photo and title sit tight together; the section rhythm resumes after. */
+  .drawer-body > .drawer-title-m { margin-top: var(--s3); }
+
+  /* The CTA bar: one tall primary with its promise underneath, the stage
+     menu beside it. Safe-area padded now that the drawer owns the bottom. */
+  .drawer-foot {
+    padding-bottom: max(var(--s3), env(safe-area-inset-bottom, 0px));
+  }
+  .drawer-foot .btn-primary.btn-block {
+    display: grid;
+    gap: 1px;
+    justify-items: center;
+    min-height: 54px;
+    font-size: var(--t-md);
+  }
+  .cta-sub {
+    display: block;
+    font-style: normal;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    opacity: 0.85;
+  }
+  /* Two controls, like the reference: the advance shortcut folds into the
+     stage menu, which lists the same move anyway. */
+  .drawer-foot > .btn:not(.btn-primary) { display: none; }
 }
 
 /* On a phone the filter panel is a bottom sheet, not a popover. Anchored to

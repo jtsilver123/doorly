@@ -461,12 +461,66 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
         <div className="drawer-body">
           {/* Keyed by listing so the strip snaps back to the first photo when
               the panel moves to another apartment. */}
-          <PhotoGallery
-            key={listing.id}
-            images={listing.images}
-            alt={`Photo of ${listing.address}`}
-            placeholder={listing.neighborhood || listing.borough || "No photo"}
-          />
+          <div className="drawer-photo-wrap">
+            <PhotoGallery
+              key={listing.id}
+              images={listing.images}
+              alt={`Photo of ${listing.address}`}
+              placeholder={listing.neighborhood || listing.borough || "No photo"}
+            />
+            {/* Phone-only controls floating on the photo, the way every
+                listing app does it — the header they replace is hidden there. */}
+            <div className="drawer-photo-bar">
+              <button className="photo-btn" onClick={onClose} aria-label="Back to listings">
+                <Icon name="chevron-left" size={18} />
+              </button>
+              <span className="photo-pill">
+                <button
+                  className="photo-btn photo-btn-flat"
+                  onClick={share}
+                  aria-label={`Share ${listing.address}`}
+                >
+                  <Icon name={shared ? "check" : "external"} size={16} />
+                </button>
+                <a
+                  className="photo-btn photo-btn-flat"
+                  href={listing.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open the original listing"
+                >
+                  <SourceMark source={listing.source} size={16} />
+                </a>
+              </span>
+            </div>
+          </div>
+
+          {/* Phone-only: price and the vitals directly under the photo,
+              reading like a listing page rather than a panel header. */}
+          <div className="drawer-title-m">
+            <span className="drawer-title-m-tag">
+              <RatingDisc
+                rating={listing.rating}
+                grade={listing.grade}
+                size="sm"
+                title={`${listing.rating} out of 100 for your search`}
+              />
+              {listing.ratingHeadline}
+            </span>
+            <b className="drawer-title-m-price">
+              {money(listing.price)}
+              <span>/mo</span>
+            </b>
+            <span className="drawer-title-m-specs">
+              <b>{listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms} bed`}</b>
+              <b>{listing.bathrooms} bath</b>
+              {listing.sqft ? <b>{listing.sqft} ft²</b> : <span>-- ft²</span>}
+            </span>
+            <span className="drawer-title-m-addr">
+              {listing.address}
+              {listing.unit ? ` #${listing.unit}` : ""}, {listing.neighborhood || listing.borough}
+            </span>
+          </div>
 
           <dl className="drawer-facts">
             <div>
@@ -1032,6 +1086,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               onClick={() => setEditingContact(true)}
             >
               {action.label}
+              <i className="cta-sub">{action.hint}</i>
             </button>
           ) : action.kind === "schedule" ? (
             <button
@@ -1039,10 +1094,12 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               onClick={() => document.getElementById("tour-at")?.focus()}
             >
               {action.label}
+              <i className="cta-sub">{action.hint}</i>
             </button>
           ) : action.kind === "apply" ? (
             <button className="btn btn-primary btn-block" onClick={() => move("applied")}>
               {action.label}
+              <i className="cta-sub">{action.hint}</i>
             </button>
           ) : action.kind === "reach" || action.kind === "chase" ? (
             <button
@@ -1057,6 +1114,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               title={reach.hint}
             >
               {action.kind === "chase" ? "Send a follow-up" : reach.label}
+              <i className="cta-sub">{action.hint}</i>
             </button>
           ) : (
             <div className="stagenote btn-block">
