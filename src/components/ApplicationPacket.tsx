@@ -56,7 +56,7 @@ export default function ApplicationPacket({
   }
 
   return (
-    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 16 }}>
+    <div className="surface" style={{ padding: 20, display: "grid", gap: 16 }}>
       <div>
         <div style={{ fontWeight: 600 }}>Application packet</div>
         <div className="muted" style={{ fontSize: 12 }}>

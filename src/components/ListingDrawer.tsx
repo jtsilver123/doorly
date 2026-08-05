@@ -95,10 +95,22 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  /**
+   * Stage moves paint immediately and reconcile behind the scenes.
+   *
+   * Star and pass have been optimistic since triage got keyboard-driven, but
+   * advancing the pipeline still awaited a round trip *and* disabled every
+   * button while it waited — so the most deliberate action in the app was the
+   * only one that felt slow.
+   */
+  const [stage, setStage] = useState<Stage>(listing.stage);
   const panelRef = useRef<HTMLElement>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
 
   const message = draftTourMessage(listing, profile);
+
+  // A different listing in the same panel starts from its own stage.
+  useEffect(() => setStage(listing.stage), [listing.id, listing.stage]);
 
   useEffect(() => {
     let live = true;
@@ -185,7 +197,8 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
       who: listing.contactName,
       note: "Tour request",
     });
-    if (listing.stage === "inbox" || listing.stage === "interested") {
+    if (stage === "inbox" || stage === "interested") {
+      setStage("contacted");
       await patch({ action: "stage", stage: "contacted" });
     }
     if (channel === "text") {
@@ -414,15 +427,19 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
               STATUS
             </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {STAGES.map((stage) => (
+              {STAGES.map((option) => (
                 <button
-                  key={stage}
-                  className={listing.stage === stage ? "btn btn-primary" : "btn"}
+                  key={option}
+                  className={stage === option ? "btn btn-primary" : "btn"}
                   style={{ fontSize: 12, padding: "5px 9px" }}
-                  onClick={() => patch({ action: "stage", stage: stage as Stage })}
-                  disabled={saving}
+                  onClick={() => {
+                    setStage(option);
+                    patch({ action: "stage", stage: option }).catch(() =>
+                      setStage(listing.stage)
+                    );
+                  }}
                 >
-                  {STAGE_LABEL[stage]}
+                  {STAGE_LABEL[option]}
                 </button>
               ))}
             </div>

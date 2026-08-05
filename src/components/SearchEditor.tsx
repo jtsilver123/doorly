@@ -121,7 +121,7 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 12 }}>
+    <div className="surface" style={{ padding: 20, display: "grid", gap: 12 }}>
       <div>
         <div style={{ fontWeight: 600 }}>What you&apos;re looking for</div>
         <div className="muted" style={{ fontSize: 12 }}>

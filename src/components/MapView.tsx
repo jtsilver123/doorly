@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { FeedListing } from "@/types";
 import type { Grade } from "@/lib/verdict";
+import { areasIn } from "@/lib/nta";
 
 /**
  * Where these places actually are.
@@ -13,12 +14,10 @@ import type { Grade } from "@/lib/verdict";
  * real coordinates — 324 of 324 in the live corpus — so the geography here is
  * measured, not decorated.
  *
- * There is deliberately no basemap. Serving tiles would mean a third-party
- * request on every pan, and hand-drawing a Manhattan silhouette from memory
- * would put invented coastline under real data — a map that is subtly wrong is
- * worse than one that is honestly sparse. Instead the frame is the listings
- * themselves: pins in true relative position, neighborhood names anchored at
- * the centroid of their own cluster, and a scale bar so distances are readable.
+ * The basemap is the city's own neighborhood boundaries, drawn as SVG. No
+ * tiles, so no third-party request on every pan, and no invented coastline —
+ * these are the same polygons that decide which neighborhood a listing is in,
+ * so the shapes under the pins and the labels on the cards can never disagree.
  *
  * Pins are priced rather than dotted, because on a map of apartments the price
  * *is* the label — and they carry the same four grades the cards do, so the map
@@ -69,6 +68,14 @@ const shortMoney = (n: number) =>
 export default function MapView({ listings, onOpen, linkedId, onHover }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  /**
+   * Zoom exists because three hundred apartments in four adjacent
+   * neighborhoods cannot be separated at one scale, however the pins are
+   * drawn. Clustering makes the picture readable; zoom makes it workable.
+   */
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
   const model = useMemo(() => {
     const withGeo = listings.filter(
@@ -136,7 +143,32 @@ export default function MapView({ listings, onOpen, linkedId, onHover }: Props) 
       .filter(([, a]) => a.n >= 3)
       .map(([name, a]) => ({ name, x: a.x / a.n, y: a.y / a.n, n: a.n }));
 
-    return { clusters, labels, spanKm: spanX * 111.32, total: points.length };
+    // --- basemap -------------------------------------------------------
+    // Only the neighborhoods the frame actually covers. Drawing all 199 would
+    // be 5,500 points of Staten Island nobody asked to see.
+    const project = (lon: number, lat: number): [number, number] => [
+      ((lon * Math.cos(LAT_RAD) - minX + padX) / spanX) * 100,
+      (1 - (lat - minY + padY) / spanY) * 100,
+    ];
+
+    const shapes: { name: string; d: string; hasListings: boolean }[] = [];
+    const present = new Set(withGeo.map((l) => l.neighborhood).filter(Boolean));
+    for (const area of areasIn()) {
+      let d = "";
+      let visible = false;
+      for (const ring of area.r) {
+        const pts = ring.map(([lon, lat]) => project(lon, lat));
+        // A ring entirely off-frame contributes nothing but bytes.
+        if (!pts.some(([x, y]) => x > -25 && x < 125 && y > -25 && y < 125)) continue;
+        visible = true;
+        d += `M${pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join("L")}Z`;
+      }
+      if (visible && d) {
+        shapes.push({ name: area.n, d, hasListings: present.has(area.n) });
+      }
+    }
+
+    return { clusters, labels, shapes, spanKm: spanX * 111.32, total: points.length };
   }, [listings]);
 
   if (!model) {
@@ -151,7 +183,7 @@ export default function MapView({ listings, onOpen, linkedId, onHover }: Props) 
     );
   }
 
-  const { clusters, labels, spanKm, total } = model;
+  const { clusters, labels, shapes, spanKm, total } = model;
 
   // A round distance that fills a sensible share of the frame.
   const scaleKm = spanKm > 6 ? 2 : spanKm > 2.5 ? 1 : 0.5;
@@ -206,8 +238,50 @@ export default function MapView({ listings, onOpen, linkedId, onHover }: Props) 
         className="mapcanvas"
         role="group"
         aria-label={`${total} listings plotted by location`}
+        data-dragging={drag.current ? "true" : undefined}
         onClick={() => setExpanded(null)}
+        onWheel={(e) => {
+          // Ctrl/⌘ + wheel is the browser's own page zoom; leave it alone.
+          if (e.ctrlKey || e.metaKey) return;
+          const next = Math.min(6, Math.max(1, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+          setZoom(next);
+          if (next === 1) setPan({ x: 0, y: 0 });
+        }}
+        onPointerDown={(e) => {
+          if (zoom <= 1) return;
+          drag.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          setPan({
+            x: d.px + ((e.clientX - d.x) / box.width) * 100,
+            y: d.py + ((e.clientY - d.y) / box.height) * 100,
+          });
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
       >
+        {/* Everything in map space scales together, so a pin never drifts off
+            the neighborhood it belongs to. */}
+        <div
+          className="mapworld"
+          style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}%, ${pan.y / zoom}%)` }}
+        >
+        <svg className="mapshapes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {shapes.map((shape) => (
+            <path
+              key={shape.name}
+              d={shape.d}
+              className="mapshape"
+              data-live={shape.hasListings ? "true" : undefined}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
         {/* Neighborhood names sit beneath the pins so they orient without
             competing — the pins are the data, this is the context. */}
         {labels.map((label) => (
@@ -291,6 +365,13 @@ export default function MapView({ listings, onOpen, linkedId, onHover }: Props) 
             </span>
           </div>
         )}
+        </div>
+
+        {zoom > 1 && (
+          <button className="mapreset" onClick={(e) => { e.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); }}>
+            Reset view
+          </button>
+        )}
       </div>
 
       <div className="maplegend">
@@ -298,7 +379,11 @@ export default function MapView({ listings, onOpen, linkedId, onHover }: Props) 
           {scaleKm < 1 ? `${scaleKm * 1000} m` : `${scaleKm} km`}
         </span>
         <span className="maphint">
-          {expanded ? "Click the map to close" : "Numbered circles hold several places — click to open one up"}
+          {expanded
+            ? "Click the map to close"
+            : zoom > 1
+              ? "Drag to pan · scroll to zoom out"
+              : "Scroll to zoom · numbered circles hold several places"}
         </span>
         <span className="mapkey">
           <i data-grade="excellent"></i> 78+

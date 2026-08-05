@@ -1117,13 +1117,9 @@ button.fact:hover { border-color: var(--accent); }
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   overflow: hidden;
-  /* A faint blueprint grid. It gives the eye something to measure against
-     without pretending to be streets. */
-  background:
-    linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 8.3333%,
-    linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 8.3333% 100%,
-    var(--surface);
-  background-blend-mode: normal;
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1344,4 +1340,178 @@ button.fact:hover { border-color: var(--accent); }
 
   .mapcanvas { aspect-ratio: 3 / 4; }
   .maphint { display: none; }
+}
+
+/* --- map basemap and zoom ------------------------------------------------ */
+
+.mapworld {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.mapcanvas[data-dragging="true"] { cursor: grabbing; }
+
+/* The city's own neighborhood boundaries. Quiet enough to sit under three
+   hundred pins, present enough to orient you. */
+.mapshapes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mapshape {
+  fill: var(--surface-2);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+/* Neighborhoods you actually have listings in are lifted out of the ground. */
+.mapshape[data-live="true"] {
+  fill: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  stroke: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.mapreset {
+  position: absolute;
+  top: var(--s3);
+  right: var(--s3);
+  z-index: 40;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.mapreset:hover { border-color: var(--accent); color: var(--accent); }
+
+/* --- page widths ---------------------------------------------------------
+ *
+ * Two screens were pinned to a narrow column while the rest of the app ran
+ * full-bleed, so the app looked like it had failed to load on a wide monitor.
+ * Prose still needs a measure — a 2000px-wide sentence is unreadable — but the
+ * cap belongs on the text, not on the page.
+ */
+
+.page-today {
+  display: grid;
+  gap: var(--s5);
+  align-content: start;
+}
+
+/* Reading matter inside Today keeps a sane measure without boxing the grid
+   of listings underneath it. */
+.page-today .timeline-note,
+.page-today p { max-width: 78ch; }
+
+/* The action list is a column of one-line decisions; three across on a wide
+   screen beats one column of stretched rows. */
+.page-today .actions {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+
+/* Settings panels sit side by side rather than stacking into a ribbon. */
+.page-panels {
+  display: grid;
+  gap: var(--s4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  align-items: start;
+}
+
+/* --- what stays put ------------------------------------------------------
+ *
+ * The rule: anything that tells you *where you are* or *what you're looking
+ * at* stays; anything that is the content itself scrolls. The sidebar and the
+ * search context qualify; listings do not.
+ */
+
+/* Budget and move-in are the two variables the product turns on. Scrolling a
+   grid of three hundred apartments shouldn't take them off screen — they're
+   the numbers every card is being judged against. */
+/*
+ * One sticky block, not two.
+ *
+ * Two independently sticky siblings need a hard-coded offset for the second,
+ * which breaks the instant the first one wraps to another line — and it does,
+ * at every width between "wide" and "phone". Sticking the pair as one element
+ * has no magic number in it.
+ */
+.stickytop {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  background: var(--bg);
+  padding-top: var(--s2);
+  margin-bottom: var(--s3);
+}
+
+.stickytop .searchhead { margin-bottom: 0; }
+.stickytop .filterbar { position: static; padding-bottom: var(--s3); }
+
+/* Column headers stay while the column scrolls, so a long pipeline never
+   leaves you guessing which stage you're reading. */
+.board-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: var(--s2) 0;
+}
+
+/* Same idea for the comparison table: the row labels are the only thing that
+   makes a column of numbers legible. */
+.compare thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+}
+
+.compare tbody th,
+.compare tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--surface);
+}
+
+/* The drawer's header carries the price and the score — the things you opened
+   it to see — so they stay while the detail scrolls under them. */
+.drawer > header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+@media (max-width: 860px) {
+  /*
+   * On a phone the facts grid plus a two-row toolbar is roughly a third of the
+   * viewport. Freezing that leaves too little room to actually read listings,
+   * so the block scrolls away and the bottom tab bar carries orientation.
+   */
+  .stickytop { position: static; }
+}
+
+/* The action cards on Today are parallel one-line decisions, so they can run
+   several across rather than stretching one per row. */
+.actions-block { display: grid; gap: var(--s3); }
+
+/* Marks where the next page of cards will appear, and says where you are in
+   the set — an infinite list with no count leaves you unable to judge whether
+   scrolling further is worth it. */
+.more-sentinel {
+  padding: var(--s5) 0 var(--s6);
+  text-align: center;
+  font-size: var(--t-sm);
+  color: var(--text-muted);
 }

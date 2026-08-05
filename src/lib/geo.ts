@@ -1,3 +1,4 @@
+import { neighborhoodAt as neighborhoodByPolygon } from "@/lib/nta";
 /**
  * Where a listing actually is.
  *
@@ -130,7 +131,15 @@ export interface Located {
   borough: string;
 }
 
-/** Nearest known neighborhood to a coordinate, or empty if nothing is close. */
+/**
+ * Which neighborhood a coordinate is in.
+ *
+ * Answered against the city's real boundaries first. The nearest-centroid
+ * search below it is a fallback for the handful of points that land in water,
+ * a park or outside the five boroughs — it was the primary method until the
+ * polygons arrived, and it was right about 62% of the time, which was quietly
+ * corrupting every market comparison built on the label.
+ */
 export function locate(
   lat: number | null | undefined,
   lon: number | null | undefined
@@ -138,6 +147,9 @@ export function locate(
   if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) {
     return { neighborhood: "", borough: "" };
   }
+
+  const exact = neighborhoodByPolygon(lat, lon);
+  if (exact) return exact;
 
   let best: Place | null = null;
   let bestDistance = Infinity;

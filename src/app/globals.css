@@ -62,7 +62,17 @@ body {
   padding: 0;
   margin: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  /*
+   * `clip`, not `hidden`.
+   *
+   * `overflow-x: hidden` forces the other axis to compute as `auto`, which
+   * turns the element into a scroll container — and a sticky descendant then
+   * sticks to *that* box rather than the viewport, so it scrolls away exactly
+   * like a static element. It silently broke every sticky header in the app.
+   * `overflow-x: clip` cuts off sideways overflow without creating a scroll
+   * container, which is the behaviour actually wanted here.
+   */
+  overflow-x: clip;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);

@@ -69,6 +69,9 @@ const NAV_ICON: Record<string, string> = {
 
 const money = (n: number) => `$${n.toLocaleString()}`;
 
+/** Cards mounted per page. Two full rows beyond a tall viewport. */
+const PAGE = 36;
+
 /** What "good deal" means when the filter is on. Above this is worth a tour. */
 const GOOD_DEAL_RATING = 70;
 
@@ -113,6 +116,16 @@ export default function Home() {
   const [readyOnly, setReadyOnly] = useState(false);
   const [goodOnly, setGoodOnly] = useState(false);
   const [view, setView] = useState<"grid" | "map">("grid");
+  /**
+   * How many cards are mounted.
+   *
+   * The grid used to render the whole filtered set — 323 articles of ~30 nodes
+   * each, about ten thousand DOM nodes, most of them below the fold. It's
+   * imperceptible at this corpus size and won't be at three thousand, or on a
+   * mid-range phone. Cards past the first page mount as you approach them.
+   */
+  const [pageSize, setPageSize] = useState(PAGE);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   /** Shared between the map and the grid, so hovering either highlights both. */
   const [linkedId, setLinkedId] = useState<string | null>(null);
 
@@ -423,6 +436,38 @@ export default function Home() {
 
   // Any change to what's on screen resets the cursor to the top of it.
   useEffect(() => setFocus(0), [visible]);
+  useEffect(() => setPageSize(PAGE), [visible]);
+
+  /**
+   * Grow the window when the marker below the grid comes into view.
+   *
+   * A callback ref rather than an effect over a plain ref: the marker only
+   * exists on the listings tab, so an effect would have to name every piece of
+   * state that governs whether it's mounted — tab, view, loading, result count
+   * — and the first one forgotten leaves the observer watching nothing. This
+   * attaches whenever the node appears and detaches when it goes, with no
+   * dependency list to get wrong.
+   */
+  const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    if (!node) return;
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setPageSize((n) => n + PAGE);
+      },
+      // Start loading before the marker is actually reached, so a fast scroll
+      // meets cards rather than a gap.
+      { rootMargin: "800px" }
+    );
+    observerRef.current.observe(node);
+  }, []);
+
+  useEffect(() => () => observerRef.current?.disconnect(), []);
+
+  // Keyboard triage can outrun the window, so walking past the end grows it.
+  useEffect(() => {
+    if (focus >= pageSize - 4) setPageSize((n) => Math.min(visible.length, n + PAGE));
+  }, [focus, pageSize, visible.length]);
 
   const finalistCount = useMemo(
     () =>
@@ -631,7 +676,9 @@ export default function Home() {
       </nav>
 
       <main className="main" id="results">
-        {(tab === "today" || tab === "feed") && budget > 0 && (
+        {(tab === "today" || tab === "feed") && (
+          <div className="stickytop">
+            {budget > 0 && (
           <SearchHeader
             listings={listings}
             budget={budget}
@@ -639,16 +686,17 @@ export default function Home() {
             onSave={saveSearchBasics}
             onEditSearch={() => setTab("profile")}
           />
-        )}
+            )}
 
         {loading && (tab === "today" || tab === "feed") && <SkeletonGrid />}
 
         {!loading && tab === "today" && (
-          <div style={{ display: "grid", gap: 16, maxWidth: 860 }}>
+          <div className="page-today">
             <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
 
-            <div style={{ display: "grid", gap: 10 }}>
+            <div className="actions-block">
               <div className="muted section-label">DO THIS TODAY</div>
+              <div className="actions">
               {actions.length === 0 ? (
                 <div className="surface" style={{ padding: 20 }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>
@@ -688,6 +736,7 @@ export default function Home() {
                   </button>
                 ))
               )}
+              </div>
             </div>
 
             {/* The best of what's live, so Today can stand alone. */}
@@ -711,9 +760,8 @@ export default function Home() {
           </div>
         )}
 
-        {tab === "feed" && (
-          <>
-            <FilterBar
+            {tab === "feed" && (
+              <FilterBar
               total={visible.length}
               filters={{
                 query,
@@ -748,7 +796,13 @@ export default function Home() {
               sourceCount={ALL_SOURCES.length}
               view={view}
               onViewChange={setView}
-            />
+              />
+            )}
+          </div>
+        )}
+
+        {tab === "feed" && (
+          <>
             {loading ? null : visible.length === 0 ? (
               <Empty
                 filtered={listings.length > 0}
@@ -765,7 +819,7 @@ export default function Home() {
               />
             ) : (
               <div className="grid" ref={gridRef}>
-                {visible.map((listing, i) => (
+                {visible.slice(0, pageSize).map((listing, i) => (
                   <ListingCard
                     key={listing.id}
                     listing={listing}
@@ -778,6 +832,11 @@ export default function Home() {
                     onReach={reachOut}
                   />
                 ))}
+              </div>
+            )}
+            {view === "grid" && visible.length > pageSize && (
+              <div ref={sentinelRef} className="more-sentinel">
+                Showing {pageSize} of {visible.length.toLocaleString()}
               </div>
             )}
           </>
@@ -884,7 +943,7 @@ export default function Home() {
         )}
 
         {!loading && tab === "profile" && (
-          <div style={{ display: "grid", gap: 16 }}>
+          <div className="page-panels">
             <SearchEditor onSaved={loadFeed} />
             <ProfileForm profile={profile} onSave={saveProfile} />
             <ApplicationPacket profile={profile} onSave={saveProfile} />
@@ -1143,7 +1202,7 @@ function ApiSettings({
   }
 
   return (
-    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 12 }}>
+    <div className="surface" style={{ padding: 20, display: "grid", gap: 12 }}>
       <div>
         <div style={{ fontWeight: 600 }}>API key & usage</div>
         <div className="muted" style={{ fontSize: 12 }}>
@@ -1291,7 +1350,7 @@ function ProfileForm({
   ];
 
   return (
-    <div className="surface" style={{ padding: 20, maxWidth: 560, display: "grid", gap: 14 }}>
+    <div className="surface" style={{ padding: 20, display: "grid", gap: 14 }}>
       <div>
         <div style={{ fontWeight: 600 }}>Your details</div>
         <div className="muted" style={{ fontSize: 12 }}>

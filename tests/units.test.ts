@@ -21,7 +21,8 @@ import {
   moveInFit,
   DEFAULT_COSTS,
 } from "@/lib/cost";
-import { neighborhoodAt, withinAreas } from "@/lib/geo";
+import { neighborhoodAt, withinAreas, locate } from "@/lib/geo";
+import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
@@ -926,4 +927,33 @@ test("search matches address, neighborhood and your own notes", () => {
     ["a", "c"]
   );
   assert.deepEqual(applyFilters(list, { search: "  " }).length, 3);
+});
+
+// --- neighborhood polygons -----------------------------------------------
+
+test("a coordinate resolves to the neighborhood it is actually in", () => {
+  // 545 East 12th Street — the nearest-centroid method called this
+  // Stuyvesant Town, which is across 14th Street.
+  assert.equal(neighborhoodInPolygon(40.7292, -73.9789)?.neighborhood, "East Village");
+  // 348 West 21st Street, squarely in Chelsea.
+  assert.equal(neighborhoodInPolygon(40.7449, -74.0003)?.neighborhood, "Chelsea");
+});
+
+test("polygon names are the ones the app lets you search for", () => {
+  // The city calls this "Midtown South-Flatiron-Union Square".
+  const hit = neighborhoodInPolygon(40.7401, -73.9903);
+  assert.ok(hit);
+  assert.ok(!hit!.neighborhood.includes("-"), `got administrative name "${hit!.neighborhood}"`);
+});
+
+test("a point in the water belongs to no neighborhood", () => {
+  // Mid-Hudson, west of Chelsea. Inventing a label here is exactly how the
+  // centroid approach produced confident wrong answers.
+  assert.equal(neighborhoodInPolygon(40.745, -74.02), null);
+});
+
+test("locate falls back rather than returning nothing for an odd point", () => {
+  const hit = locate(40.7292, -73.9789);
+  assert.equal(hit.neighborhood, "East Village");
+  assert.equal(hit.borough, "Manhattan");
 });
