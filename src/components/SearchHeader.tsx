@@ -79,6 +79,15 @@ export default function SearchHeader({
   // Under 15% of the market is a search that will mostly return nothing —
   // worth saying plainly, with the number that would fix it.
   const tooLow = share != null && share < 15 && priced.length >= 20;
+  /*
+   * "Neighborhoods" told you nothing — it was a label wearing a value's
+   * clothes. The set actually being tracked is the useful answer: one area by
+   * name, or how many.
+   */
+  const hoods = new Set(listings.map((l) => l.neighborhood).filter(Boolean));
+  const areaLabel =
+    hoods.size === 0 ? "Anywhere" : hoods.size === 1 ? [...hoods][0] : `${hoods.size} areas`;
+
   const dateLabel = moveInDate
     ? new Date(`${moveInDate}T12:00:00Z`).toLocaleDateString("en-US", {
         month: "short",
@@ -112,7 +121,7 @@ export default function SearchHeader({
             <span className="fact-label">Budget</span>
             <span className="fact-value">
               ${budget.toLocaleString()}
-              <span className="fact-unit">/mo · edit</span>
+              <span className="fact-unit">/mo</span>
             </span>
           </button>
         )}
@@ -139,7 +148,7 @@ export default function SearchHeader({
             <span className="fact-label">Move in</span>
             <span className="fact-value">
               {dateLabel}
-              <span className="fact-unit">{days > 0 ? `in ${days} days` : "edit"}</span>
+              <span className="fact-unit">{days > 0 ? `in ${days} days` : ""}</span>
             </span>
           </button>
         )}
@@ -156,10 +165,7 @@ export default function SearchHeader({
 
         <button className="fact fact-ghost fact-where" onClick={onEditSearch}>
           <span className="fact-label">Where</span>
-          <span className="fact-value">
-            Neighborhoods
-            <span className="fact-unit">edit</span>
-          </span>
+          <span className="fact-value">{areaLabel}</span>
         </button>
       </div>
 

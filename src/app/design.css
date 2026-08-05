@@ -855,7 +855,15 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
 
   /* The filter row is genuinely wider than a phone; let it scroll itself
      rather than pushing the whole page sideways. */
-  .filterbar-row {
+  /* Search is the widest thing in the toolbar and the most used; squeezed
+     into a row with Filters and Sort it collapsed to about three characters.
+     It takes the first line alone, the two controls share the second. */
+  .filterbar-row { display: grid; gap: var(--s2); }
+  .filterbar-row .searchfield { width: 100%; }
+  .filterbar-controls { display: flex; gap: var(--s2); }
+  .filterbar-controls > * { flex: 1; min-width: 0; max-width: none; }
+
+  .filterbar-row--legacy {
     gap: 5px;
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -925,28 +933,52 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
   margin-bottom: var(--s4);
 }
 
+/*
+ * The masthead.
+ *
+ * Four bordered tiles read as a form to fill in — boxes are for inputs, and
+ * these are facts. A newspaper doesn't box its standfirst figures; it sets
+ * them large, separates them with rules, and lets whitespace do the grouping.
+ * Same job here: the numbers the whole product turns on, stated once, with
+ * nothing drawn around them.
+ */
 .searchhead-facts {
   display: flex;
-  gap: var(--s2);
+  align-items: stretch;
   flex-wrap: wrap;
+  gap: 0;
 }
 
 .fact {
   display: grid;
-  gap: 1px;
-  padding: var(--s2) var(--s4);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface);
+  gap: 2px;
+  align-content: start;
+  padding: var(--s1) var(--s5) var(--s1) 0;
+  margin-right: var(--s5);
+  border: none;
+  border-right: 1px solid var(--border);
+  background: none;
   text-align: left;
-  min-width: 132px;
-  transition: border-color 0.12s ease;
+  min-width: 0;
+  color: inherit;
 }
 
+/* No rule after the last one — a divider needs something on both sides. */
+.fact:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+
 button.fact { cursor: pointer; }
-button.fact:hover { border-color: var(--accent); }
-.fact-static { cursor: default; background: var(--surface-2); }
-.fact-ghost { background: transparent; border-style: dashed; }
+
+/*
+ * Editability shows on approach rather than as permanent "edit" text beside
+ * every value. The underline is the affordance a link already uses, so it
+ * needs no explaining.
+ */
+button.fact .fact-value { text-decoration: 1.5px underline transparent; text-underline-offset: 4px; }
+button.fact:hover .fact-value { text-decoration-color: var(--accent); }
+button.fact:hover .fact-label { color: var(--accent); }
+
+.fact-static { cursor: default; }
+.fact-ghost { background: none; }
 
 /* Editing in place keeps the bar's height identical, so nothing below it
    moves when you click into a value. */
@@ -958,9 +990,10 @@ button.fact:hover { border-color: var(--accent); }
 
 .fact-input {
   font: inherit;
-  font-size: var(--t-lg);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 400;
+  letter-spacing: -0.01em;
   width: 100%;
   min-width: 0;
   border: none;
@@ -972,27 +1005,38 @@ button.fact:hover { border-color: var(--accent); }
 .fact-input:focus { outline: none; }
 .fact-editing:focus-within { box-shadow: var(--ring); border-color: var(--accent); }
 
+/* Wide tracking, light weight: a standfirst label orients you, it doesn't
+   shout. The old 650-weight caps competed with their own values. */
 .fact-label {
-  font-size: var(--t-xs);
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  font-size: var(--t-2xs);
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
+  transition: color var(--t-fast) var(--ease);
 }
 
+/* Display figures — large, read once. The serif earns its place here the
+   same way it does on a card's rent. */
 .fact-value {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: var(--t-lg);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 400;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .fact-unit {
+  font-family: var(--font-sans);
   font-size: var(--t-xs);
   font-weight: 500;
   color: var(--text-muted);
+  letter-spacing: 0;
 }
 
 /* Only appears when the search genuinely can't work. */
@@ -1013,8 +1057,8 @@ button.fact:hover { border-color: var(--accent); }
 .reality .linkish { color: inherit; text-decoration: underline; }
 
 @media (max-width: 860px) {
-  .searchhead-facts { gap: 6px; }
-  .fact { flex: 1; min-width: 104px; padding: var(--s2) var(--s3); }
+  .searchhead-facts { gap: 0; }
+  .fact { flex: 1; min-width: 104px; }
   .reality { flex-direction: column; }
 }
 
@@ -1711,7 +1755,15 @@ button.fact:hover { border-color: var(--accent); }
 
 /* --- the rail ------------------------------------------------------------- */
 
-.brandblock { display: grid; gap: var(--s2); }
+/*
+ * The rail's head.
+ *
+ * Two flat muted lines under a wordmark: the live count and the countdown
+ * carried identical weight, so the one number with a deadline attached read
+ * as a footnote. The countdown is the whole premise of the product — a
+ * four-week sprint — and it now looks like it.
+ */
+.brandblock { display: grid; gap: var(--s3); }
 .brandrow { display: flex; align-items: center; gap: var(--s2); }
 
 /* The mark follows the accent, so it reads in either theme rather than being
@@ -1724,12 +1776,53 @@ button.fact:hover { border-color: var(--accent); }
 
 .brandmeta {
   display: grid;
-  gap: 1px;
+  gap: var(--s2);
   font-size: var(--t-xs);
   color: var(--text-muted);
 }
 
-.brandmeta .warn-text { font-weight: 600; }
+/* The countdown, set as a figure with its unit beneath — the one thing in
+   the rail you should be able to read without focusing on it. */
+.brandcount {
+  display: grid;
+  gap: 1px;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.brandcount b {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 400;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.brandcount[data-soon="true"] b { color: var(--urgent); }
+
+.brandcount span {
+  font-size: var(--t-2xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* Live / changed reads as a status line, not as a second headline. */
+.brandstat { display: flex; align-items: center; gap: 5px; }
+.brandstat b { font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* A quiet pulse on the live count: the corpus really is moving underneath
+   you, and nothing else on the screen says so. */
+.brandstat i {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--action);
+  flex-shrink: 0;
+}
+
+.brandmark { font-size: var(--t-2xl); }
 
 /* Refresh and the budget it spends, as one object. They were at opposite ends
    of the rail with no way to tell they were related. */
@@ -2178,30 +2271,40 @@ button.fact:hover { border-color: var(--accent); }
  * full viewport of your own settings before reaching a single place to live.
  */
 @media (max-width: 860px) {
-  /* Four facts as a 2×2 grid of tight tiles instead of a wrapping flex row
-     that gave "$4,000 /mo ·" and "edit" a line each. */
+  /* Four facts as a 2×2 grid instead of a wrapping row that gave "$4,000 /mo"
+     and its label a line each. */
   .searchhead-facts {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--s2);
+    gap: 0 var(--s4);
   }
 
+  /* The desktop rules are vertical dividers between columns; in a 2x2 grid
+     that would draw one down the outside edge. Rows get a rule underneath
+     instead, and the bottom row gets none. */
   .fact {
     min-width: 0;
-    padding: 6px var(--s3);
+    margin-right: 0;
+    padding: var(--s2) 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
     gap: 0;
   }
 
-  .fact-label { font-size: var(--t-2xs); letter-spacing: 0.06em; }
-  .fact-value { font-size: var(--t-md); gap: 4px; flex-wrap: nowrap; min-width: 0; }
+  /* Bottom row keeps no rule under it. */
+  .fact:nth-child(n + 3) { border-bottom: none; }
+
+  .fact-label { font-size: var(--t-2xs); letter-spacing: 0.08em; }
+  .fact-value { font-size: var(--t-xl); gap: 4px; flex-wrap: nowrap; min-width: 0; }
   .fact-value > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* The whole tile is the button; spelling out "edit" costs a line to say
      what tapping it already says. */
   .fact-unit { display: none; }
 
-  /* "Where" spans both columns — a neighborhood list needs the width. */
-  .fact-where { grid-column: 1 / -1; }
+  /* "Where" used to span both columns because it held a neighborhood list.
+     It now holds "20 areas", so it sits in the grid like the rest and the
+     facts are a true 2x2 instead of two rows plus two orphans. */
 
   /*
    * The map stays, and stays *put*: pinned to the top of the viewport at a
@@ -2459,3 +2562,16 @@ button.fact:hover { border-color: var(--accent); }
    shrink when a flex row runs out of room. */
 .icon { flex-shrink: 0; display: block; }
 .btn .icon { margin-block: -2px; }
+
+/* Handing a booked viewing over to the calendar you actually live in. */
+.addcal {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.addcal .btn { font-size: var(--t-sm); }
+.addcal > .muted { flex: 1 1 100%; font-size: var(--t-xs); line-height: var(--lh-body); }

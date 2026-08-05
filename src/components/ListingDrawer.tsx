@@ -22,6 +22,7 @@ import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/component
 import { nextAction, tourWhen } from "@/lib/nextAction";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
 import Icon from "@/components/Icon";
+import { googleCalendarUrl, icsFilename, icsFor } from "@/lib/calendar";
 import {
   bestChannel,
   reachableOn,
@@ -282,6 +283,25 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
       }
       if (listing.url) window.open(listing.url, "_blank", "noopener");
     }
+  }
+
+  /**
+   * The .ics as a Blob rather than a `data:` URL: Safari refuses to download
+   * a data: URL from an anchor, and the file is well past the length some
+   * browsers cap those at anyway.
+   */
+  function downloadIcs() {
+    const body = icsFor(listing);
+    if (!body) return;
+    const url = URL.createObjectURL(new Blob([body], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = icsFilename(listing);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Revoking immediately can race the download in Firefox.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
   async function copyMessage() {
@@ -823,6 +843,33 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                   <span className="muted" style={{ fontSize: 11 }}>
                     A window, not an appointment — show up any time inside it.
                   </span>
+                )}
+
+                {/*
+                  A viewing that lives only in here is a viewing you miss. You
+                  check your phone on the way out the door, so the appointment
+                  has to leave the app — with the rent, the score, the number
+                  to call from the sidewalk and a link back to the listing.
+                */}
+                {listing.tourAt && (
+                  <div className="addcal">
+                    <button className="btn" onClick={downloadIcs}>
+                      <Icon name="calendar" size={15} />
+                      Add to calendar
+                    </button>
+                    <a
+                      className="btn"
+                      href={googleCalendarUrl(listing) ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Google Calendar
+                      <Icon name="external" size={13} />
+                    </a>
+                    <span className="muted">
+                      Reminds you an hour before, with everything you need at the door.
+                    </span>
+                  </div>
                 )}
               </div>
             )}

@@ -31,6 +31,7 @@ import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint } from "@/lib/apikey";
 import { amenitiesOf, qualityScore } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
+import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar.ts";
 import { applyFilters } from "@/lib/filters";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
@@ -1196,4 +1197,111 @@ test("search still reaches neighborhoods and your own notes", () => {
 test("a search that matches nothing returns nothing, not everything", () => {
   const list = [feed({ id: "a", address: "91 East Third Street" })];
   assert.equal(applyFilters(list, { search: "500 Fifth Avenue" }).length, 0);
+});
+
+// --- calendar handoff ------------------------------------------------------
+
+test("no tour time means no calendar event to hand over", () => {
+  assert.equal(icsFor(feed({ stage: "tour", tourAt: null })), null);
+  assert.equal(googleCalendarUrl(feed({ stage: "tour", tourAt: null })), null);
+});
+
+test("a private viewing with no stated end gets a 30-minute slot", () => {
+  const at = new Date("2026-09-10T15:00:00Z");
+  const ics = icsFor(feed({ stage: "tour", tourAt: at.toISOString(), tourKind: "private" }))!;
+  assert.match(ics, /DTSTART:20260910T150000Z/);
+  assert.match(ics, /DTEND:20260910T153000Z/);
+});
+
+test("an open house honours its own window rather than guessing", () => {
+  const start = new Date("2026-09-12T16:00:00Z");
+  const end = new Date("2026-09-12T18:00:00Z");
+  const ics = icsFor(
+    feed({
+      stage: "tour",
+      tourAt: start.toISOString(),
+      tourEndsAt: end.toISOString(),
+      tourKind: "open_house",
+    })
+  )!;
+  assert.match(ics, /DTSTART:20260912T160000Z/);
+  assert.match(ics, /DTEND:20260912T180000Z/);
+  assert.match(ics, /SUMMARY:Open house/);
+});
+
+test("commas in an address are escaped, not left to truncate the field", () => {
+  // An unescaped comma ends the LOCATION value early: the neighborhood and
+  // city would silently vanish from the calendar entry.
+  const ics = icsFor(
+    feed({
+      stage: "tour",
+      tourAt: new Date("2026-09-10T15:00:00Z").toISOString(),
+      address: "55 Morton Street",
+      neighborhood: "West Village",
+    })
+  )!;
+  const line = ics.split("\r\n").find((l) => l.startsWith("LOCATION:"))!;
+  assert.ok(line.includes("\\,"), "commas must be backslash-escaped");
+  assert.ok(!/[^\\],/.test(line), "no bare comma may survive in LOCATION");
+});
+
+test("newlines in the description become the two-character escape", () => {
+  const ics = icsFor(
+    feed({ stage: "tour", tourAt: new Date("2026-09-10T15:00:00Z").toISOString() })
+  )!;
+  // One property ends where the next unfolded line begins — continuations of
+  // a folded value always start with a space.
+  const lines = ics.split("\r\n");
+  const at = lines.findIndex((l) => l.startsWith("DESCRIPTION:"));
+  let body = lines[at];
+  for (let i = at + 1; i < lines.length && lines[i].startsWith(" "); i++) {
+    body += lines[i].slice(1);
+  }
+  assert.ok(body.includes("\\n"), "line breaks should be encoded as \\n");
+  assert.ok(!body.includes("\n"), "no raw newline may survive in DESCRIPTION");
+});
+
+test("no line exceeds the 75-octet limit clients enforce", () => {
+  const ics = icsFor(
+    feed({
+      stage: "tour",
+      tourAt: new Date("2026-09-10T15:00:00Z").toISOString(),
+      notes: "Ask about the boiler, the roof access, and whether the rent includes heat.",
+    })
+  )!;
+  for (const line of ics.split("\r\n")) {
+    assert.ok(line.length <= 75, `line too long (${line.length}): ${line.slice(0, 40)}…`);
+  }
+});
+
+test("re-adding the same tour updates the event instead of duplicating it", () => {
+  const at = new Date("2026-09-10T15:00:00Z").toISOString();
+  const one = icsFor(feed({ id: "abc", stage: "tour", tourAt: at }))!;
+  const two = icsFor(feed({ id: "abc", stage: "tour", tourAt: at }))!;
+  const uid = (s: string) => s.split("\r\n").find((l) => l.startsWith("UID:"));
+  assert.equal(uid(one), uid(two));
+});
+
+test("the event carries what you need at the door", () => {
+  const body = eventDescription(
+    feed({
+      price: 3250,
+      rating: 88,
+      myContactPhone: "2125550134",
+      myContactName: "Jane at Corcoran",
+      notes: "Third floor walk-up",
+    })
+  );
+  assert.match(body, /\$3,250/);
+  assert.match(body, /88\/100/);
+  assert.match(body, /\(212\) 555-0134/);
+  assert.match(body, /Jane at Corcoran/);
+  assert.match(body, /Third floor walk-up/);
+});
+
+test("the Google link carries the same window as the file", () => {
+  const at = new Date("2026-09-10T15:00:00Z").toISOString();
+  const url = googleCalendarUrl(feed({ stage: "tour", tourAt: at }))!;
+  const dates = new URL(url).searchParams.get("dates");
+  assert.equal(dates, "20260910T150000Z/20260910T153000Z");
 });

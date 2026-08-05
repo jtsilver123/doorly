@@ -731,15 +731,25 @@ export default function Home() {
         <div className="brandblock">
           <div className="brandrow">
             <Logo />
-            <span className="brand">Doorly</span>
+            <span className="brand brandmark">Doorly</span>
           </div>
           <div className="brandmeta">
-            <span>
-              {counts.active} live · {counts.changed} changed
+            <span className="brandstat">
+              <i aria-hidden="true" />
+              <b>{counts.active}</b> live
+              {counts.changed > 0 && (
+                <>
+                  {" · "}
+                  <b>{counts.changed}</b> changed
+                </>
+              )}
             </span>
+            {/* The countdown is the premise of the product — four weeks, then
+                you're either moving or you're not. It reads as a figure. */}
             {daysToMove > 0 && (
-              <span className={daysToMove <= 21 ? "warn-text" : undefined}>
-                {daysToMove} days to move-in
+              <span className="brandcount" data-soon={daysToMove <= 21 ? "true" : undefined}>
+                <b>{daysToMove}</b>
+                <span>days to move-in</span>
               </span>
             )}
           </div>
