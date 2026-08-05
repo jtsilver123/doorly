@@ -25,6 +25,9 @@ import { neighborhoodAt, withinAreas } from "@/lib/geo";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
+import { amenitiesOf, qualityScore } from "@/lib/amenities";
+import { verdictFor } from "@/lib/verdict";
+import { applyFilters } from "@/lib/filters";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
@@ -309,6 +312,12 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     lastContactChannel: null,
     score: 80,
     scoreReasons: [],
+    rating: 60,
+    grade: "fair" as const,
+    ratingHeadline: "",
+    pros: [],
+    cons: [],
+    perks: [],
     daysOnMarket: 1,
     unseenEvents: 0,
     needsFollowUp: false,
@@ -756,4 +765,165 @@ test("manual-only has no expiry date", () => {
 
 test("an exhausted key reads as zero days, not negative", () => {
   assert.equal(runwayDays(0, 2, 5), 0);
+});
+
+// --- amenities ------------------------------------------------------------
+
+test("in-unit laundry is not confused with a shared basement machine", () => {
+  const inUnit = amenitiesOf({
+    amenities: ["Laundry: In Unit"],
+    description: "",
+    address: "",
+  });
+  const shared = amenitiesOf({
+    amenities: ["Laundry: Shared"],
+    description: "",
+    address: "",
+  });
+
+  assert.ok(inUnit.includes("laundry_unit"));
+  assert.ok(!inUnit.includes("laundry_building"), "in-unit implies building, saying both is noise");
+  assert.ok(shared.includes("laundry_building"));
+  assert.ok(!shared.includes("laundry_unit"));
+});
+
+test("amenities are found in free text as well as the amenity list", () => {
+  const found = amenitiesOf({
+    amenities: [],
+    description: "Sun-drenched top floor with a private terrace and a dishwasher.",
+    address: "",
+  });
+  assert.ok(found.includes("light"));
+  assert.ok(found.includes("outdoor"));
+  assert.ok(found.includes("dishwasher"));
+});
+
+test("amenities come back in decision order, not source order", () => {
+  const found = amenitiesOf({
+    amenities: ["Gym", "Elevator", "Laundry: In Unit"],
+    description: "",
+    address: "",
+  });
+  assert.deepEqual(found, ["laundry_unit", "elevator", "gym"]);
+});
+
+test("more amenities is a higher quality score", () => {
+  assert.ok(qualityScore(["laundry_unit", "outdoor"]) > qualityScore(["gym"]));
+  assert.equal(qualityScore([]), 0);
+});
+
+// --- the rating -----------------------------------------------------------
+
+test("a cheap well-equipped flat rates above an expensive bare one", () => {
+  const good = verdictFor(
+    feed({
+      dealVerdict: "good",
+      dealDelta: -15,
+      perks: ["laundry_unit", "dishwasher", "elevator", "outdoor"],
+      allInMonthly: 3000,
+    }),
+    { ...DEFAULT_CRITERIA, priceMax: 3500 }
+  );
+  const bad = verdictFor(
+    feed({
+      dealVerdict: "high",
+      dealDelta: 18,
+      perks: [],
+      allInMonthly: 3900,
+    }),
+    { ...DEFAULT_CRITERIA, priceMax: 3500 }
+  );
+
+  assert.ok(good.rating > bad.rating, `${good.rating} should beat ${bad.rating}`);
+  assert.equal(good.grade, "excellent");
+  assert.ok(good.pros.some((p) => /washer/i.test(p)));
+  assert.ok(bad.cons.some((c) => /over budget/i.test(c)));
+});
+
+test("price alone can't carry a listing with nothing in it", () => {
+  const base = { dealVerdict: "steal" as const, dealDelta: -22, allInMonthly: 3000 };
+  const loaded = verdictFor(feed({ ...base, perks: ["laundry_unit", "dishwasher", "elevator"] }), DEFAULT_CRITERIA);
+  const bare = verdictFor(feed({ ...base, perks: [] }), DEFAULT_CRITERIA);
+
+  assert.ok(loaded.rating > bare.rating, "amenities have to move the number");
+  assert.ok(bare.cons.some((c) => /laundry/i.test(c)));
+});
+
+test("a bait-priced listing is penalised rather than rewarded", () => {
+  const flagged = verdictFor(
+    feed({
+      dealVerdict: "steal",
+      dealDelta: -45,
+      perks: ["laundry_unit"],
+      flags: [{ kind: "too-cheap", message: "Priced 45% below similar listings. Often bait.", severity: "warn" }],
+    }),
+    DEFAULT_CRITERIA
+  );
+  const clean = verdictFor(
+    feed({ dealVerdict: "steal", dealDelta: -45, perks: ["laundry_unit"], flags: [] }),
+    DEFAULT_CRITERIA
+  );
+
+  assert.ok(flagged.rating < clean.rating);
+  assert.equal(flagged.headline, "Verify first");
+});
+
+test("a listing with no comparable listings is not punished for our missing data", () => {
+  const unknown = verdictFor(
+    feed({ dealVerdict: "unknown", dealDelta: 0, perks: ["laundry_unit", "dishwasher"] }),
+    DEFAULT_CRITERIA
+  );
+  assert.ok(unknown.rating >= 45, `scored ${unknown.rating} with nothing wrong with it`);
+});
+
+test("every rating lands inside 1-100 whatever the inputs", () => {
+  for (const over of [
+    { dealDelta: -90, allInMonthly: 0 },
+    { dealDelta: 300, allInMonthly: 99_000 },
+    { score: null },
+  ] as Partial<FeedListing>[]) {
+    const { rating } = verdictFor(feed(over), DEFAULT_CRITERIA);
+    assert.ok(rating >= 1 && rating <= 100, `got ${rating}`);
+    assert.ok(Number.isFinite(rating));
+  }
+});
+
+// --- filters --------------------------------------------------------------
+
+test("filtering by source is any-of, not all-of", () => {
+  const list = [
+    feed({ id: "a", alsoOn: [{ source: "zillow", url: "u" }] }),
+    feed({ id: "b", alsoOn: [{ source: "craigslist", url: "u" }] }),
+  ];
+  const hits = applyFilters(list, { stage: "all", sources: ["zillow", "hotpads"] });
+  assert.deepEqual(hits.map((l) => l.id), ["a"]);
+});
+
+test("the default view hides what you've passed on", () => {
+  const list = [feed({ id: "keep" }), feed({ id: "gone", stage: "passed" })];
+  assert.deepEqual(
+    applyFilters(list, {}).map((l) => l.id),
+    ["keep"]
+  );
+});
+
+test("sorting on 'best' uses the rating the user actually sees", () => {
+  const list = [feed({ id: "low", rating: 30 }), feed({ id: "high", rating: 90 })];
+  assert.deepEqual(
+    applyFilters(list, { sort: "best" }).map((l) => l.id),
+    ["high", "low"]
+  );
+});
+
+test("search matches address, neighborhood and your own notes", () => {
+  const list = [
+    feed({ id: "a", address: "55 Morton Street" }),
+    feed({ id: "b", address: "1 Other Ave", neighborhood: "Chelsea" }),
+    feed({ id: "c", address: "2 Third St", notes: "great morton light" }),
+  ];
+  assert.deepEqual(
+    applyFilters(list, { search: "morton" }).map((l) => l.id).sort(),
+    ["a", "c"]
+  );
+  assert.deepEqual(applyFilters(list, { search: "  " }).length, 3);
 });

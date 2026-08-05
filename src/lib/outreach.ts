@@ -209,9 +209,9 @@ export function mailtoLink(email: string, subject: string, body: string): string
  * What you can actually do with this listing right now.
  *
  * Almost no NYC listing publishes a phone number — 0 of 324 in a live sample —
- * so a "Text for tour" button is usually a dead end. The action offered adapts
- * to what the listing actually has, and there is deliberately no fourth state
- * where the button does nothing:
+ * so a button that promises a text message is usually a dead end. The channel
+ * adapts to what the listing actually has, and there is deliberately no fourth
+ * state where the button does nothing:
  *
  *   phone  -> text     the fastest channel, when it exists
  *   email  -> email    reliable, works from any device
@@ -228,16 +228,35 @@ export function bestChannel(listing: {
   contactEmail?: string;
   url: string;
 }): Reachable {
+  /**
+   * One label across all three channels, on purpose.
+   *
+   * The button used to name its mechanism — "Text for tour", "Copy & open
+   * listing" — which made the most important action on the card read
+   * differently depending on data the renter can't see and doesn't care about.
+   * Worse, "Copy & open listing" describes a clipboard operation rather than
+   * the thing you actually want, so the strongest call to action on the page
+   * sounded like a chore. The goal is identical every time; only the plumbing
+   * differs, and the plumbing belongs in the tooltip.
+   */
   if (listing.contactPhone) {
-    return { channel: "text", label: "Text for tour", hint: "Opens Messages" };
+    return {
+      channel: "text",
+      label: "Request a tour",
+      hint: "Opens Messages with your introduction already written",
+    };
   }
   if (listing.contactEmail) {
-    return { channel: "email", label: "Email for tour", hint: "Opens Mail" };
+    return {
+      channel: "email",
+      label: "Request a tour",
+      hint: "Opens your email app with the message already written",
+    };
   }
   return {
     channel: "portal",
-    label: "Copy & open listing",
-    hint: "Copies the message, opens the listing's contact form",
+    label: "Request a tour",
+    hint: "No phone or email published — copies your message and opens their contact form",
   };
 }
 

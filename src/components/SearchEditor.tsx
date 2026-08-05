@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AREAS } from "@/lib/areas";
+import AreaPicker from "@/components/AreaPicker";
 import { LAYOUT_PRESETS, type SavedSearch } from "@/types";
 
 /**
@@ -166,28 +167,8 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
           </div>
 
           <div style={{ display: "grid", gap: 5, fontSize: 12 }}>
-            <span className="muted">
-              Neighborhoods · <strong>{areas.length} selected</strong>
-            </span>
-            <div className="welcome-areas">
-              {grouped.map(([borough, list]) => (
-                <div key={borough}>
-                  <div className="welcome-borough">{borough}</div>
-                  <div className="welcome-chips">
-                    {list.map((area) => (
-                      <button
-                        key={area.slug}
-                        className={areas.includes(area.slug) ? "btn btn-primary" : "btn"}
-                        style={{ fontSize: 12, padding: "4px 9px" }}
-                        onClick={() => toggle(area.slug)}
-                      >
-                        {area.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <span className="muted">Neighborhoods</span>
+            <AreaPicker selected={areas} onChange={setAreas} />
           </div>
 
           <label style={{ display: "grid", gap: 4, fontSize: 12 }}>

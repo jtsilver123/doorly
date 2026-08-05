@@ -1,3 +1,5 @@
+import type { AmenityKey } from "@/lib/amenities";
+
 export type Source =
   | "streeteasy"
   | "craigslist"
@@ -151,6 +153,21 @@ export interface FeedListing extends Listing {
   lastContactChannel: ContactChannel | null;
   score: number | null;
   scoreReasons: string[];
+  /**
+   * The headline judgment: 1-100, how good this apartment is for *this* renter,
+   * with the reasoning split out. Replaces the old pair of competing numbers.
+   */
+  rating: number;
+  grade: "excellent" | "strong" | "fair" | "weak";
+  ratingHeadline: string;
+  pros: string[];
+  cons: string[];
+  /**
+   * The raw `amenities` strings folded into a canonical set. Kept separate from
+   * `amenities` because the drawer still shows everything the source said,
+   * while the card and the rating need the normalized handful.
+   */
+  perks: AmenityKey[];
   daysOnMarket: number;
   unseenEvents: number;
   /** Contacted, still sitting at "contacted", and gone quiet. Chases itself. */

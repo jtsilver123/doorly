@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { loadFeed, type FeedFilters } from "@/lib/feed";
+import { loadFeed } from "@/lib/feed";
+import type { FeedFilterOptions, SortKey } from "@/lib/filters";
 import type { Source, Stage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,9 @@ function num(value: string | null): number | undefined {
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
-  const filters: FeedFilters = {
+  const filters: FeedFilterOptions = {
     stage: (params.get("stage") as Stage | "all" | "active") ?? undefined,
-    source: (params.get("source") as Source | "all") ?? undefined,
+    sources: (params.get("sources")?.split(",").filter(Boolean) as Source[]) ?? undefined,
     priceMin: num(params.get("priceMin")),
     priceMax: num(params.get("priceMax")),
     bedsMin: num(params.get("bedsMin")),
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     starredOnly: params.get("starred") === "1",
     includeGone: params.get("gone") === "1",
     search: params.get("q") ?? undefined,
-    sort: (params.get("sort") as FeedFilters["sort"]) ?? "best",
+    sort: (params.get("sort") as SortKey) ?? "best",
     areas: params.get("areas")?.split(",").filter(Boolean),
   };
 

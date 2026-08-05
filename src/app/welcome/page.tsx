@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AREAS } from "@/lib/areas";
+import AreaPicker from "@/components/AreaPicker";
 import { LAYOUT_PRESETS } from "@/types";
 
 /**
@@ -15,8 +15,6 @@ import { LAYOUT_PRESETS } from "@/types";
  * is the one answer nobody else can guess.
  */
 
-const BOROUGH_ORDER = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
-
 export default function Welcome() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -28,31 +26,6 @@ export default function Welcome() {
   const [moveIn, setMoveIn] = useState(defaultMoveIn());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, typeof AREAS>();
-    for (const area of AREAS) {
-      if (area.isBorough) continue;
-      const list = map.get(area.borough) ?? [];
-      list.push(area);
-      map.set(area.borough, list);
-    }
-    return BOROUGH_ORDER.filter((b) => map.has(b)).map((b) => [b, map.get(b)!] as const);
-  }, []);
-
-  function toggle(slug: string) {
-    setAreas((list) =>
-      list.includes(slug) ? list.filter((s) => s !== slug) : [...list, slug]
-    );
-  }
-
-  function toggleBorough(borough: string) {
-    const slugs = AREAS.filter((a) => a.borough === borough && !a.isBorough).map((a) => a.slug);
-    const allOn = slugs.every((s) => areas.includes(s));
-    setAreas((list) =>
-      allOn ? list.filter((s) => !slugs.includes(s)) : [...new Set([...list, ...slugs])]
-    );
-  }
 
   async function submit() {
     if (!areas.length) {
@@ -121,33 +94,7 @@ export default function Welcome() {
           <span className="muted">
             Where are you looking? <strong>{areas.length} selected</strong>
           </span>
-          <div className="welcome-areas">
-            {grouped.map(([borough, list]) => (
-              <div key={borough}>
-                <button
-                  type="button"
-                  className="welcome-borough"
-                  onClick={() => toggleBorough(borough)}
-                >
-                  {borough}
-                  <span className="muted"> · select all</span>
-                </button>
-                <div className="welcome-chips">
-                  {list.map((area) => (
-                    <button
-                      key={area.slug}
-                      type="button"
-                      className={areas.includes(area.slug) ? "btn btn-primary" : "btn"}
-                      style={{ fontSize: 12, padding: "4px 9px" }}
-                      onClick={() => toggle(area.slug)}
-                    >
-                      {area.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <AreaPicker selected={areas} onChange={setAreas} />
         </div>
 
         <div className="welcome-field">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FeedListing } from "@/types";
+import type { FeedListing, Source } from "@/types";
 import { PIPELINE_STAGES, SOURCE_LABEL, STAGE_LABEL, ALL_SOURCES } from "@/types";
 import {
   CONTACT_ICON,
@@ -16,10 +16,13 @@ import {
   type Profile,
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
+import { applyFilters } from "@/lib/filters";
 import { runwayDays } from "@/lib/runway";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
+import FilterBar, { type Filters } from "@/components/FilterBar";
+import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
 import { signOut } from "@/app/auth/actions";
@@ -53,7 +56,20 @@ interface ApiStatus {
   perPollEstimate: number;
 }
 
+/** Bottom-bar glyphs. Text-only on desktop; these only surface on phones. */
+const NAV_ICON: Record<string, string> = {
+  today: "◎",
+  feed: "▤",
+  changes: "↯",
+  pipeline: "▦",
+  compare: "⇄",
+  profile: "☰",
+};
+
 const money = (n: number) => `$${n.toLocaleString()}`;
+
+/** What "good deal" means when the filter is on. Above this is worth a tour. */
+const GOOD_DEAL_RATING = 70;
 
 function sinceText(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -78,6 +94,7 @@ export default function Home() {
   const [adding, setAdding] = useState(false);
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [email, setEmail] = useState("");
+  const [budget, setBudget] = useState(0);
   const [focus, setFocus] = useState(0);
   const { toasts, push: toast, dismiss } = useToasts();
 
@@ -87,54 +104,90 @@ export default function Home() {
   const [priceMax, setPriceMax] = useState("");
   const [beds, setBeds] = useState("any");
   const [baths, setBaths] = useState("any");
-  const [source, setSource] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState<Source[]>([]);
   const [changedOnly, setChangedOnly] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
   const [noFeeOnly, setNoFeeOnly] = useState(false);
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [readyOnly, setReadyOnly] = useState(false);
+  const [goodOnly, setGoodOnly] = useState(false);
 
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const loadFeed = useCallback(async () => {
-    const params = new URLSearchParams({ sort, stage: "all" });
-    if (query) params.set("q", query);
-    if (priceMax) params.set("priceMax", priceMax);
-    if (beds !== "any") {
-      params.set("bedsMin", beds);
-      params.set("bedsMax", beds);
-    }
-    if (baths !== "any") params.set("bathsMin", baths);
-    if (source !== "all") params.set("source", source);
-    if (changedOnly) params.set("changed", "1");
-    if (starredOnly) params.set("starred", "1");
-    if (noFeeOnly) params.set("noFee", "1");
-    if (followUpOnly) params.set("followUp", "1");
-    if (readyOnly) params.set("readyBy", "1");
+  const clearFilters = useCallback(() => {
+    setQuery("");
+    setPriceMax("");
+    setBeds("any");
+    setBaths("any");
+    setSourceFilter([]);
+    setSort("best");
+    setChangedOnly(false);
+    setStarredOnly(false);
+    setNoFeeOnly(false);
+    setFollowUpOnly(false);
+    setReadyOnly(false);
+    setGoodOnly(false);
+  }, []);
 
-    const res = await fetch(`/api/feed?${params}`);
-    const body = await res.json();
-    if (body.error) toast({ message: body.error, tone: "warn" });
-    setListings(body.listings ?? []);
-    setLoading(false);
-  }, [
-    toast,
-    query,
-    sort,
-    priceMax,
-    beds,
-    baths,
-    source,
-    changedOnly,
-    starredOnly,
-    noFeeOnly,
-    followUpOnly,
-    readyOnly,
-  ]);
+  /**
+   * One fetch for the whole corpus, then everything narrows in the browser.
+   *
+   * Filters used to be query parameters, so each keystroke in the search box
+   * cost a round trip *and* a full server-side rescore. Now the network is
+   * touched only when the underlying data can actually have changed — a poll, a
+   * star, a stage move — and adjusting a filter is a synchronous array pass.
+   */
+  const loadFeed = useCallback(async () => {
+    try {
+      const res = await fetch("/api/feed?stage=all");
+      const body = await res.json();
+      if (body.error) toast({ message: body.error, tone: "warn" });
+      setListings(body.listings ?? []);
+    } catch {
+      toast({ message: "Couldn't load your listings. Check your connection.", tone: "warn" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
+
+  const visible = useMemo(
+    () =>
+      applyFilters(listings, {
+        stage: "all",
+        search: query,
+        priceMax: priceMax ? Number(priceMax) : undefined,
+        bedsMin: beds === "any" ? undefined : Number(beds),
+        bedsMax: beds === "any" ? undefined : Number(beds),
+        bathsMin: baths === "any" ? undefined : Number(baths),
+        sources: sourceFilter,
+        changedOnly,
+        starredOnly,
+        noFeeOnly,
+        followUpOnly,
+        readyByMoveIn: readyOnly,
+        minRating: goodOnly ? GOOD_DEAL_RATING : undefined,
+        sort: sort as Parameters<typeof applyFilters>[1]["sort"],
+      }),
+    [
+      listings,
+      query,
+      priceMax,
+      beds,
+      baths,
+      sourceFilter,
+      changedOnly,
+      starredOnly,
+      noFeeOnly,
+      followUpOnly,
+      readyOnly,
+      goodOnly,
+      sort,
+    ]
+  );
 
   const loadChanges = useCallback(async () => {
     const body = await fetch("/api/changes").then((r) => r.json());
@@ -152,6 +205,13 @@ export default function Home() {
   useEffect(() => {
     loadChanges();
     loadApi();
+    fetch("/api/searches")
+      .then((r) => r.json())
+      .then((b) => {
+        const first = (b.searches ?? [])[0];
+        if (first?.criteria?.priceMax) setBudget(first.criteria.priceMax);
+      })
+      .catch(() => {});
     fetch("/api/profile")
       .then((r) => r.json())
       .then((b) => {
@@ -220,7 +280,6 @@ export default function Home() {
   const pass = useCallback(
     (listing: FeedListing) => {
       setListings((list) => list.filter((l) => l.id !== listing.id));
-      setFocus((f) => Math.max(0, Math.min(f, listings.length - 2)));
       patch(listing.id, { action: "feedback", value: "pass" }, false).catch(() =>
         loadFeed()
       );
@@ -234,7 +293,7 @@ export default function Home() {
         },
       });
     },
-    [patch, loadFeed, toast, listings.length]
+    [patch, loadFeed, toast]
   );
 
   /**
@@ -301,15 +360,17 @@ export default function Home() {
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      const current = listings[focus];
+      const current = visible[focus];
       switch (e.key.toLowerCase()) {
-        case "j":
+        case "arrowright":
         case "arrowdown":
+        case "j":
           e.preventDefault();
-          setFocus((f) => Math.min(f + 1, listings.length - 1));
+          setFocus((f) => Math.min(f + 1, visible.length - 1));
           break;
-        case "k":
+        case "arrowleft":
         case "arrowup":
+        case "k":
           e.preventDefault();
           setFocus((f) => Math.max(f - 1, 0));
           break;
@@ -348,7 +409,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, listings, focus, pass, star, reachOut]);
+  }, [tab, open, visible, focus, pass, star, reachOut]);
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
@@ -356,7 +417,8 @@ export default function Home() {
     node?.scrollIntoView({ block: "nearest" });
   }, [focus]);
 
-  useEffect(() => setFocus(0), [query, sort, priceMax, beds, baths, source]);
+  // Any change to what's on screen resets the cursor to the top of it.
+  useEffect(() => setFocus(0), [visible]);
 
   const finalistCount = useMemo(
     () =>
@@ -388,6 +450,52 @@ export default function Home() {
     [listings, funnel, phase]
   );
 
+  /**
+   * Budget and move-in date, saved from wherever they're edited.
+   *
+   * The budget lives on the saved search (it bounds what gets scraped) and the
+   * date lives on the profile (it fills the outreach message and the timeline),
+   * but to the user they're one pair of settings. This hides that seam, and
+   * reloads the feed because both feed straight back into the rating.
+   */
+  const saveSearchBasics = useCallback(
+    async ({ budget: nextBudget, moveInDate }: { budget?: number; moveInDate?: string }) => {
+      if (nextBudget != null) {
+        setBudget(nextBudget);
+        const body = await fetch("/api/searches").then((r) => r.json());
+        const current = (body.searches ?? [])[0];
+        if (current) {
+          await fetch("/api/searches", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              label: current.label,
+              criteria: { ...current.criteria, priceMax: nextBudget },
+            }),
+          });
+          // Criteria are keyed by content, so an edit creates a new row. Drop
+          // the old one or every poll scrapes both and doubles the API spend.
+          await fetch("/api/searches", {
+            method: "DELETE",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ searchKey: current.searchKey }),
+          });
+        }
+      }
+      if (moveInDate) {
+        setProfile((p) => ({ ...p, moveInDate }));
+        await fetch("/api/profile", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ profile: { ...profile, moveInDate } }),
+        });
+      }
+      await loadFeed();
+      toast({ message: "Updated", tone: "good" });
+    },
+    [profile, loadFeed, toast]
+  );
+
   async function saveProfile(next: Profile) {
     setProfile(next);
     await fetch("/api/profile", {
@@ -400,7 +508,10 @@ export default function Home() {
 
   return (
     <div className="shell">
-      <nav className="sidebar">
+      <a className="skiplink" href="#results">
+        Skip to listings
+      </a>
+      <nav className="sidebar" aria-label="Sections">
         <div>
           <div className="brand">Homefinder</div>
           <div className="muted" style={{ fontSize: 11 }}>
@@ -416,7 +527,7 @@ export default function Home() {
           )}
         </div>
 
-        <div style={{ display: "grid", gap: 2 }}>
+        <div className="mobile-nav" style={{ display: "grid", gap: 2 }}>
           {(
             [
               ["today", "Today", actions.length],
@@ -430,9 +541,12 @@ export default function Home() {
             <button
               key={key}
               className="nav-item"
-              aria-current={tab === key}
+              aria-current={tab === key ? "page" : undefined}
               onClick={() => setTab(key)}
             >
+              <span className="nav-icon" aria-hidden="true">
+                {NAV_ICON[key]}
+              </span>
               <span>{label}</span>
               {count > 0 && <span className="chip">{count}</span>}
             </button>
@@ -450,87 +564,6 @@ export default function Home() {
             <strong>{counts.followUp} waiting on a reply</strong>
             <span className="muted">Contacted 2+ days ago — chase them</span>
           </button>
-        )}
-
-        {tab === "feed" && (
-          <div style={{ display: "grid", gap: 9 }}>
-            <div className="muted section-label">FILTERS</div>
-            <input
-              className="field"
-              placeholder="Address, neighborhood, notes"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                className="field"
-                placeholder="Max rent"
-                inputMode="numeric"
-                value={priceMax}
-                onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
-              />
-              <select
-                className="field"
-                value={beds}
-                onChange={(e) => setBeds(e.target.value)}
-              >
-                <option value="any">Any beds</option>
-                <option value="0">Studio</option>
-                <option value="1">1 bed</option>
-                <option value="2">2 bed</option>
-                <option value="3">3 bed</option>
-              </select>
-              <select
-                className="field"
-                value={baths}
-                onChange={(e) => setBaths(e.target.value)}
-              >
-                <option value="any">Any bath</option>
-                <option value="1">1+ bath</option>
-                <option value="1.5">1.5+</option>
-                <option value="2">2+ bath</option>
-              </select>
-            </div>
-            <select className="field" value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="all">All sites</option>
-              {ALL_SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {SOURCE_LABEL[s]}
-                </option>
-              ))}
-            </select>
-            <select className="field" value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="best">Best match</option>
-              <option value="newest">Newest</option>
-              <option value="effective">Cheapest (after concessions)</option>
-              <option value="allin">Cheapest all-in</option>
-              <option value="upfront">Least cash up front</option>
-              <option value="cheapest">Cheapest sticker price</option>
-              <option value="recent_change">Recently changed</option>
-            </select>
-            {(
-              [
-                ["Price changed", changedOnly, setChangedOnly],
-                ["Starred", starredOnly, setStarredOnly],
-                ["No fee", noFeeOnly, setNoFeeOnly],
-                ["Needs follow-up", followUpOnly, setFollowUpOnly],
-                ["Ready by my date", readyOnly, setReadyOnly],
-              ] as [string, boolean, (v: boolean) => void][]
-            ).map(([label, value, set]) => (
-              <label key={label} className="check">
-                <input
-                  type="checkbox"
-                  checked={value}
-                  onChange={(e) => set(e.target.checked)}
-                />
-                {label}
-              </label>
-            ))}
-            <div className="muted keyhint">
-              <kbd>J</kbd>/<kbd>K</kbd> move · <kbd>E</kbd> reach out · <kbd>S</kbd> star ·{" "}
-              <kbd>X</kbd> pass · <kbd>O</kbd> open · <kbd>↵</kbd> details
-            </div>
-          </div>
         )}
 
         {api?.usage && (
@@ -593,22 +626,18 @@ export default function Home() {
         </div>
       </nav>
 
-      <main className="main">
-        {loading && (
-          <div className="grid" aria-busy="true" aria-label="Loading listings">
-            {Array.from({ length: 8 }, (_, i) => (
-              <div key={i} className="surface card skeleton-card">
-                <div className="skeleton skeleton-media" />
-                <div className="card-body">
-                  <div className="skeleton skeleton-line" style={{ width: "45%", height: 16 }} />
-                  <div className="skeleton skeleton-line" style={{ width: "80%" }} />
-                  <div className="skeleton skeleton-line" style={{ width: "60%" }} />
-                  <div className="skeleton skeleton-line" style={{ width: "100%", height: 30, marginTop: 6 }} />
-                </div>
-              </div>
-            ))}
-          </div>
+      <main className="main" id="results">
+        {(tab === "today" || tab === "feed") && budget > 0 && (
+          <SearchHeader
+            listings={listings}
+            budget={budget}
+            moveInDate={profile.moveInDate}
+            onSave={saveSearchBasics}
+            onEditSearch={() => setTab("profile")}
+          />
         )}
+
+        {loading && (tab === "today" || tab === "feed") && <SkeletonGrid />}
 
         {!loading && tab === "today" && (
           <div style={{ display: "grid", gap: 16, maxWidth: 860 }}>
@@ -658,11 +687,11 @@ export default function Home() {
             </div>
 
             {/* The best of what's live, so Today can stand alone. */}
-            {listings.length > 0 && (
+            {visible.length > 0 && (
               <div style={{ display: "grid", gap: 10 }}>
                 <div className="muted section-label">BEST MATCHES RIGHT NOW</div>
                 <div className="grid">
-                  {listings.slice(0, 4).map((listing) => (
+                  {visible.slice(0, 4).map((listing) => (
                     <ListingCard
                       key={listing.id}
                       listing={listing}
@@ -678,19 +707,52 @@ export default function Home() {
           </div>
         )}
 
-        {!loading && tab === "feed" && (
+        {tab === "feed" && (
           <>
-            <div className="toolbar">
-              <span className="muted" style={{ fontSize: 12 }}>
-                {listings.length} listing{listings.length === 1 ? "" : "s"}
-                {followUpOnly ? " needing follow-up" : ""}
-              </span>
-            </div>
-            {listings.length === 0 ? (
-              <Empty onRefresh={refresh} onAdd={() => setAdding(true)} />
+            <FilterBar
+              total={visible.length}
+              filters={{
+                query,
+                priceMax,
+                beds,
+                baths,
+                sources: sourceFilter,
+                sort,
+                changedOnly,
+                starredOnly,
+                noFeeOnly,
+                followUpOnly,
+                readyOnly,
+                goodOnly,
+              }}
+              onChange={(next: Partial<Filters>) => {
+                if (next.query !== undefined) setQuery(next.query);
+                if (next.priceMax !== undefined) setPriceMax(next.priceMax);
+                if (next.beds !== undefined) setBeds(next.beds);
+                if (next.baths !== undefined) setBaths(next.baths);
+                if (next.sources !== undefined) setSourceFilter(next.sources);
+                if (next.sort !== undefined) setSort(next.sort);
+                if (next.changedOnly !== undefined) setChangedOnly(next.changedOnly);
+                if (next.starredOnly !== undefined) setStarredOnly(next.starredOnly);
+                if (next.noFeeOnly !== undefined) setNoFeeOnly(next.noFeeOnly);
+                if (next.followUpOnly !== undefined) setFollowUpOnly(next.followUpOnly);
+                if (next.readyOnly !== undefined) setReadyOnly(next.readyOnly);
+                if (next.goodOnly !== undefined) setGoodOnly(next.goodOnly);
+              }}
+              onReset={clearFilters}
+              lastCheckedAt={api?.lastCheckedAt}
+              sourceCount={ALL_SOURCES.length}
+            />
+            {loading ? null : visible.length === 0 ? (
+              <Empty
+                filtered={listings.length > 0}
+                onRefresh={refresh}
+                onAdd={() => setAdding(true)}
+                onClear={clearFilters}
+              />
             ) : (
               <div className="grid" ref={gridRef}>
-                {listings.map((listing, i) => (
+                {visible.map((listing, i) => (
                   <ListingCard
                     key={listing.id}
                     listing={listing}
@@ -704,6 +766,14 @@ export default function Home() {
               </div>
             )}
           </>
+        )}
+
+        {loading && tab !== "today" && tab !== "feed" && (
+          <div className="surface" style={{ padding: 24 }} aria-busy="true">
+            <div className="skeleton skeleton-line" style={{ width: "40%", height: 16 }} />
+            <div className="skeleton skeleton-line" style={{ width: "70%", marginTop: 10 }} />
+            <div className="skeleton skeleton-line" style={{ width: "55%", marginTop: 8 }} />
+          </div>
         )}
 
         {!loading && tab === "changes" && (
@@ -833,19 +903,71 @@ export default function Home() {
   );
 }
 
-function Empty({ onRefresh, onAdd }: { onRefresh: () => void; onAdd: () => void }) {
+/**
+ * Two different nothings, two different answers.
+ *
+ * "You have no listings at all" and "your filters excluded all 300 of them" are
+ * unrelated problems, and offering "check for new listings" to someone who has
+ * simply set the max rent too low sends them off to spend API credit on a
+ * question they could answer by clicking Clear.
+ */
+/** Placeholder cards in the real card's shape, so nothing jumps on arrival. */
+function SkeletonGrid() {
   return (
-    <div className="surface" style={{ padding: 32, textAlign: "center" }}>
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>Nothing matches</div>
-      <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-        Loosen the filters, pull fresh listings, or add a place you found yourself.
+    <div className="grid" aria-busy="true" aria-label="Loading listings">
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} className="card skeleton-card">
+          <div className="skeleton skeleton-media" />
+          <div className="card-body">
+            <div className="skeleton skeleton-line" style={{ width: "45%", height: 18 }} />
+            <div className="skeleton skeleton-line" style={{ width: "62%" }} />
+            <div className="skeleton skeleton-line" style={{ width: "88%" }} />
+            <div className="skeleton skeleton-line" style={{ width: "50%" }} />
+            <div className="skeleton skeleton-line" style={{ width: "70%" }} />
+            <div
+              className="skeleton skeleton-line"
+              style={{ width: "100%", height: 32, marginTop: 10 }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Empty({
+  filtered,
+  onRefresh,
+  onAdd,
+  onClear,
+}: {
+  filtered: boolean;
+  onRefresh: () => void;
+  onAdd: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="empty">
+      <div className="empty-title">
+        {filtered ? "No listings match these filters" : "Nothing tracked yet"}
       </div>
-      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-        <button className="btn btn-primary" onClick={onRefresh}>
-          Check for new listings
-        </button>
+      <p className="empty-body">
+        {filtered
+          ? "Everything we're tracking got filtered out. Clearing the filters will bring the full list back."
+          : "Pull listings from StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, or add a place you found yourself."}
+      </p>
+      <div className="empty-actions">
+        {filtered ? (
+          <button className="btn btn-primary" onClick={onClear}>
+            Clear all filters
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={onRefresh}>
+            Find listings now
+          </button>
+        )}
         <button className="btn" onClick={onAdd}>
-          Add a place
+          Add a place manually
         </button>
       </div>
     </div>
@@ -1048,6 +1170,14 @@ function ApiSettings({
           <option value="8">Every 3 hours</option>
         </select>
         <span className="muted" style={{ fontSize: 11 }}>
+          {Number(checks) > 1 && (
+            <>
+              Vercel&apos;s free plan only runs one scheduled job a day, so
+              anything above &ldquo;once a day&rdquo; needs Vercel Pro or a free
+              external pinger hitting <code>/api/cron/poll</code>. Pressing
+              &ldquo;Check for new&rdquo; always works.{" "}
+            </>
+          )}
           {days == null
             ? "Nothing runs on its own — the key only spends when you press the button, so it never expires on a schedule."
             : days <= 3

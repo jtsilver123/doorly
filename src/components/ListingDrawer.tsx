@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ContactLog,
   FeedListing,
@@ -15,6 +15,9 @@ import {
   STAGES,
   STAGE_LABEL,
 } from "@/types";
+import SourceMark from "@/components/SourceMark";
+import Perks from "@/components/Perks";
+import { RatingDisc, ProsConsList } from "@/components/Rating";
 import {
   bestChannel,
   draftTourMessage,
@@ -92,6 +95,8 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const returnFocusTo = useRef<HTMLElement | null>(null);
 
   const message = draftTourMessage(listing, profile);
 
@@ -114,10 +119,44 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
     };
   }, [listing.id]);
 
+  /**
+   * Focus goes into the panel on open and back to whatever opened it on close,
+   * and Tab is kept inside while it's up. Without this a keyboard user tabs
+   * straight out of the dialog into the grid behind it, which is disorienting
+   * sighted and unusable unsighted.
+   */
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    returnFocusTo.current = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panelRef.current) return;
+
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, summary, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      returnFocusTo.current?.focus();
+    };
   }, [onClose]);
 
   async function patch(body: Record<string, unknown>) {
@@ -181,7 +220,14 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-label={listing.address}>
+      <aside
+        ref={panelRef}
+        className="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={listing.address}
+        tabIndex={-1}
+      >
         <header
           style={{
             padding: "14px 16px",
@@ -191,8 +237,20 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
             alignItems: "flex-start",
           }}
         >
+          <RatingDisc
+            rating={listing.rating}
+            grade={listing.grade}
+            size="lg"
+            title={`${listing.rating} out of 100 for your search`}
+          />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>{money(listing.price)}</div>
+            <div style={{ fontSize: 20, fontWeight: 600 }}>
+              {money(listing.price)}
+              <span className="muted" style={{ fontSize: 13, fontWeight: 500 }}>
+                {" "}
+                · {listing.ratingHeadline}
+              </span>
+            </div>
             <div style={{ fontSize: 13 }}>
               {listing.address}
               {listing.unit ? ` #${listing.unit}` : ""}
@@ -210,6 +268,15 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
         </header>
 
         <div style={{ overflowY: "auto", padding: 16, display: "grid", gap: 18 }}>
+          {/* --- the verdict, before anything else ----------------------- */}
+          <section style={{ display: "grid", gap: 10 }}>
+            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
+              WHY {listing.rating} OUT OF 100
+            </label>
+            <ProsConsList listing={listing} />
+            <Perks keys={listing.perks} limit={10} showLabels />
+          </section>
+
           {/* --- outreach ------------------------------------------------ */}
           <section style={{ display: "grid", gap: 8 }}>
             <div style={{ display: "flex", gap: 8 }}>
@@ -320,7 +387,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                     : "pricecheck"
               }
             >
-              <strong>{listing.dealLabel}</strong>
+              <strong>{listing.dealLabel}.</strong>
               {listing.dealVerdict === "steal" && (
                 <span className="muted">
                   {" "}
@@ -443,18 +510,28 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                     LINK_PREFERENCE.indexOf(a.source) - LINK_PREFERENCE.indexOf(b.source)
                 )
                 .map((s) => (
-                <a
-                  key={s.source}
-                  className="btn"
-                  style={{ fontSize: 12, padding: "4px 8px" }}
-                  href={s.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {SOURCE_LABEL[s.source]} ↗
-                </a>
-              ))}
+                  <a
+                    key={s.source}
+                    className="btn srcbtn"
+                    style={{ fontSize: 12, padding: "4px 9px" }}
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <SourceMark source={s.source} size={15} />
+                    {SOURCE_LABEL[s.source]}
+                  </a>
+                ))}
             </div>
+            {/* Provenance, plainly. Everything here is copied from the sites
+                above — we don't inspect apartments, and saying so is what makes
+                the rest of the numbers credible. */}
+            <p className="muted" style={{ fontSize: 11, lineHeight: 1.45, margin: 0 }}>
+              Details come from the listing sites, not from us. Last confirmed
+              live {when(listing.lastSeenAt)}; first seen {when(listing.firstSeenAt)}.
+              Prices and availability can change without the listing being
+              updated — confirm both before you travel.
+            </p>
           </section>
         </div>
       </aside>

@@ -23,35 +23,9 @@ import {
   DEFAULT_COSTS,
 } from "@/lib/cost";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
-
-export interface FeedFilters {
-  stage?: Stage | "all" | "active";
-  source?: Source | "all";
-  areas?: string[];
-  priceMin?: number;
-  priceMax?: number;
-  bedsMin?: number;
-  bedsMax?: number;
-  bathsMin?: number;
-  noFeeOnly?: boolean;
-  changedOnly?: boolean;
-  followUpOnly?: boolean;
-  includeGone?: boolean;
-  starredOnly?: boolean;
-  sort?:
-    | "best"
-    | "newest"
-    | "cheapest"
-    | "effective"
-    | "allin"
-    | "upfront"
-    | "recent_change";
-  /** Filter on effective rent, so concession deals aren't hidden by gross. */
-  effectiveMax?: number;
-  readyByMoveIn?: boolean;
-  search?: string;
-  limit?: number;
-}
+import { applyFilters, type FeedFilterOptions } from "@/lib/filters";
+import { amenitiesOf } from "@/lib/amenities";
+import { verdictFor } from "@/lib/verdict";
 
 interface ListingRow {
   id: string;
@@ -151,7 +125,7 @@ function daysBetween(from: string, to = new Date().toISOString()): number {
  * Scoring happens here rather than at ingest time so that a thumbs-up
  * re-ranks the whole board immediately, without waiting for the next poll.
  */
-export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]> {
+export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedListing[]> {
   const supabase = await db();
   const userId = await currentUserId();
 
@@ -256,6 +230,12 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
   const profile = await loadProfile().catch(() => DEFAULT_PROFILE);
   const costs = profile.costs ?? DEFAULT_COSTS;
 
+  // Rank and rate against the renter's own search rather than a stock one, so
+  // "over budget" and "well under your ceiling" mean their numbers.
+  const saved = await loadSearches().catch(() => []);
+  const criteria =
+    saved.find((s) => s.active)?.criteria ?? saved[0]?.criteria ?? DEFAULT_CRITERIA;
+
   // Comparison set for pricing. Drawn from everything currently tracked, which
   // is what makes "12% under market" a measurement rather than an opinion.
   const corpus = listings.map((r) => ({
@@ -271,7 +251,7 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
     const state = stateBy.get(row.id);
     const alsoOn = sourcesBy.get(row.id) ?? [];
     const listing = toListing(row, alsoOn[0]?.source ?? "streeteasy");
-    const { score: value, reasons } = score(listing, model, DEFAULT_CRITERIA);
+    const { score: value, reasons } = score(listing, model, criteria);
 
     const rowEvents = eventsBy.get(row.id) ?? [];
     const seenAt = state?.events_seen_at;
@@ -314,6 +294,12 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
       lastContactChannel: contact?.channel ?? null,
       score: value,
       scoreReasons: reasons,
+      perks: amenitiesOf(listing),
+      rating: 0,
+      grade: "fair",
+      ratingHeadline: "",
+      pros: [],
+      cons: [],
       daysOnMarket: daysBetween(row.first_seen_at),
       unseenEvents: unseen,
       needsFollowUp,
@@ -330,8 +316,9 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
     });
   }
 
-  // Flags depend on fields only present once the row is fully assembled
-  // (days on market, how many sites carry it), so they're a second pass.
+  // Flags depend on fields only present once the row is fully assembled (days
+  // on market, how many sites carry it), so they're a second pass — and the
+  // rating depends on the flags, so it comes after them in the same pass.
   for (const listing of out) {
     listing.flags = flagsFor(listing, {
       verdict: listing.dealVerdict,
@@ -339,66 +326,15 @@ export async function loadFeed(filters: FeedFilters = {}): Promise<FeedListing[]
       stats: statsFor(listing, corpus),
       label: listing.dealLabel,
     });
+    const verdict = verdictFor(listing, criteria);
+    listing.rating = verdict.rating;
+    listing.grade = verdict.grade;
+    listing.ratingHeadline = verdict.headline;
+    listing.pros = verdict.pros;
+    listing.cons = verdict.cons;
   }
 
   return applyFilters(out, filters);
-}
-
-function applyFilters(listings: FeedListing[], filters: FeedFilters): FeedListing[] {
-  let result = listings;
-
-  if (filters.stage && filters.stage !== "all") {
-    if (filters.stage === "active") {
-      result = result.filter((l) => l.stage !== "inbox" && l.stage !== "passed");
-    } else {
-      result = result.filter((l) => l.stage === filters.stage);
-    }
-  } else {
-    // "All" still hides things you've explicitly rejected.
-    result = result.filter((l) => l.stage !== "passed");
-  }
-
-  if (filters.effectiveMax != null) {
-    result = result.filter((l) => l.effectiveRent <= filters.effectiveMax!);
-  }
-  if (filters.starredOnly) result = result.filter((l) => l.starred);
-  if (filters.followUpOnly) result = result.filter((l) => l.needsFollowUp);
-  if (filters.readyByMoveIn) {
-    // "unknown" stays in: most sources publish no date, and dropping them
-    // would hide the majority of the market.
-    result = result.filter((l) => l.timing === "ready" || l.timing === "unknown");
-  }
-  if (filters.changedOnly) {
-    result = result.filter((l) => l.unseenEvents > 0 || l.price !== l.originalPrice);
-  }
-  if (filters.source && filters.source !== "all") {
-    result = result.filter((l) => l.alsoOn.some((s) => s.source === filters.source));
-  }
-  if (filters.areas?.length) {
-    const wanted = new Set(filters.areas.map((a) => a.toLowerCase()));
-    result = result.filter((l) => wanted.has(l.neighborhood.toLowerCase()));
-  }
-  if (filters.search) {
-    const needle = filters.search.toLowerCase();
-    result = result.filter((l) =>
-      `${l.address} ${l.unit} ${l.neighborhood} ${l.notes}`.toLowerCase().includes(needle)
-    );
-  }
-
-  const sort = filters.sort ?? "best";
-  const sorters: Record<string, (a: FeedListing, b: FeedListing) => number> = {
-    best: (a, b) => (b.score ?? 0) - (a.score ?? 0),
-    newest: (a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt),
-    cheapest: (a, b) => a.price - b.price,
-    upfront: (a, b) => a.upfrontCost - b.upfrontCost,
-    effective: (a, b) => a.effectiveRent - b.effectiveRent,
-    allin: (a, b) => a.allInMonthly - b.allInMonthly,
-    recent_change: (a, b) =>
-      (b.priceChangedAt ?? b.lastSeenAt).localeCompare(a.priceChangedAt ?? a.lastSeenAt),
-  };
-  result = [...result].sort(sorters[sort] ?? sorters.best);
-
-  return filters.limit ? result.slice(0, filters.limit) : result;
 }
 
 /** Everything known about one listing, for the detail view. */
