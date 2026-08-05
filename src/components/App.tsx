@@ -42,6 +42,8 @@ const CityMap = dynamic(() => import("@/components/CityMap"), {
   ssr: false,
   loading: () => <div className="citymap" aria-busy="true" />,
 });
+// Same constraint, same cure: the planner is Leaflet too.
+const TourPlanner = dynamic(() => import("@/components/TourPlanner"), { ssr: false });
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
 
@@ -152,6 +154,8 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [open, setOpen] = useState<FeedListing | null>(null);
+  /** The tour-day route planner, opened from the pipeline's Tour column. */
+  const [planning, setPlanning] = useState(false);
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
   const [email, setEmail] = useState("");
@@ -1111,6 +1115,7 @@ export default function Home() {
             onOpen={setOpen}
             onMove={moveStage}
             onQuickAdd={quickAdd}
+            onPlanTours={() => setPlanning(true)}
             crewTag={(l) => {
               if (!crew) return null;
               // Point person first — on a working board, "who's on this" beats
@@ -1123,7 +1128,14 @@ export default function Home() {
         )}
 
         {!loading && tab === "compare" && (
-          <Compare listings={listings} onOpen={setOpen} />
+          <Compare
+            listings={listings}
+            onOpen={setOpen}
+            onNotes={async (id, notes) => {
+              await patch(id, { action: "notes", notes });
+              loadFeed();
+            }}
+          />
         )}
 
         {!loading && tab === "profile" && (
@@ -1169,6 +1181,17 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {planning && (
+        <TourPlanner
+          listings={listings}
+          onClose={() => setPlanning(false)}
+          onOpen={(l) => {
+            setPlanning(false);
+            setOpen(l);
+          }}
+        />
+      )}
 
       {openListing && (
         <ListingDrawer

@@ -137,10 +137,18 @@ export function draftTourMessage(listing: FeedListing, profile: Profile): string
   const ask =
     "Any chance you could send a quick video walkthrough when you get a minute? If it looks as good as the photos, I'd love to come tour it right after — I'm flexible on timing.";
 
-  const moveIn = profile.moveInDate
-    ? ` Hoping to move in around ${formatMoveIn(profile.moveInDate)}.`
+  /*
+   * No qualifications in the opener.
+   *
+   * The draft used to lead the second paragraph with income, employment and
+   * the documents on hand. It reads as an application to someone who hasn't
+   * offered you anything yet — and on a first message to a broker the only
+   * question on the table is whether they'll send a video. The packet exists
+   * for the moment that question is settled.
+   */
+  const about = profile.moveInDate
+    ? `Hoping to move in around ${formatMoveIn(profile.moveInDate)}.`
     : "";
-  const about = `${qualifyingLine(profile)}${moveIn}`.trim();
 
   const callback = [profile.phone, profile.email].filter(Boolean).join(" / ");
   const thanks = callback
@@ -153,10 +161,10 @@ export function draftTourMessage(listing: FeedListing, profile: Profile): string
 /**
  * The qualification sentence.
  *
- * This is the part that decides whether you get a viewing. A self-employed
- * applicant who lists no salary reads as unqualified, so when there's no income
- * figure we say why *and* lead with the documents — answering the landlord's
- * objection before they raise it, rather than leaving a gap for them to fill in.
+ * No longer in the first message — that opener is asking for a video, and
+ * leading with your income reads as applying to someone who hasn't offered
+ * you anything. It belongs to the application packet, which is the document
+ * for the moment the question is actually on the table.
  */
 export function qualifyingLine(profile: Profile): string {
   const parts: string[] = [];

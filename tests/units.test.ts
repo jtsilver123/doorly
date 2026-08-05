@@ -10,6 +10,7 @@ import { train, score, features } from "@/lib/rank";
 import {
   bestChannel,
   draftTourMessage,
+  qualifyingLine,
   smsLink,
   normalizePhone,
   reachableOn,
@@ -32,6 +33,7 @@ import { DEFAULT_CONFIG, keyHint } from "@/lib/apikey";
 import { amenitiesOf, qualityScore } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
 import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar.ts";
+import { tourDays } from "../src/lib/tourday.ts";
 import { applyFilters } from "@/lib/filters";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
@@ -359,8 +361,10 @@ test("the tour message names the address, the rent and the move-in date", () => 
   assert.match(message, /55 Morton Street #5J/);
   assert.match(message, /\$3,500/);
   assert.match(message, /Jake/);
-  assert.match(message, /about me/i);
   assert.match(message, /September 1/);
+  // Qualifications belong to the packet, not to a first message asking for
+  // a video — see "the opener does not read like an application".
+  assert.doesNotMatch(message, /about me/i);
   // The small ask before the big one: video first, then the tour.
   assert.match(message, /video walkthrough/i);
   assert.match(message, /tour/i);
@@ -375,11 +379,28 @@ test("the message greets the agent by first name when you know it", () => {
   assert.match(message, /^Hi Jane!/);
 });
 
-test("the message still qualifies you when the profile is empty", () => {
+test("an empty profile still produces a sendable message", () => {
   const bare = { ...DEFAULT_PROFILE, employer: "", income: "", creditNote: "", proofs: [] };
   const message = draftTourMessage(feed(), bare);
-  assert.match(message, /proof of income/i);
   assert.match(message, /55 Morton Street/);
+  assert.match(message, /video walkthrough/i);
+});
+
+test("the opener does not read like an application", () => {
+  // Leading with income to someone who hasn't offered you anything yet reads
+  // as pleading. The first ask is a ninety-second video, nothing more.
+  const message = draftTourMessage(feed(), {
+    ...DEFAULT_PROFILE,
+    name: "Jake",
+    employer: "BetterCampus",
+    employment: "self_employed",
+    income: "$240,000",
+    proofs: ["2025 tax return", "proof of assets"],
+  });
+  assert.doesNotMatch(message, /\$240,000/);
+  assert.doesNotMatch(message, /tax return/i);
+  assert.doesNotMatch(message, /I own BetterCampus/);
+  assert.doesNotMatch(message, /don't draw a salary/);
 });
 
 test("normalizePhone produces a dialable number", () => {
@@ -397,7 +418,7 @@ test("smsLink works with and without a recipient", () => {
 // --- qualifying as a business owner ---------------------------------------
 
 test("a business owner with no salary names the gap and closes it", () => {
-  const message = draftTourMessage(feed(), {
+  const message = qualifyingLine({
     ...DEFAULT_PROFILE,
     name: "Jake",
     employer: "BetterCampus",
@@ -412,7 +433,7 @@ test("a business owner with no salary names the gap and closes it", () => {
 });
 
 test("a salaried applicant does not get the no-salary caveat", () => {
-  const message = draftTourMessage(feed(), {
+  const message = qualifyingLine({
     ...DEFAULT_PROFILE,
     employer: "Acme",
     employment: "employed",
@@ -425,7 +446,7 @@ test("a salaried applicant does not get the no-salary caveat", () => {
 });
 
 test("with no documents listed it still offers them on request", () => {
-  const message = draftTourMessage(feed(), { ...DEFAULT_PROFILE, proofs: [] });
+  const message = qualifyingLine({ ...DEFAULT_PROFILE, proofs: [] });
   assert.match(message, /on request/);
 });
 
@@ -442,7 +463,7 @@ test("the offered action matches what the listing actually has", () => {
 });
 
 test("income on the return is cited as documented, not self-reported", () => {
-  const message = draftTourMessage(feed(), {
+  const message = qualifyingLine({
     ...DEFAULT_PROFILE,
     employer: "BetterCampus",
     employment: "self_employed",
@@ -1304,4 +1325,51 @@ test("the Google link carries the same window as the file", () => {
   const url = googleCalendarUrl(feed({ stage: "tour", tourAt: at }))!;
   const dates = new URL(url).searchParams.get("dates");
   assert.equal(dates, "20260910T150000Z/20260910T153000Z");
+});
+
+// --- the tour day ----------------------------------------------------------
+
+test("tours group by local day and order by time inside it", () => {
+  const days = tourDays([
+    feed({ id: "b", stage: "tour", tourAt: "2026-09-12T19:00:00Z", lat: 40.744, lon: -73.978 }),
+    feed({ id: "a", stage: "tour", tourAt: "2026-09-12T17:00:00Z", lat: 40.727, lon: -73.984 }),
+    feed({ id: "c", stage: "tour", tourAt: "2026-09-13T16:00:00Z", lat: 40.73, lon: -73.99 }),
+    // No time set: a booked tour without a time can't be routed.
+    feed({ id: "d", stage: "tour", tourAt: null }),
+    // Not in the tour column at all.
+    feed({ id: "e", stage: "interested", tourAt: "2026-09-12T18:00:00Z" }),
+  ]);
+  assert.equal(days.length, 2);
+  assert.deepEqual(days[0].stops.map((s) => s.listing.id), ["a", "b"]);
+  assert.deepEqual(days[1].stops.map((s) => s.listing.id), ["c"]);
+});
+
+test("the walk between stops is estimated and the first leg is null", () => {
+  const days = tourDays([
+    feed({ id: "a", stage: "tour", tourAt: "2026-09-12T17:00:00Z", lat: 40.727, lon: -73.984 }),
+    feed({ id: "b", stage: "tour", tourAt: "2026-09-12T19:00:00Z", lat: 40.744, lon: -73.978 }),
+  ]);
+  const [first, second] = days[0].stops;
+  assert.equal(first.walkMinutes, null);
+  // ~1.9km straight-line, grid factor 1.3, 80m/min → about half an hour.
+  assert.ok(second.walkMinutes! >= 25 && second.walkMinutes! <= 40, `${second.walkMinutes}`);
+  assert.equal(second.tight, false);
+});
+
+test("a walk that cannot fit its gap is flagged tight", () => {
+  const days = tourDays([
+    feed({ id: "a", stage: "tour", tourAt: "2026-09-12T17:00:00Z", lat: 40.727, lon: -73.984 }),
+    // 30 minutes later, ~30 minutes' walk away: the viewing itself makes it late.
+    feed({ id: "b", stage: "tour", tourAt: "2026-09-12T17:30:00Z", lat: 40.744, lon: -73.978 }),
+  ]);
+  assert.equal(days[0].stops[1].tight, true);
+});
+
+test("stops without coordinates keep their place but estimate nothing", () => {
+  const days = tourDays([
+    feed({ id: "a", stage: "tour", tourAt: "2026-09-12T17:00:00Z", lat: null, lon: null }),
+    feed({ id: "b", stage: "tour", tourAt: "2026-09-12T19:00:00Z", lat: 40.744, lon: -73.978 }),
+  ]);
+  assert.equal(days[0].stops.length, 2);
+  assert.equal(days[0].stops[1].walkMinutes, null);
 });

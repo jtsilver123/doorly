@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import type { FeedListing } from "@/types";
 import { STAGE_LABEL } from "@/types";
 import { CONTACT_LABEL } from "@/lib/outreach";
 import { AMENITIES } from "@/lib/amenities";
 import { RatingDisc } from "@/components/Rating";
+import Icon from "@/components/Icon";
+import { useAutosave, saveLabel } from "@/lib/useAutosave";
 
 /**
  * Decision night.
@@ -15,9 +18,67 @@ import { RatingDisc } from "@/components/Rating";
  * the finalists side by side on the numbers that decide it, with the best value
  * in each row marked, so the trade you're making is visible instead of felt.
  *
- * Finalists = starred, or anywhere in the active pipeline. No separate
- * "add to compare" step — the shortlist you already built is the comparison.
+ * Finalists default to starred-or-in-the-pipeline, because the shortlist you
+ * already built is the comparison and a separate "add to compare" step is
+ * busywork. But the default is only a default: on decision night you want to
+ * put two specific places next to each other, drag the one you're leaning
+ * toward into the first column, and write down what you actually thought
+ * while standing in the kitchen. So the set, the order, and the notes are all
+ * yours to change.
+ *
+ * The set and the order live in localStorage rather than the database: they
+ * are a view of your own pipeline that changes twice an hour on the night it
+ * matters and never again. The notes are real content and go to the server.
  */
+
+const ORDER_KEY = "doorly.compare.order";
+const OUT_KEY = "doorly.compare.excluded";
+
+/** Reads a string array out of localStorage without trusting what it finds. */
+function readList(key: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+    return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * One column's notes.
+ *
+ * Its own component so each cell can hold its own autosave timer — hooks
+ * can't be called in a loop, and a single shared debounce would let a note
+ * typed in column three overwrite column one.
+ */
+function NoteCell({
+  listing,
+  onSave,
+}: {
+  listing: FeedListing;
+  onSave: (id: string, notes: string) => Promise<void> | void;
+}) {
+  const [text, setText] = useState(listing.notes);
+  useEffect(() => setText(listing.notes), [listing.id, listing.notes]);
+  const state = useAutosave(text, (next) => onSave(listing.id, next));
+
+  return (
+    <div className="compare-note">
+      <textarea
+        className="field"
+        rows={3}
+        value={text}
+        placeholder="Loud at 8pm. Kitchen smaller than the photos…"
+        aria-label={`Notes on ${listing.address}`}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <span className="savestate" data-state={state}>
+        {saveLabel(state)}
+      </span>
+    </div>
+  );
+}
 
 const money = (n: number) => `$${n.toLocaleString()}`;
 
@@ -90,16 +151,83 @@ const ROWS: Row[] = [
 export default function Compare({
   listings,
   onOpen,
+  onNotes,
 }: {
   listings: FeedListing[];
   onOpen: (l: FeedListing) => void;
+  onNotes: (id: string, notes: string) => Promise<void> | void;
 }) {
-  const finalists = listings
-    .filter((l) => l.starred || !["inbox", "passed", "closed"].includes(l.stage))
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 5);
+  const [order, setOrder] = useState<string[]>([]);
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [dragging, setDragging] = useState<string | null>(null);
 
-  if (finalists.length < 2) {
+  // localStorage is only readable after mount; reading it in the initialiser
+  // would render different markup on the server and hydrate mismatched.
+  useEffect(() => {
+    setOrder(readList(ORDER_KEY));
+    setExcluded(readList(OUT_KEY));
+  }, []);
+
+  function persist(key: string, value: string[]) {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* private mode; the session still works, it just won't be remembered */
+    }
+  }
+
+  /** Everything eligible to be compared, before your inclusions and order. */
+  const candidates = useMemo(
+    () =>
+      listings
+        .filter((l) => l.starred || !["inbox", "passed", "closed"].includes(l.stage))
+        .sort((a, b) => b.rating - a.rating),
+    [listings]
+  );
+
+  const finalists = useMemo(() => {
+    const kept = candidates.filter((l) => !excluded.includes(l.id));
+    // Anything you've dragged leads, in your order; the rest follow by rating.
+    const ranked = order
+      .map((id) => kept.find((l) => l.id === id))
+      .filter((l): l is FeedListing => Boolean(l));
+    const rest = kept.filter((l) => !order.includes(l.id));
+    return [...ranked, ...rest].slice(0, 5);
+  }, [candidates, excluded, order]);
+
+  /** Drop `id` where `target` currently sits. */
+  function reorder(id: string, target: string) {
+    if (id === target) return;
+    const ids = finalists.map((l) => l.id);
+    const from = ids.indexOf(id);
+    const to = ids.indexOf(target);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ...ids.splice(from, 1));
+    setOrder(ids);
+    persist(ORDER_KEY, ids);
+  }
+
+  /** Keyboard equivalent, because dragging is not available to everyone. */
+  function nudge(id: string, delta: number) {
+    const ids = finalists.map((l) => l.id);
+    const at = ids.indexOf(id);
+    const to = at + delta;
+    if (at < 0 || to < 0 || to >= ids.length) return;
+    [ids[at], ids[to]] = [ids[to], ids[at]];
+    setOrder(ids);
+    persist(ORDER_KEY, ids);
+  }
+
+  function toggle(id: string) {
+    const next = excluded.includes(id)
+      ? excluded.filter((x) => x !== id)
+      : [...excluded, id];
+    setExcluded(next);
+    persist(OUT_KEY, next);
+  }
+
+  if (candidates.length < 2) {
     return (
       <div className="surface" style={{ padding: 24 }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Nothing to compare yet</div>
@@ -148,6 +276,55 @@ export default function Compare({
 
   return (
     <div className="compare-wrap">
+      {/*
+        Which places are in the table, and in what order. Both are decisions
+        you make on the night, so they're one click away rather than derived
+        and unchangeable.
+      */}
+      <div className="compare-bar">
+        <button className="btn" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
+          <Icon name="filter" size={15} />
+          {finalists.length} of {candidates.length} places
+        </button>
+        <span className="muted">
+          Drag a column heading to reorder, or focus one and use ← →.
+        </span>
+        {excluded.length > 0 && (
+          <button
+            className="linkish"
+            onClick={() => {
+              setExcluded([]);
+              persist(OUT_KEY, []);
+            }}
+          >
+            Put back {excluded.length}
+          </button>
+        )}
+      </div>
+
+      {picking && (
+        <div className="compare-pick" role="group" aria-label="Places to compare">
+          {candidates.map((l) => {
+            const on = !excluded.includes(l.id);
+            const full = on && !finalists.some((f) => f.id === l.id);
+            return (
+              <button
+                key={l.id}
+                className={on ? "pill is-on" : "pill"}
+                aria-pressed={on}
+                onClick={() => toggle(l.id)}
+                title={full ? "Included, but the table shows five at a time" : undefined}
+              >
+                {on && <Icon name="check" size={12} />}
+                {l.address}
+                {l.unit ? ` #${l.unit}` : ""}
+                {full && <span className="muted"> · over five</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="surface" style={{ overflowX: "auto" }}>
       <table className="compare">
         <thead>
@@ -155,16 +332,55 @@ export default function Compare({
             <th />
             {finalists.map((l) => (
               <th key={l.id}>
-                <button className="compare-head" onClick={() => onOpen(l)}>
+                <button
+                  className="compare-head"
+                  draggable
+                  data-dragging={dragging === l.id ? "true" : undefined}
+                  onClick={() => onOpen(l)}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", l.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragging(l.id);
+                  }}
+                  onDragOver={(e) => {
+                    // Without preventDefault the browser refuses the drop.
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    reorder(e.dataTransfer.getData("text/plain"), l.id);
+                    setDragging(null);
+                  }}
+                  onDragEnd={() => setDragging(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      nudge(l.id, -1);
+                    } else if (e.key === "ArrowRight") {
+                      e.preventDefault();
+                      nudge(l.id, 1);
+                    }
+                  }}
+                  aria-label={`${l.address}. Left and right arrows move this column.`}
+                >
                   <span className="compare-rating">
                     <RatingDisc rating={l.rating} grade={l.grade} size="sm" />
                     <span className="muted">{l.ratingHeadline}</span>
                   </span>
-                  <span style={{ fontWeight: 600 }}>
+                  <span className="compare-addr">
                     {l.address}
                     {l.unit ? ` #${l.unit}` : ""}
                   </span>
                   <span className="muted">{l.neighborhood}</span>
+                </button>
+                <button
+                  className="compare-drop"
+                  onClick={() => toggle(l.id)}
+                  title="Take this out of the comparison"
+                  aria-label={`Remove ${l.address} from the comparison`}
+                >
+                  <Icon name="close" size={13} />
                 </button>
               </th>
             ))}
@@ -185,11 +401,13 @@ export default function Compare({
               </tr>
             );
           })}
+          {/* Written on the night, in the row where you're comparing them —
+              not in a panel you'd have to open one place at a time. */}
           <tr>
             <td className="muted compare-label">Your notes</td>
             {finalists.map((l) => (
-              <td key={l.id} className="muted" style={{ fontSize: 12, maxWidth: 180 }}>
-                {l.notes || "—"}
+              <td key={l.id} className="compare-notecell">
+                <NoteCell listing={l} onSave={onNotes} />
               </td>
             ))}
           </tr>

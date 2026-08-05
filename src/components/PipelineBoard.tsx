@@ -5,6 +5,7 @@ import type { FeedListing, Stage } from "@/types";
 import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
 import { nextAction } from "@/lib/nextAction";
+import Icon from "@/components/Icon";
 
 /**
  * The pipeline board.
@@ -43,6 +44,7 @@ export default function PipelineBoard({
   onOpen,
   onMove,
   onQuickAdd,
+  onPlanTours,
   crewTag,
 }: {
   listings: FeedListing[];
@@ -50,6 +52,8 @@ export default function PipelineBoard({
   onMove: (listing: FeedListing, stage: Stage) => void;
   /** Address typed into the quick-add box. Resolved by the page. */
   onQuickAdd: (address: string) => void;
+  /** Opens the tour-day route planner. */
+  onPlanTours: () => void;
   /**
    * Tag-team line for a card — "Emma has point", "via Dad" — or null when
    * solo. Computed by the page, which holds the roster.
@@ -125,7 +129,23 @@ export default function PipelineBoard({
           >
             <div className="board-head">
               <span>{STAGE_LABEL[stage]}</span>
-              <span className="muted">{column.length}</span>
+              <span className="board-head-side">
+                {/* The Tour column is the one with a geography problem: the
+                    bookings have times and addresses, so the app can draw
+                    the day instead of leaving you to zigzag. */}
+                {stage === "tour" && column.some((l) => l.tourAt) && (
+                  <button
+                    className="board-plan"
+                    onClick={onPlanTours}
+                    title="Map your tour days — order, route and walking time"
+                    aria-label="Plan your tour route"
+                  >
+                    <Icon name="calendar" size={13} />
+                    Plan
+                  </button>
+                )}
+                <span className="muted">{column.length}</span>
+              </span>
             </div>
 
             <div className="board-stack">
