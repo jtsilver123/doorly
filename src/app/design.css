@@ -1972,3 +1972,63 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 .quickadd .field { flex: 1; }
+
+/* --- the rail ------------------------------------------------------------- */
+
+.brandblock { display: grid; gap: var(--s2); }
+.brandrow { display: flex; align-items: center; gap: var(--s2); }
+
+/* The mark follows the accent, so it reads in either theme rather than being
+   a fixed-colour asset fighting the background. */
+.logo { flex-shrink: 0; }
+.logo-face { fill: var(--accent); }
+.logo-pane { fill: color-mix(in srgb, #fff 78%, var(--accent)); opacity: 0.42; }
+.logo-lit { fill: #ffd66b; }
+.logo-door { stroke: color-mix(in srgb, #fff 78%, var(--accent)); stroke-width: 1.6; opacity: 0.5; }
+
+.brandmeta {
+  display: grid;
+  gap: 1px;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
+.brandmeta .warn-text { font-weight: 600; }
+
+/* Refresh and the budget it spends, as one object. They were at opposite ends
+   of the rail with no way to tell they were related. */
+.railfoot { margin-top: auto; display: grid; gap: var(--s3); }
+
+.refresh {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  min-height: fit-content;
+}
+
+.refresh > .btn-primary { border-radius: 0; border: none; height: 38px; }
+
+.usage {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: var(--s3);
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  text-align: left;
+  color: inherit;
+}
+
+.usage:hover { background: var(--border); }
+.usage-top { font-size: var(--t-xs); color: var(--text-muted); }
+
+.usage-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  font-size: 10px;
+  color: var(--text-muted);
+}

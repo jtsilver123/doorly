@@ -30,6 +30,7 @@ import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
+import Logo from "@/components/Logo";
 import MapView from "@/components/MapView";
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
@@ -102,7 +103,6 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [open, setOpen] = useState<FeedListing | null>(null);
-  const [adding, setAdding] = useState(false);
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [email, setEmail] = useState("");
   const [budget, setBudget] = useState(0);
@@ -333,30 +333,20 @@ export default function Home() {
    * copy of it would split its price history and its notes in two.
    */
   const quickAdd = useCallback(
-    async (address: string) => {
-      const needle = address.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const hit = listings.find(
-        (l) => l.address.toLowerCase().replace(/[^a-z0-9]/g, "").includes(needle) && needle.length > 5
-      );
+    (address: string) => {
+      const hit = applyFilters(listings, { stage: "all", search: address })[0];
       if (hit) {
         moveStage(hit, "interested");
         setOpen(hit);
         toast({ message: `Found it — ${hit.address} is in your pipeline`, tone: "good" });
         return;
       }
-      const res = await fetch("/api/listings", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address, price: 0, url: "" }),
+      toast({
+        message: `Nothing matching "${address}" yet. It'll appear after the next check.`,
+        tone: "warn",
       });
-      const body = await res.json();
-      if (body.error) toast({ message: body.error, tone: "warn" });
-      else {
-        await loadFeed();
-        toast({ message: `Added ${address}. Open it to fill in the rest.`, tone: "good" });
-      }
     },
-    [listings, moveStage, loadFeed, toast]
+    [listings, moveStage, toast]
   );
 
   const pass = useCallback(
@@ -657,19 +647,21 @@ export default function Home() {
         Skip to listings
       </a>
       <nav className="sidebar" aria-label="Sections">
-        <div>
-          <div className="brand">Homefinder</div>
-          <div className="muted" style={{ fontSize: 11 }}>
-            {counts.active} live · {counts.changed} changed
+        <div className="brandblock">
+          <div className="brandrow">
+            <Logo />
+            <span className="brand">Homefinder</span>
           </div>
-          {daysToMove > 0 && (
-            <div
-              className={daysToMove <= 21 ? "warn-text" : "muted"}
-              style={{ fontSize: 11, fontWeight: 600 }}
-            >
-              {daysToMove} days to move-in
-            </div>
-          )}
+          <div className="brandmeta">
+            <span>
+              {counts.active} live · {counts.changed} changed
+            </span>
+            {daysToMove > 0 && (
+              <span className={daysToMove <= 21 ? "warn-text" : undefined}>
+                {daysToMove} days to move-in
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mobile-nav" style={{ display: "grid", gap: 2 }}>
@@ -714,42 +706,71 @@ export default function Home() {
           </button>
         )}
 
-        {api?.usage && (
-          <button className="usage" onClick={() => setTab("profile")} title="Manage API key">
-            <div className="usage-top">
-              <span>API requests</span>
-              <span className={api.usage.remaining <= 25 ? "warn-text" : "muted"}>
-                {api.usage.used}/{api.usage.limit}
-              </span>
-            </div>
-            <div className="meter">
-              <span
-                style={{
-                  width: `${Math.min(100, (api.usage.used / api.usage.limit) * 100)}%`,
-                  background:
-                    api.usage.remaining <= 25 ? "var(--warn)" : "var(--accent)",
-                }}
-              />
-            </div>
-            <div className="muted" style={{ fontSize: 10 }}>
-              {api.usage.remaining} left ·{" "}
-              {(() => {
-                const d = runwayDays(
-                  api.usage.remaining,
-                  api.checksPerDay,
-                  Math.max(api.perPollEstimate ?? 5, 1)
-                );
-                return d == null
-                  ? "manual checks only"
-                  : d <= 3
-                    ? `new key needed in ${d}d`
-                    : `key lasts ~${d}d at current pace`;
-              })()}
-            </div>
-          </button>
-        )}
+        {/*
+          Checking for listings and the budget that check spends are one
+          subject, and they were at opposite ends of the rail — a meter in the
+          middle, the button that moves it at the bottom, with no way to tell
+          they were related.
+        */}
+        <div className="railfoot">
+          <div className="refresh">
+            <button
+              className="btn btn-primary"
+              onClick={refresh}
+              disabled={refreshing}
+            >
+              {refreshing ? "Checking…" : "Check for new"}
+            </button>
 
-        <div style={{ marginTop: "auto", display: "grid", gap: 6 }}>
+            {api?.usage && (
+              <button
+                className="usage"
+                onClick={() => {
+                  setSection("api");
+                  setTab("profile");
+                }}
+                title="Change your key or how often we check"
+              >
+                <span className="usage-top">
+                  <span>
+                    {api.lastCheckedAt
+                      ? `Checked ${sinceText(api.lastCheckedAt)}`
+                      : "Not checked yet"}
+                    {api.checksPerDay > 0 ? ` · auto ${api.checksPerDay}×/day` : " · auto off"}
+                  </span>
+                </span>
+                <span className="meter">
+                  <span
+                    style={{
+                      width: `${Math.min(100, (api.usage.used / api.usage.limit) * 100)}%`,
+                      background:
+                        api.usage.remaining <= 25 ? "var(--warn)" : "var(--accent)",
+                    }}
+                  />
+                </span>
+                <span className="usage-foot">
+                  <span className={api.usage.remaining <= 25 ? "warn-text" : undefined}>
+                    {api.usage.remaining} of {api.usage.limit} requests left
+                  </span>
+                  <span>
+                    {(() => {
+                      const d = runwayDays(
+                        api.usage.remaining,
+                        api.checksPerDay,
+                        Math.max(api.perPollEstimate ?? 5, 1)
+                      );
+                      return d == null
+                        ? "manual only"
+                        : d <= 3
+                          ? `new key in ${d}d`
+                          : `~${d}d left`;
+                    })()}
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
+
           <AccountMenu
             email={email}
             name={profile.name}
@@ -758,21 +779,6 @@ export default function Home() {
               setTab("profile");
             }}
           />
-          <button className="btn" onClick={() => setAdding(true)}>
-            + Add a place
-          </button>
-          <button className="btn btn-primary" onClick={refresh} disabled={refreshing}>
-            {refreshing ? "Checking…" : "Check for new"}
-          </button>
-          {api?.lastCheckedAt && (
-            <div className="muted" style={{ fontSize: 10, textAlign: "center" }}>
-              Last checked {sinceText(api.lastCheckedAt)}
-              {api.checksPerDay > 0
-                ? ` · auto ${api.checksPerDay}×/day`
-                : " · auto off"}
-            </div>
-          )}
-  
         </div>
       </nav>
 
@@ -908,7 +914,6 @@ export default function Home() {
               <Empty
                 filtered={listings.length > 0}
                 onRefresh={refresh}
-                onAdd={() => setAdding(true)}
                 onClear={clearFilters}
               />
             ) : view === "map" ? (
@@ -1064,16 +1069,6 @@ export default function Home() {
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
 
-      {adding && (
-        <AddListing
-          onClose={() => setAdding(false)}
-          onAdded={async () => {
-            setAdding(false);
-            await loadFeed();
-            toast({ message: "Added to your pipeline", tone: "good" });
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -1113,12 +1108,10 @@ function SkeletonGrid() {
 function Empty({
   filtered,
   onRefresh,
-  onAdd,
   onClear,
 }: {
   filtered: boolean;
   onRefresh: () => void;
-  onAdd: () => void;
   onClear: () => void;
 }) {
   return (
@@ -1129,7 +1122,7 @@ function Empty({
       <p className="empty-body">
         {filtered
           ? "Everything we're tracking got filtered out. Clearing the filters will bring the full list back."
-          : "Pull listings from StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, or add a place you found yourself."}
+          : "Pull listings from StreetEasy, Zillow, Apartments.com, HotPads and Craigslist."}
       </p>
       <div className="empty-actions">
         {filtered ? (
@@ -1141,98 +1134,8 @@ function Empty({
             Find listings now
           </button>
         )}
-        <button className="btn" onClick={onAdd}>
-          Add a place manually
-        </button>
       </div>
     </div>
-  );
-}
-
-/** Anything the scrapers missed still belongs in the pipeline. */
-function AddListing({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
-  const [form, setForm] = useState({
-    address: "",
-    price: "",
-    bedrooms: "0",
-    neighborhood: "",
-    url: "",
-    contactName: "",
-    contactPhone: "",
-    contactEmail: "",
-    notes: "",
-  });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit() {
-    setBusy(true);
-    setError("");
-    const res = await fetch("/api/listings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...form, price: Number(form.price) }),
-    });
-    const body = await res.json();
-    setBusy(false);
-    if (body.error) setError(body.error);
-    else onAdded();
-  }
-
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm({ ...form, [k]: e.target.value });
-
-  return (
-    <>
-      <div className="scrim" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-label="Add a place">
-        <header className="drawer-head">
-          <strong>Add a place</strong>
-          <button className="btn" onClick={onClose}>
-            ✕
-          </button>
-        </header>
-        <div style={{ padding: 16, display: "grid", gap: 10, overflowY: "auto" }}>
-          <div className="muted" style={{ fontSize: 12 }}>
-            For somewhere a friend sent you, a broker emailed, or a sign in a window.
-            It joins the same pipeline and outreach flow as everything else.
-          </div>
-          {(
-            [
-              ["address", "Address *", "55 Morton Street #5J"],
-              ["price", "Monthly rent *", "3500"],
-              ["bedrooms", "Bedrooms (0 = studio)", "1"],
-              ["neighborhood", "Neighborhood", "West Village"],
-              ["url", "Link", "https://…"],
-              ["contactName", "Agent / landlord", "Jane at Corcoran"],
-              ["contactPhone", "Their phone", "(212) 555-0134"],
-              ["contactEmail", "Their email", "jane@example.com"],
-              ["notes", "Notes", "Saw a sign in the window"],
-            ] as [keyof typeof form, string, string][]
-          ).map(([key, label, placeholder]) => (
-            <label key={key} style={{ display: "grid", gap: 4, fontSize: 12 }}>
-              <span className="muted">{label}</span>
-              <input
-                className="field"
-                value={form[key]}
-                placeholder={placeholder}
-                onChange={set(key)}
-              />
-            </label>
-          ))}
-          {error && (
-            <div style={{ color: "var(--warn)", fontSize: 12 }}>{error}</div>
-          )}
-          <button
-            className="btn btn-primary"
-            disabled={busy || !form.address || !form.price}
-            onClick={submit}
-          >
-            {busy ? "Adding…" : "Add to pipeline"}
-          </button>
-        </div>
-      </aside>
-    </>
   );
 }
 

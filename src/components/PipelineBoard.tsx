@@ -64,9 +64,10 @@ export default function PipelineBoard({
   return (
     <>
       {/*
-        Somebody sends you an address. Before this, getting it onto the board
-        meant opening a modal and filling in a form — enough friction that the
-        tip stayed in the text message it arrived in.
+        Somebody sends you an address. This finds it in what's already tracked
+        and moves it onto the board — everything gets posted somewhere, so a
+        miss means the poll hasn't reached it yet, not that it wants typing in
+        by hand.
       */}
       <form
         className="quickadd"
@@ -80,12 +81,12 @@ export default function PipelineBoard({
         <input
           className="field"
           value={quick}
-          placeholder="Paste an address to add it — 91 East Third Street"
-          aria-label="Add a place by address"
+          placeholder="Paste an address to pull it in — 91 East Third Street"
+          aria-label="Find a place by address"
           onChange={(e) => setQuick(e.target.value)}
         />
         <button className="btn btn-primary" type="submit" disabled={!quick.trim()}>
-          Add
+          Find it
         </button>
       </form>
 
