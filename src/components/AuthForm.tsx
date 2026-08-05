@@ -100,6 +100,24 @@ export default function AuthForm({
             </p>
           </div>
 
+          {/* A real name, because a crew card saying "via Emma" is the whole
+              point — nobody wants help from "jt.silver.92". */}
+          {signup && (
+            <label className="auth-field">
+              <span>Your name</span>
+              <input
+                className="field"
+                name="name"
+                type="text"
+                autoComplete="name"
+                placeholder="First name is fine"
+                maxLength={80}
+                required
+                autoFocus
+              />
+            </label>
+          )}
+
           <label className="auth-field">
             <span>Email</span>
             <input
@@ -109,7 +127,7 @@ export default function AuthForm({
               autoComplete="email"
               placeholder="you@example.com"
               required
-              autoFocus
+              autoFocus={!signup}
             />
           </label>
 

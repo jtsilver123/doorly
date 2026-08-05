@@ -72,12 +72,33 @@ export async function signIn(_prev: AuthResult, formData: FormData): Promise<Aut
 export async function signUp(_prev: AuthResult, formData: FormData): Promise<AuthResult> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const name = String(formData.get("name") ?? "").trim().slice(0, 80);
   if (!email || !password) return { error: "Email and password are both needed." };
   if (password.length < 8) return { error: "Use at least 8 characters." };
+  if (!name) return { error: "Tell us your name — it's how your crew sees you." };
 
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    // Into auth metadata AND the profile below: metadata survives even if
+    // the profile write fails, and Google users get theirs the same way.
+    options: { data: { name } },
+  });
   if (error) return { error: error.message };
+
+  // The whole point of asking: "via Emma" instead of "via emma.k.92". Only
+  // possible immediately when signup returns a session (no email confirm).
+  if (data.session && data.user) {
+    await supabase.from("user_profile").upsert(
+      {
+        user_id: data.user.id,
+        profile: { name },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+  }
 
   // With email confirmation on, there's a session only after the link is
   // clicked. Say which happened rather than dumping the user on a blank app.

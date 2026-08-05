@@ -88,8 +88,29 @@ export function MyScoreField({
   onChange: (score: number | null) => void;
 }) {
   const [draft, setDraft] = useState<number>(score ?? 70);
+  // Unscored stays visibly *nothing* — a slider resting at 70 reads as a 70
+  // you never gave. The control only appears once you ask for it.
+  const [editing, setEditing] = useState(false);
   // A different listing in the same panel starts from its own score.
-  useEffect(() => setDraft(score ?? 70), [score]);
+  useEffect(() => {
+    setDraft(score ?? 70);
+    setEditing(false);
+  }, [score]);
+
+  if (score == null && !editing) {
+    return (
+      <div className="myscore-field">
+        <button className="btn" style={{ justifySelf: "start" }} onClick={() => setEditing(true)}>
+          Score it yourself
+        </button>
+        <div className="myscore-foot">
+          <span className="muted">
+            Yours shows on the card next to ours, and wins the sort
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="myscore-field">

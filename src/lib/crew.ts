@@ -86,11 +86,23 @@ export async function crewOf(userId?: string): Promise<CrewInfo | null> {
   const emailOf = new Map(
     (authUsers?.users ?? []).map((u) => [u.id, u.email ?? ""])
   );
+  // Signup and Google both stash a display name in auth metadata; it's the
+  // fallback when the profile hasn't been filled in yet.
+  const metaNameOf = new Map(
+    (authUsers?.users ?? []).map((u) => [
+      u.id,
+      String(u.user_metadata?.name ?? u.user_metadata?.full_name ?? "").trim(),
+    ])
+  );
 
   const member = (id: string, role: CrewMember["role"]): CrewMember => ({
     userId: id,
     email: emailOf.get(id) ?? "",
-    name: nameOf.get(id) || (emailOf.get(id) ?? "").split("@")[0] || "Someone",
+    name:
+      nameOf.get(id) ||
+      metaNameOf.get(id) ||
+      (emailOf.get(id) ?? "").split("@")[0] ||
+      "Someone",
     role,
     isYou: id === uid,
   });
