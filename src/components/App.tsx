@@ -160,6 +160,8 @@ export default function Home() {
   const [crew, setCrew] = useState<CrewView | null>(null);
   const [email, setEmail] = useState("");
   const [budget, setBudget] = useState(0);
+  /** The saved search's neighborhoods — what "Where" actually means. */
+  const [searchAreas, setSearchAreas] = useState<string[]>([]);
   const [focus, setFocus] = useState(0);
   const { toasts, push: toast, dismiss } = useToasts();
 
@@ -319,6 +321,7 @@ export default function Home() {
       .then((b) => {
         const first = (b.searches ?? [])[0];
         if (first?.criteria?.priceMax) setBudget(first.criteria.priceMax);
+        if (Array.isArray(first?.criteria?.areas)) setSearchAreas(first.criteria.areas);
       })
       .catch(() => {});
     fetch("/api/profile")
@@ -882,9 +885,13 @@ export default function Home() {
           <SearchHeader
             listings={listings}
             budget={budget}
+            searchAreas={searchAreas}
             moveInDate={profile.moveInDate}
             onSave={saveSearchBasics}
-            onEditSearch={() => setTab("profile")}
+            onEditSearch={() => {
+              setSection("search");
+              setTab("profile");
+            }}
           />
             )}
 
@@ -1295,6 +1302,8 @@ function ApiSettings({
   const [checks, setChecks] = useState(String(status?.checksPerDay ?? 2));
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  /** Focused after the renewal card sends you to the dashboard. */
+  const keyInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!status) return;
@@ -1427,10 +1436,44 @@ function ApiSettings({
         </span>
       </label>
 
+      {/*
+        Renewal, made mindless. The free tier runs dry mid-hunt by design, and
+        the old answer was a paragraph of instructions from onboarding you'd
+        long forgotten. When the runway is short this card walks the whole
+        loop: open the dashboard (new tab), copy the key, paste it here — and
+        the input is focused for you when you come back.
+      */}
+      {status && (days == null ? status.usage.remaining <= 25 : days <= 3) && (
+        <div className="keyrenew" role="status">
+          <div className="keyrenew-copy">
+            <b>
+              {status.usage.remaining <= 0
+                ? "This key is spent."
+                : `About ${status.usage.remaining} requests left on this key.`}
+            </b>
+            <span>
+              A fresh one takes a minute and resets the meter — same account,
+              new key.
+            </span>
+          </div>
+          <a
+            className="btn btn-primary"
+            href="https://realtyapi.io/dashboard"
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => keyInputRef.current?.focus()}
+          >
+            Get a fresh key
+            <Icon name="external" size={13} />
+          </a>
+        </div>
+      )}
+
       <div className="fieldgrid">
       <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
         <span className="muted">New API key — saves when you click away</span>
         <input
+          ref={keyInputRef}
           className="field"
           value={key}
           placeholder="rt_…"
@@ -1440,6 +1483,13 @@ function ApiSettings({
             if (e.key === "Enter") saveKey();
           }}
         />
+        <span className="muted" style={{ fontSize: 11 }}>
+          From{" "}
+          <a href="https://realtyapi.io/dashboard" target="_blank" rel="noreferrer">
+            realtyapi.io/dashboard
+          </a>{" "}
+          — copy, paste, done. Usage resets the moment it saves.
+        </span>
       </label>
 
         <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FeedListing } from "@/types";
+import { AREAS } from "@/lib/areas";
 import { daysUntil } from "@/lib/cost";
 
 /**
@@ -27,12 +28,15 @@ import { daysUntil } from "@/lib/cost";
 export default function SearchHeader({
   listings,
   budget,
+  searchAreas = [],
   moveInDate,
   onSave,
   onEditSearch,
 }: {
   listings: FeedListing[];
   budget: number;
+  /** Slugs from the saved search. The Where fact reports these. */
+  searchAreas?: string[];
   moveInDate: string;
   /** Persists a change to either input. Both are optional; only what moved. */
   onSave: (next: { budget?: number; moveInDate?: string }) => void | Promise<void>;
@@ -80,13 +84,17 @@ export default function SearchHeader({
   // worth saying plainly, with the number that would fix it.
   const tooLow = share != null && share < 15 && priced.length >= 20;
   /*
-   * "Neighborhoods" told you nothing — it was a label wearing a value's
-   * clothes. The set actually being tracked is the useful answer: one area by
-   * name, or how many.
+   * What "Where" reports is the saved search, not the corpus. Counting
+   * distinct listing neighborhoods looked right until geocoding got finer
+   * than the picker: five chosen areas resolve to twenty-one NTA names, and
+   * the fact read "21 areas" to somebody who picked five.
    */
-  const hoods = new Set(listings.map((l) => l.neighborhood).filter(Boolean));
   const areaLabel =
-    hoods.size === 0 ? "Anywhere" : hoods.size === 1 ? [...hoods][0] : `${hoods.size} areas`;
+    searchAreas.length === 0
+      ? "Anywhere"
+      : searchAreas.length === 1
+        ? (AREAS.find((a) => a.slug === searchAreas[0])?.label ?? searchAreas[0])
+        : `${searchAreas.length} areas`;
 
   const dateLabel = moveInDate
     ? new Date(`${moveInDate}T12:00:00Z`).toLocaleDateString("en-US", {

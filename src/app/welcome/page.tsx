@@ -4,12 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AreaPicker from "@/components/AreaPicker";
 import type { Source } from "@/types";
-import {
-  ALL_SOURCES,
-  DEFAULT_PREFERRED_SOURCE,
-  LAYOUT_PRESETS,
-  SOURCE_LABEL,
-} from "@/types";
+import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
+import BedBathPicker from "@/components/BedBathPicker";
 
 /**
  * Setup.
@@ -203,31 +199,18 @@ export default function Welcome() {
 
             <div className="welcome-field">
               <span className="muted">What layout?</span>
-              <div className="welcome-chips">
-                {LAYOUT_PRESETS.map((preset) => {
-                  const active =
-                    Number(bedMin) === preset.bedMin &&
-                    (preset.bedMax === null
-                      ? bedMax === "any"
-                      : Number(bedMax) === preset.bedMax) &&
-                    Number(bathMin) === preset.bathMin;
-                  return (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      className={active ? "btn btn-primary" : "btn"}
-                      style={{ fontSize: 12, padding: "5px 10px" }}
-                      onClick={() => {
-                        setBedMin(String(preset.bedMin));
-                        setBedMax(preset.bedMax === null ? "any" : String(preset.bedMax));
-                        setBathMin(String(preset.bathMin));
-                      }}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <BedBathPicker
+                value={{
+                  bedMin: Number(bedMin) || 0,
+                  bedMax: bedMax === "any" ? null : Number(bedMax),
+                  bathMin: Number(bathMin) || 0,
+                }}
+                onChange={(next) => {
+                  setBedMin(String(next.bedMin));
+                  setBedMax(next.bedMax == null ? "any" : String(next.bedMax));
+                  setBathMin(String(next.bathMin));
+                }}
+              />
             </div>
 
             <div className="welcome-row">
@@ -239,19 +222,6 @@ export default function Welcome() {
                   value={priceMax}
                   onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
                 />
-              </label>
-              <label className="welcome-field">
-                <span className="muted">Baths</span>
-                <select
-                  className="field"
-                  value={bathMin}
-                  onChange={(e) => setBathMin(e.target.value)}
-                >
-                  <option value="0">Any</option>
-                  <option value="1">1+</option>
-                  <option value="1.5">1.5+</option>
-                  <option value="2">2+</option>
-                </select>
               </label>
               <label className="welcome-field">
                 <span className="muted">Move in by</span>

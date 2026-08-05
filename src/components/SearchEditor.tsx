@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { AREAS } from "@/lib/areas";
 import AreaPicker from "@/components/AreaPicker";
-import { LAYOUT_PRESETS, type SavedSearch } from "@/types";
+import type { SavedSearch } from "@/types";
+import BedBathPicker, { bedBathLabel } from "@/components/BedBathPicker";
 
 /**
  * Editing what you're looking for, after setup.
@@ -25,7 +26,7 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
   const [bathMin, setBathMin] = useState("0");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     fetch("/api/searches")
@@ -126,44 +127,38 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
         <div style={{ fontWeight: 600 }}>What you&apos;re looking for</div>
         <div className="muted" style={{ fontSize: 12 }}>
           {labels.length ? labels.join(", ") : "No neighborhoods set"} ·{" "}
-          {bedMin === bedMax ? bedLabel(bedMin) : `${bedLabel(bedMin)}–${bedLabel(bedMax)}`}
-          {Number(bathMin) > 0 ? ` · ${bathMin}+ bath` : ""} · up to $
-          {Number(priceMax).toLocaleString()}
+          {bedBathLabel({
+            bedMin: Number(bedMin) || 0,
+            bedMax: bedMax === "any" ? null : Number(bedMax),
+            bathMin: Number(bathMin) || 0,
+          })}{" "}
+          · up to ${Number(priceMax).toLocaleString()}
         </div>
       </div>
 
       <button className="btn" onClick={() => setOpen((v) => !v)}>
-        {open ? "Close" : "Change search"}
+        {open ? "Hide the controls" : "Change search"}
       </button>
 
       {open && (
         <>
           <div style={{ display: "grid", gap: 5, fontSize: 12 }}>
             <span className="muted">Layout</span>
-            <div className="welcome-chips">
-              {LAYOUT_PRESETS.map((preset) => {
-                const active =
-                  Number(bedMin) === preset.bedMin &&
-                  (preset.bedMax === null
-                    ? bedMax === "any"
-                    : Number(bedMax) === preset.bedMax) &&
-                  Number(bathMin) === preset.bathMin;
-                return (
-                  <button
-                    key={preset.label}
-                    className={active ? "btn btn-primary" : "btn"}
-                    style={{ fontSize: 12, padding: "4px 9px" }}
-                    onClick={() => {
-                      setBedMin(String(preset.bedMin));
-                      setBedMax(preset.bedMax === null ? "any" : String(preset.bedMax));
-                      setBathMin(String(preset.bathMin));
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Tap a size; tap a second to stretch it into a range. The old
+                preset chips ("2B1B", "Studio–1B") were a vocabulary to learn
+                and couldn't say "studio through 2 bed" at all. */}
+            <BedBathPicker
+              value={{
+                bedMin: Number(bedMin) || 0,
+                bedMax: bedMax === "any" ? null : Number(bedMax),
+                bathMin: Number(bathMin) || 0,
+              }}
+              onChange={(next) => {
+                setBedMin(String(next.bedMin));
+                setBedMax(next.bedMax == null ? "any" : String(next.bedMax));
+                setBathMin(String(next.bathMin));
+              }}
+            />
           </div>
 
           <div style={{ display: "grid", gap: 5, fontSize: 12 }}>
@@ -196,7 +191,3 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-function bedLabel(value: string): string {
-  if (value === "any") return "any size";
-  return value === "0" ? "studio" : `${value} bed`;
-}

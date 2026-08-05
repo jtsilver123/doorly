@@ -2926,3 +2926,74 @@ button.fact:hover .fact-label { color: var(--accent); }
 .drawer-log li > span:nth-child(2) { flex: 1; }
 
 .drawer-fineprint { font-size: var(--t-xs); line-height: var(--lh-body); margin: 0; }
+
+/* --- beds and baths as a painted range ------------------------------------ */
+
+.bedbath { display: grid; gap: var(--s3); }
+.bedbath-group { display: grid; gap: var(--s1); }
+
+.bedbath-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+}
+
+.bedbath-label i { font-style: normal; font-size: var(--t-xs); opacity: 0.85; }
+
+/* One object with joined cells, not a row of adjacent buttons. */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.seg > button {
+  padding: 8px 14px;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font-size: var(--t-md);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.seg > button:last-child { border-right: none; }
+.seg > button:hover:not(.is-on) { background: var(--surface-2); }
+.seg > button:focus-visible { outline: none; box-shadow: inset var(--ring); }
+
+/* A painted range reads as one filled span across adjacent cells. */
+.seg > button.is-on {
+  background: var(--accent);
+  border-right-color: color-mix(in srgb, #fff 22%, var(--accent));
+  color: #fff;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .seg { display: flex; }
+  .seg > button { flex: 1; min-width: 0; padding: 8px 4px; }
+}
+
+/* The key-renewal card: shows up when the runway is short, walks the loop. */
+.keyrenew {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  padding: var(--s3) var(--s4);
+  border: 1px solid color-mix(in srgb, var(--urgent) 35%, transparent);
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+}
+
+.keyrenew-copy { display: grid; gap: 1px; flex: 1; min-width: 200px; }
+.keyrenew-copy b { font-size: var(--t-md); }
+.keyrenew-copy span { font-size: var(--t-sm); color: var(--text-muted); }
+.keyrenew .btn-primary { white-space: nowrap; }
