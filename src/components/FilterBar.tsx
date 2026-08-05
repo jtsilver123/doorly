@@ -101,16 +101,20 @@ export default function FilterBar({
     });
   }
 
-  const tuckedCount =
+  /**
+   * What the Filters badge counts: things behind that button, and nothing
+   * else. Search lives outside it, so counting the query here would put a
+   * number on a button that has no control for the thing being counted.
+   */
+  const filterCount =
+    (filters.priceMax ? 1 : 0) +
+    (filters.beds !== "any" ? 1 : 0) +
     (filters.baths !== "any" ? 1 : 0) +
     filters.sources.length +
     TOGGLES.filter((t) => filters[t.key]).length;
 
-  const activeCount =
-    tuckedCount +
-    (filters.query ? 1 : 0) +
-    (filters.priceMax ? 1 : 0) +
-    (filters.beds !== "any" ? 1 : 0);
+  /** The count under the bar, which does include the search term. */
+  const activeCount = filterCount + (filters.query ? 1 : 0);
 
   return (
     <div className="filterbar">
@@ -130,44 +134,69 @@ export default function FilterBar({
           )}
         </div>
 
-        {/* Everything but the search box, grouped so phones can scroll it as
-            one strip instead of stacking it into three rows. */}
+        {/*
+          Two controls, not four.
+          
+          This row used to carry a rent box, a size dropdown, a "More filters"
+          popover and a sort menu — so "narrow this down" was spread across
+          three places and you had to learn which lived where. Everything that
+          narrows the list is now behind Filters; the one thing that reorders
+          it is Sort. Search stays separate because finding a specific address
+          isn't filtering.
+        */}
         <div className="filterbar-controls">
-        <input
-          className="control control-sm"
-          inputMode="numeric"
-          value={filters.priceMax}
-          placeholder="Max rent"
-          onChange={(e) => onChange({ priceMax: e.target.value.replace(/[^\d]/g, "") })}
-          aria-label="Maximum rent"
-        />
-
-        <select
-          className="control control-sm"
-          value={filters.beds}
-          onChange={(e) => onChange({ beds: e.target.value })}
-          aria-label="Bedrooms"
-        >
-          <option value="any">Any size</option>
-          <option value="0">Studio</option>
-          <option value="1">1 bed</option>
-          <option value="2">2 bed</option>
-          <option value="3">3 bed</option>
-        </select>
-
         <div className="filterbar-more" ref={panelRef}>
           <button
-            className={tuckedCount ? "control is-on" : "control"}
+            className={filterCount ? "control is-on" : "control"}
             onClick={() => setOpenPanel((v) => !v)}
             aria-expanded={openPanel}
             aria-haspopup="dialog"
           >
-            More filters
-            {tuckedCount > 0 && <b className="control-count">{tuckedCount}</b>}
+            <span aria-hidden="true">☰</span> Filters
+            {filterCount > 0 && <b className="control-count">{filterCount}</b>}
           </button>
 
           {openPanel && (
-            <div className="panel" role="dialog" aria-label="More filters">
+            <div className="panel" role="dialog" aria-label="Filters">
+              <div className="panel-group">
+                <span className="panel-label">Rent and size</span>
+                <div className="panel-row">
+                  <input
+                    className="control control-sm"
+                    inputMode="numeric"
+                    value={filters.priceMax}
+                    placeholder="Max rent"
+                    onChange={(e) =>
+                      onChange({ priceMax: e.target.value.replace(/[^\d]/g, "") })
+                    }
+                    aria-label="Maximum rent"
+                  />
+                  <select
+                    className="control control-sm"
+                    value={filters.beds}
+                    onChange={(e) => onChange({ beds: e.target.value })}
+                    aria-label="Bedrooms"
+                  >
+                    <option value="any">Any size</option>
+                    <option value="0">Studio</option>
+                    <option value="1">1 bed</option>
+                    <option value="2">2 bed</option>
+                    <option value="3">3 bed</option>
+                  </select>
+                  <select
+                    className="control control-sm"
+                    value={filters.baths}
+                    onChange={(e) => onChange({ baths: e.target.value })}
+                    aria-label="Bathrooms"
+                  >
+                    <option value="any">Any baths</option>
+                    <option value="1">1+ bath</option>
+                    <option value="1.5">1.5+ bath</option>
+                    <option value="2">2+ bath</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="panel-group">
                 <span className="panel-label">Show me</span>
                 <div className="panel-pills">
@@ -185,23 +214,6 @@ export default function FilterBar({
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="panel-group">
-                <label className="panel-label" htmlFor="baths-filter">
-                  Bathrooms
-                </label>
-                <select
-                  id="baths-filter"
-                  className="control control-sm"
-                  value={filters.baths}
-                  onChange={(e) => onChange({ baths: e.target.value })}
-                >
-                  <option value="any">Any</option>
-                  <option value="1">1 or more</option>
-                  <option value="1.5">1.5 or more</option>
-                  <option value="2">2 or more</option>
-                </select>
               </div>
 
               <div className="panel-group">
@@ -242,6 +254,7 @@ export default function FilterBar({
 
         <select
           className="control control-sm control-sort"
+          title="Sort"
           value={filters.sort}
           onChange={(e) => onChange({ sort: e.target.value })}
           aria-label="Sort listings"

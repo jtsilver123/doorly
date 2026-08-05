@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Ahead of design.css deliberately: Leaflet ships opinionated control sizing
+   we override for touch, and later rules win. */
+@import "leaflet/dist/leaflet.css";
 @import "./design.css";
 
 /*
@@ -661,17 +664,21 @@ kbd {
 /* --- hunt timeline ------------------------------------------------------ */
 
 .timeline {
-  padding: 18px;
+  padding: var(--s5);
   display: grid;
-  gap: 14px;
+  gap: var(--s4);
 }
 
+/* The heading and the funnel are separate thoughts; a rule between them
+   stops the numbers reading as part of the sentence above. */
 .timeline-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--s5);
   flex-wrap: wrap;
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
 }
 
 .timeline-phase {
@@ -682,7 +689,8 @@ kbd {
 
 .timeline-funnel {
   display: flex;
-  gap: 18px;
+  gap: var(--s5);
+  flex-wrap: wrap;
 }
 
 .timeline-stat {
@@ -703,16 +711,19 @@ kbd {
 }
 
 /* Phase bands, widths proportional to their real length in days. */
+/* flex-basis: 0 on the bands, so the widths come purely from the day counts
+   rather than from how long each phase's label happens to be. */
 .timeline-bar {
   position: relative;
   display: flex;
-  gap: 2px;
-  height: 30px;
+  gap: 3px;
+  height: 34px;
 }
 
 .timeline-band {
   display: grid;
   place-items: center;
+  flex-basis: 0;
   min-width: 0;
   border-radius: 5px;
   background: var(--surface-2);
@@ -724,7 +735,7 @@ kbd {
 }
 
 .timeline-band span {
-  padding: 0 4px;
+  padding: 0 var(--s2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

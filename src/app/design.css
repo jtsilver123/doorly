@@ -131,11 +131,14 @@
   display: inline-grid;
   place-items: center;
   border-radius: var(--r-sm);
-  font-weight: 800;
-  letter-spacing: -0.02em;
   line-height: 1;
   flex-shrink: 0;
+  overflow: hidden;
 }
+
+/* Each site's own mark fills the badge; the shapes carry their own rounding
+   (Zillow and Craigslist are circles, the rest are squared off). */
+.srcglyph { width: 100%; height: 100%; display: block; }
 
 /* The badge stays 18px because that's the size it reads at, but the link
    around it is padded out to 24px — below that a target is not reliably
@@ -1185,8 +1188,13 @@ button.fact:hover { border-color: var(--accent); }
   top: 0;
   z-index: 25;
   background: var(--bg);
-  padding-top: var(--s2);
-  margin-bottom: var(--s3);
+  padding-top: var(--s3);
+  /* A hairline and real air below it: the frozen block and the content that
+     scrolls under it were touching, so the page read as one crowded slab
+     with no seam between "your settings" and "your apartments". */
+  padding-bottom: var(--s3);
+  margin-bottom: var(--s4);
+  border-bottom: 1px solid var(--border);
 }
 
 .stickytop .searchhead { margin-bottom: 0; }
@@ -2120,3 +2128,180 @@ button.fact:hover { border-color: var(--accent); }
 }
 
 .accountmenu-out .accountmenu-item > b { color: var(--warn); }
+
+/* --- phones: the listings screen, final word -----------------------------
+ *
+ * Last in the file on purpose. Everything above was written desktop-first and
+ * wins the cascade otherwise — the same collision the toolbar rules hit once
+ * already. Ordering is the fix; !important would only hide it.
+ *
+ * The problem this solves: on a 390×844 phone the search header alone ran
+ * ~950px, so the Listings screen opened on *zero apartments*. You scrolled a
+ * full viewport of your own settings before reaching a single place to live.
+ */
+@media (max-width: 860px) {
+  /* Four facts as a 2×2 grid of tight tiles instead of a wrapping flex row
+     that gave "$4,000 /mo ·" and "edit" a line each. */
+  .searchhead-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s2);
+  }
+
+  .fact {
+    min-width: 0;
+    padding: 6px var(--s3);
+    gap: 0;
+  }
+
+  .fact-label { font-size: 9.5px; letter-spacing: 0.06em; }
+  .fact-value { font-size: var(--t-md); gap: 4px; flex-wrap: nowrap; min-width: 0; }
+  .fact-value > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* The whole tile is the button; spelling out "edit" costs a line to say
+     what tapping it already says. */
+  .fact-unit { display: none; }
+
+  /* "Where" spans both columns — a neighborhood list needs the width. */
+  .fact-where { grid-column: 1 / -1; }
+
+  /*
+   * The map stays, and stays *put*: pinned to the top of the viewport at a
+   * height that leaves room for actual apartments underneath. Cards scroll
+   * beneath it, so geography stays on screen the whole way down the list
+   * rather than being a thing you scroll past once and lose.
+   */
+  .split-map {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    height: 34dvh;
+    min-height: 190px;
+    max-height: 260px;
+    margin-bottom: var(--s3);
+    /* The card column scrolls under it; without a backdrop the rounded
+       corners would show cards sliding through the gaps. */
+    background: var(--bg);
+    padding-bottom: var(--s2);
+  }
+
+  .citymap { border-radius: var(--r-md); }
+
+  /* One card per row, and the first one starts right under the map. */
+  .split-cards { grid-template-columns: 1fr; gap: var(--s3); }
+
+  /* Thumb-sized. 30px overlay buttons on a photo are a coin-flip tap, and
+     the pass button destroys a listing from the feed. */
+  .card-star,
+  .card-pass {
+    width: 38px;
+    height: 38px;
+  }
+
+  .card-judge { gap: 6px; }
+
+  /* Leaflet ships 30px controls; on a phone they sit under a thumb. */
+  .citymap .leaflet-touch .leaflet-bar a,
+  .citymap .leaflet-control-zoom a {
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    font-size: 20px;
+  }
+
+  /* Source marks are links out to StreetEasy et al. — 24px was a miss. */
+  .srcmark-link { min-width: 34px; min-height: 34px; }
+}
+
+/* --- onboarding, stepped -------------------------------------------------- */
+
+.welcome-head { display: grid; gap: var(--s2); }
+
+/* Four labelled steps rather than a bare "2 of 4": knowing what's still
+   coming is what makes a wizard feel finite instead of open-ended. */
+.welcome-progress {
+  list-style: none;
+  margin: var(--s3) 0 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--s2);
+}
+
+.welcome-progress li {
+  display: grid;
+  gap: 5px;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
+/* The rule above each label is the progress bar — no separate widget. */
+.welcome-progress li::before {
+  content: "";
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--border);
+}
+
+.welcome-progress li[data-state="on"] { color: var(--accent); font-weight: 650; }
+.welcome-progress li[data-state="on"]::before { background: var(--accent); }
+.welcome-progress li[data-state="done"]::before { background: var(--action); }
+
+.welcome-progress li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+}
+
+/* The team step is three whole sentences to choose between, so they're cards
+   rather than chips — you're picking a way of working, not a value. */
+.welcome-pick {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  text-align: left;
+  color: inherit;
+}
+
+.welcome-pick:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); }
+.welcome-pick:focus-visible { outline: none; box-shadow: var(--ring); }
+.welcome-pick[data-on="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.welcome-pick > b { font-size: var(--t-md); font-weight: 650; }
+.welcome-pick > span { font-size: var(--t-sm); color: var(--text-muted); line-height: 1.5; }
+
+@media (max-width: 560px) {
+  /* Four labels across a 390px screen is four ellipses. The bar still shows
+     position; the words go. */
+  .welcome-progress li > span { display: none; }
+}
+
+/* Rent / size / baths sit on one line inside the filter panel. */
+.panel-row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.panel-row > * { flex: 1 1 96px; min-width: 0; max-width: none; }
+
+/* The panel carries every filter now, so it needs the width for a three-up
+   row without wrapping each control onto its own line. */
+.panel { width: min(400px, calc(100vw - 32px)); }
+
+/* Two controls in the toolbar, so both can be comfortable rather than
+   squeezed against a rent box and a size menu. */
+.control-sort { max-width: 200px; }
+
+/* The Filters button now sits at the right end of the toolbar, so a panel
+   anchored to its left edge hangs off the side of the window. Anchor right. */
+.filterbar-more { position: relative; }
+.filterbar-more .panel { left: auto; right: 0; }

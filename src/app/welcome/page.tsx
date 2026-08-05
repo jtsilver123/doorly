@@ -12,43 +12,80 @@ import {
 } from "@/types";
 
 /**
- * Setup, in one screen.
+ * Setup.
  *
- * The app is worthless until it knows where you're looking, so this is the
- * first thing a new account sees — and it's kept to one screen because a
- * multi-step wizard would be four chances to abandon before seeing a single
- * apartment. Defaults are filled in for everything except neighborhoods, which
- * is the one answer nobody else can guess.
+ * This was one long screen with nine questions on it, which reads as a form to
+ * survive rather than a product to use. Now it's four steps, ordered by what
+ * earns the next answer:
+ *
+ *   1  What you want      The interesting question. Answering it is what makes
+ *                         the rest feel worth doing, so it goes first — never
+ *                         make somebody do admin before they've seen the point.
+ *   2  Where we look      Cheap, all defaults already correct, and it sets up
+ *                         the tie-breaker question that only makes sense once
+ *                         more than one site is on.
+ *   3  Connect listings   The API key. Deliberately third: it's the only real
+ *                         work, and by now they've spent two steps describing
+ *                         the apartment they want.
+ *   4  Your team          Optional and last, because it's the one step that
+ *                         can wait — and ending on "invite someone" is a much
+ *                         better final beat than ending on "paste a token".
+ *
+ * Your name isn't asked here any more; signup takes it, and asking twice
+ * reads as an app that wasn't listening.
  */
+
+type Step = 0 | 1 | 2 | 3;
+
+const STEPS = ["What you want", "Where we look", "Connect listings", "Your team"];
 
 export default function Welcome() {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [step, setStep] = useState<Step>(0);
+
+  // 1 — the place
   const [areas, setAreas] = useState<string[]>([]);
   const [priceMax, setPriceMax] = useState("4000");
   const [bedMin, setBedMin] = useState("0");
   const [bedMax, setBedMax] = useState("1");
   const [bathMin, setBathMin] = useState("0");
   const [moveIn, setMoveIn] = useState(defaultMoveIn());
-  const [apiKey, setApiKey] = useState("");
+
+  // 2 — the sources
+  const [sources, setSources] = useState<Source[]>([...ALL_SOURCES]);
   const [preferred, setPreferred] = useState<Source>(DEFAULT_PREFERRED_SOURCE);
+
+  // 3 — the key
+  const [apiKey, setApiKey] = useState("");
+
+  // 4 — the crew
+  const [crewMode, setCrewMode] = useState<"solo" | "partner" | "scout" | null>(null);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [copied, setCopied] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function submit() {
-    if (!areas.length) {
-      setError("Pick at least one neighborhood — it's the one thing we can't guess.");
-      return;
-    }
+  function toggleSource(source: Source) {
+    setSources((list) => {
+      const next = list.includes(source)
+        ? list.filter((s) => s !== source)
+        : [...list, source];
+      // The tie-breaker has to be a site we're actually searching.
+      if (next.length && !next.includes(preferred)) setPreferred(next[0]);
+      return next;
+    });
+  }
+
+  /** Steps 1–3 are saved before the team step, so the crew has a search to join. */
+  async function saveSearch(): Promise<boolean> {
     setBusy(true);
     setError("");
-
     const res = await fetch("/api/searches", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         label: "My search",
-        name,
         moveInDate: moveIn,
         criteria: {
           areas,
@@ -57,7 +94,7 @@ export default function Welcome() {
           bathMin: Number(bathMin),
           priceMin: 0,
           priceMax: Number(priceMax) || 4000,
-          sources: ["streeteasy", "zillow", "apartments", "hotpads", "craigslist"],
+          sources,
           noFeeOnly: false,
         },
       }),
@@ -66,11 +103,9 @@ export default function Welcome() {
     if (body.error) {
       setBusy(false);
       setError(body.error);
-      return;
+      return false;
     }
 
-    // The key is what makes the next screen have anything in it, so it's saved
-    // here rather than left for the user to find in settings afterwards.
     if (apiKey.trim()) {
       await fetch("/api/settings", {
         method: "PUT",
@@ -81,197 +116,361 @@ export default function Welcome() {
     await fetch("/api/profile", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ profile: { name, moveInDate: moveIn, preferredSource: preferred } }),
+      body: JSON.stringify({ profile: { moveInDate: moveIn, preferredSource: preferred } }),
     }).catch(() => {});
-
     setBusy(false);
+    return true;
+  }
+
+  async function makeCrew(role: "partner" | "scout") {
+    setCrewMode(role);
+    setBusy(true);
+    await fetch("/api/crew", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "create", name: "Our search" }),
+    }).catch(() => {});
+    const body = await fetch("/api/crew", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "invite", role }),
+    })
+      .then((r) => r.json())
+      .catch(() => ({}));
+    setBusy(false);
+    if (body?.token) setInviteUrl(`${window.location.origin}/join/${body.token}`);
+  }
+
+  function finish() {
     router.push("/");
     router.refresh();
+  }
+
+  const canAdvance =
+    step === 0 ? areas.length > 0 : step === 1 ? sources.length > 0 : true;
+
+  async function next() {
+    if (step === 2) {
+      // Everything the app needs to work is now answered; persist before the
+      // optional step so abandoning at "team" still leaves a working account.
+      if (await saveSearch()) setStep(3);
+      return;
+    }
+    setStep((s) => Math.min(3, s + 1) as Step);
   }
 
   return (
     <main className="welcome">
       <div className="surface welcome-card">
-        <header>
+        <header className="welcome-head">
           <div className="brand" style={{ fontSize: 22 }}>
-            Let&apos;s set up your search
+            {step === 0 && "What are you looking for?"}
+            {step === 1 && "Where should we look?"}
+            {step === 2 && "Connect the listings"}
+            {step === 3 && "Hunting alone?"}
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
-            Doorly watches StreetEasy, Zillow, Apartments.com, HotPads and
-            Craigslist for you, and tells you when something changes.
+            {step === 0 &&
+              "Neighborhoods are the one thing nobody can guess for you — everything else has a sensible default."}
+            {step === 1 &&
+              "One key covers the big four. Craigslist is free and always on."}
+            {step === 2 && "About a minute, and it's what fills your first screen."}
+            {step === 3 &&
+              "Apartment hunting is a team sport, even when one name goes on the lease."}
           </div>
+
+          <ol className="welcome-progress" aria-label="Setup progress">
+            {STEPS.map((label, i) => (
+              <li
+                key={label}
+                data-state={i === step ? "on" : i < step ? "done" : undefined}
+              >
+                <span>{label}</span>
+              </li>
+            ))}
+          </ol>
         </header>
 
-        <label className="welcome-field">
-          <span className="muted">What should we call you?</span>
-          <input
-            className="field"
-            value={name}
-            placeholder="Jake"
-            onChange={(e) => setName(e.target.value)}
-          />
-          <span className="muted welcome-hint">
-            Used in the tour requests it drafts for you.
-          </span>
-        </label>
+        {/* --- 1 · the place ------------------------------------------- */}
+        {step === 0 && (
+          <>
+            <div className="welcome-field">
+              <span className="muted">
+                Where are you looking? <strong>{areas.length} selected</strong>
+              </span>
+              <AreaPicker selected={areas} onChange={setAreas} />
+            </div>
 
-        <div className="welcome-field">
-          <span className="muted">
-            Where are you looking? <strong>{areas.length} selected</strong>
-          </span>
-          <AreaPicker selected={areas} onChange={setAreas} />
-        </div>
+            <div className="welcome-field">
+              <span className="muted">What layout?</span>
+              <div className="welcome-chips">
+                {LAYOUT_PRESETS.map((preset) => {
+                  const active =
+                    Number(bedMin) === preset.bedMin &&
+                    (preset.bedMax === null
+                      ? bedMax === "any"
+                      : Number(bedMax) === preset.bedMax) &&
+                    Number(bathMin) === preset.bathMin;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      className={active ? "btn btn-primary" : "btn"}
+                      style={{ fontSize: 12, padding: "5px 10px" }}
+                      onClick={() => {
+                        setBedMin(String(preset.bedMin));
+                        setBedMax(preset.bedMax === null ? "any" : String(preset.bedMax));
+                        setBathMin(String(preset.bathMin));
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-        <div className="welcome-field">
-          <span className="muted">What layout?</span>
-          <div className="welcome-chips">
-            {LAYOUT_PRESETS.map((preset) => {
-              const active =
-                Number(bedMin) === preset.bedMin &&
-                (preset.bedMax === null ? bedMax === "any" : Number(bedMax) === preset.bedMax) &&
-                Number(bathMin) === preset.bathMin;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className={active ? "btn btn-primary" : "btn"}
-                  style={{ fontSize: 12, padding: "5px 10px" }}
-                  onClick={() => {
-                    setBedMin(String(preset.bedMin));
-                    setBedMax(preset.bedMax === null ? "any" : String(preset.bedMax));
-                    setBathMin(String(preset.bathMin));
-                  }}
+            <div className="welcome-row">
+              <label className="welcome-field">
+                <span className="muted">Max rent</span>
+                <input
+                  className="field"
+                  inputMode="numeric"
+                  value={priceMax}
+                  onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
+                />
+              </label>
+              <label className="welcome-field">
+                <span className="muted">Baths</span>
+                <select
+                  className="field"
+                  value={bathMin}
+                  onChange={(e) => setBathMin(e.target.value)}
                 >
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
-          <span className="muted welcome-hint">
-            Or set it exactly below. Bathrooms are a minimum — a 2-bath place
-            still shows up in a 1-bath search.
-          </span>
-        </div>
+                  <option value="0">Any</option>
+                  <option value="1">1+</option>
+                  <option value="1.5">1.5+</option>
+                  <option value="2">2+</option>
+                </select>
+              </label>
+              <label className="welcome-field">
+                <span className="muted">Move in by</span>
+                <input
+                  className="field"
+                  type="date"
+                  value={moveIn}
+                  onChange={(e) => setMoveIn(e.target.value)}
+                />
+              </label>
+            </div>
+            <span className="muted welcome-hint">
+              New York listings appear about 30 days before they&apos;re free, so
+              your move-in date is really when the search starts.
+            </span>
+          </>
+        )}
 
-        <div className="welcome-field">
-          <span className="muted">
-            When a place is on several sites, which should we open?
-          </span>
-          <div className="welcome-chips">
-            {ALL_SOURCES.map((source) => (
-              <button
-                key={source}
-                type="button"
-                className={preferred === source ? "btn btn-primary" : "btn"}
-                style={{ fontSize: 12, padding: "5px 10px" }}
-                onClick={() => setPreferred(source)}
-              >
-                {SOURCE_LABEL[source]}
-              </button>
-            ))}
-          </div>
-          <span className="muted welcome-hint">
-            The same apartment is usually listed three or four times. Every card
-            still shows which sites carry it.
-          </span>
-        </div>
+        {/* --- 2 · the sources ------------------------------------------ */}
+        {step === 1 && (
+          <>
+            <div className="welcome-field">
+              <span className="muted">
+                Sites to search <strong>{sources.length} on</strong>
+              </span>
+              <div className="welcome-chips">
+                {ALL_SOURCES.map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    className={sources.includes(source) ? "btn btn-primary" : "btn"}
+                    style={{ fontSize: 12, padding: "5px 10px" }}
+                    aria-pressed={sources.includes(source)}
+                    onClick={() => toggleSource(source)}
+                  >
+                    {sources.includes(source) ? "✓ " : ""}
+                    {SOURCE_LABEL[source]}
+                  </button>
+                ))}
+              </div>
+              <span className="muted welcome-hint">
+                More sites means better coverage and more of your monthly
+                request budget per check. All five is the right default.
+              </span>
+            </div>
 
-        {/*
-          The listing data comes from one aggregator, and nothing works without
-          a key for it. Burying that in settings means a new account lands on an
-          empty screen with no idea why — so it's asked for here, with the two
-          minutes of instruction it actually needs.
-        */}
-        <div className="welcome-field welcome-key">
-          <span className="muted">
-            Last thing — a data key <strong>(about a minute)</strong>
-          </span>
-          <ol className="welcome-steps">
-            <li>
-              Open{" "}
-              <a href="https://realtyapi.io" target="_blank" rel="noreferrer">
-                realtyapi.io
-              </a>{" "}
-              and sign up. The free tier is 250 requests a month.
-            </li>
-            <li>Copy the key from your dashboard — it starts with <code>rt_</code>.</li>
-            <li>Paste it here.</li>
-          </ol>
-          <input
-            className="field"
-            value={apiKey}
-            placeholder="rt_…"
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => setApiKey(e.target.value.trim())}
-          />
-          <span className="muted welcome-hint">
-            One key covers StreetEasy, Zillow, Apartments.com and HotPads.
-            Craigslist needs none, so you&apos;ll see listings either way — just
-            fewer. You can add or change this later under your account.
-          </span>
-        </div>
+            {/* Only a question once there's something to break a tie between. */}
+            {sources.length > 1 && (
+              <div className="welcome-field">
+                <span className="muted">
+                  When a place is on several of them, which do we open?
+                </span>
+                <div className="welcome-chips">
+                  {sources.map((source) => (
+                    <button
+                      key={source}
+                      type="button"
+                      className={preferred === source ? "btn btn-primary" : "btn"}
+                      style={{ fontSize: 12, padding: "5px 10px" }}
+                      onClick={() => setPreferred(source)}
+                    >
+                      {SOURCE_LABEL[source]}
+                    </button>
+                  ))}
+                </div>
+                <span className="muted welcome-hint">
+                  The same apartment is usually listed three or four times. This
+                  picks the one the buttons open — every card still shows all of
+                  them.
+                </span>
+              </div>
+            )}
+          </>
+        )}
 
-        <div className="welcome-row">
-          <label className="welcome-field">
-            <span className="muted">Max rent</span>
+        {/* --- 3 · the key ---------------------------------------------- */}
+        {step === 2 && (
+          <div className="welcome-field welcome-key">
+            <ol className="welcome-steps">
+              <li>
+                Open{" "}
+                <a href="https://realtyapi.io" target="_blank" rel="noreferrer">
+                  realtyapi.io
+                </a>{" "}
+                and sign up. The free tier is 250 requests a month.
+              </li>
+              <li>
+                Copy the key from your dashboard — it starts with <code>rt_</code>.
+              </li>
+              <li>Paste it here.</li>
+            </ol>
             <input
               className="field"
-              inputMode="numeric"
-              value={priceMax}
-              onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
+              value={apiKey}
+              placeholder="rt_…"
+              spellCheck={false}
+              autoComplete="off"
+              onChange={(e) => setApiKey(e.target.value.trim())}
             />
-          </label>
-          <label className="welcome-field">
-            <span className="muted">Smallest</span>
-            <select className="field" value={bedMin} onChange={(e) => setBedMin(e.target.value)}>
-              <option value="0">Studio</option>
-              <option value="1">1 bed</option>
-              <option value="2">2 bed</option>
-              <option value="3">3 bed</option>
-            </select>
-          </label>
-          <label className="welcome-field">
-            <span className="muted">Largest</span>
-            <select className="field" value={bedMax} onChange={(e) => setBedMax(e.target.value)}>
-              <option value="0">Studio</option>
-              <option value="1">1 bed</option>
-              <option value="2">2 bed</option>
-              <option value="3">3 bed</option>
-              <option value="any">No limit</option>
-            </select>
-          </label>
-          <label className="welcome-field">
-            <span className="muted">Baths</span>
-            <select className="field" value={bathMin} onChange={(e) => setBathMin(e.target.value)}>
-              <option value="0">Any</option>
-              <option value="1">1+</option>
-              <option value="1.5">1.5+</option>
-              <option value="2">2+</option>
-              <option value="3">3+</option>
-            </select>
-          </label>
-        </div>
+            <span className="muted welcome-hint">
+              One key covers StreetEasy, Zillow, Apartments.com and HotPads.
+              Craigslist needs none, so you&apos;ll see listings either way — just
+              fewer. You can add or change this any time under your account.
+            </span>
+          </div>
+        )}
 
-        <label className="welcome-field">
-          <span className="muted">When do you need to move in?</span>
-          <input
-            className="field"
-            type="date"
-            value={moveIn}
-            onChange={(e) => setMoveIn(e.target.value)}
-          />
-          <span className="muted welcome-hint">
-            New York listings appear about 30 days before they&apos;re free, so this
-            sets when your search really starts.
-          </span>
-        </label>
+        {/* --- 4 · the crew --------------------------------------------- */}
+        {step === 3 && (
+          <>
+            {!inviteUrl && (
+              <div className="welcome-field">
+                <div className="crew-pitch">
+                  <button
+                    type="button"
+                    className="welcome-pick"
+                    data-on={crewMode === "partner" ? "true" : undefined}
+                    onClick={() => makeCrew("partner")}
+                    disabled={busy}
+                  >
+                    <b>I&apos;m moving in with someone</b>
+                    <span>
+                      One shared pipeline you both fill and work, with a point
+                      person on each place so you never both text the same agent.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="welcome-pick"
+                    data-on={crewMode === "scout" ? "true" : undefined}
+                    onClick={() => makeCrew("scout")}
+                    disabled={busy}
+                  >
+                    <b>Friends and family are helping me look</b>
+                    <span>
+                      They drop places into your pipeline, tagged with who found
+                      them. You keep the final say.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="welcome-pick"
+                    onClick={finish}
+                    disabled={busy}
+                  >
+                    <b>Just me for now</b>
+                    <span>You can invite people any time from your account.</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {inviteUrl && (
+              <div className="welcome-field">
+                <div className="crew-invite">
+                  <code>{inviteUrl}</code>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(inviteUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1800);
+                      } catch {
+                        setCopied(false);
+                      }
+                    }}
+                  >
+                    {copied ? "Copied" : "Copy invite link"}
+                  </button>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    Paste it in your group chat — whoever opens it joins as a{" "}
+                    {crewMode === "partner" ? "partner" : "scout"}. You can make
+                    more links later.
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
         {error && <div className="auth-error">{error}</div>}
 
-        <button className="btn btn-primary" onClick={submit} disabled={busy || !areas.length}>
-          {busy ? "Setting up…" : "Start hunting"}
-        </button>
+        <div className="welcome-nav">
+          {step > 0 ? (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setStep((s) => Math.max(0, s - 1) as Step)}
+              disabled={busy}
+            >
+              Back
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {step < 3 ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={next}
+              disabled={busy || !canAdvance}
+            >
+              {busy
+                ? "Saving…"
+                : step === 2
+                  ? apiKey.trim()
+                    ? "Save and continue"
+                    : "Skip for now"
+                  : "Continue"}
+            </button>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={finish} disabled={busy}>
+              Start hunting
+            </button>
+          )}
+        </div>
       </div>
     </main>
   );

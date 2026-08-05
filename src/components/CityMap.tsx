@@ -2,7 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+// Leaflet's stylesheet is imported from globals.css, ahead of design.css, so
+// our overrides win on ordering rather than on !important. A component-level
+// import here would be injected *after* the globals and take the sizing of
+// the zoom controls back.
 import type { FeedListing } from "@/types";
 
 /**

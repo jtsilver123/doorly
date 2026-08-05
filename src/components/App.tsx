@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { FeedListing, Source } from "@/types";
 import type { Stage } from "@/types";
@@ -43,6 +43,9 @@ const CityMap = dynamic(() => import("@/components/CityMap"), {
 });
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
+
+/** Every valid tab, so a hand-edited hash can't put the app in a dead state. */
+const TABS: Tab[] = ["today", "feed", "changes", "pipeline", "compare", "profile"];
 
 interface Change {
   id: number;
@@ -105,6 +108,42 @@ export default function Home() {
   // Today is the default: the hunt is a four-week sprint, and the first
   // question each morning is what to do, not what exists.
   const [tab, setTab] = useState<Tab>("today");
+
+  /**
+   * The tab lives in the URL.
+   *
+   * Reloading in the middle of working a pipeline used to dump you back on
+   * Today — the app forgot where you were every time you refreshed, which on
+   * a phone happens constantly. The hash also makes back/forward work and
+   * makes a screen linkable.
+   *
+   * useLayoutEffect, not useEffect: it runs before the browser paints, so
+   * restoring the tab never flashes Today first. And it can't go in the
+   * useState initialiser — the server renders this too, and reading
+   * `location` there would hydrate mismatched.
+   */
+  useLayoutEffect(() => {
+    const fromHash = () => {
+      const key = window.location.hash.replace(/^#/, "") as Tab;
+      return TABS.includes(key) ? key : null;
+    };
+    const initial = fromHash();
+    if (initial) setTab(initial);
+    const onPop = () => {
+      const next = fromHash();
+      if (next) setTab(next);
+    };
+    window.addEventListener("hashchange", onPop);
+    return () => window.removeEventListener("hashchange", onPop);
+  }, []);
+
+  // replaceState rather than pushState: switching tabs shouldn't stack up
+  // history entries you then have to press Back through five times.
+  useEffect(() => {
+    if (window.location.hash.replace(/^#/, "") !== tab) {
+      window.history.replaceState(null, "", `#${tab}`);
+    }
+  }, [tab]);
   const [listings, setListings] = useState<FeedListing[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);

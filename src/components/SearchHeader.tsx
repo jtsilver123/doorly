@@ -154,7 +154,7 @@ export default function SearchHeader({
           </span>
         </div>
 
-        <button className="fact fact-ghost" onClick={onEditSearch}>
+        <button className="fact fact-ghost fact-where" onClick={onEditSearch}>
           <span className="fact-label">Where</span>
           <span className="fact-value">
             Neighborhoods
