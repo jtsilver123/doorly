@@ -52,6 +52,44 @@ export function bedBathLabel({ bedMin, bedMax, bathMin }: BedBathValue): string 
   return bathMin > 0 ? `${beds} · ${bathMin}+ bath` : beds;
 }
 
+/**
+ * What one tap on a bed segment means, given what's already painted.
+ *
+ *   nothing      → exactly n
+ *   single, same → back to Any
+ *   single, other→ the range between them
+ *   range, outside→ the range stretches to include n — tapping 2 with
+ *                  Studio–1 painted means "and 2-beds too", and the first
+ *                  version restarted to a bare "2" instead, which threw away
+ *                  the range someone was visibly building
+ *   range, inside → start over at n
+ *
+ * Pure and exported so the one piece of this control with actual rules in it
+ * is pinned by tests.
+ */
+export function nextBedRange(
+  current: { bedMin: number; bedMax: number | null },
+  n: number
+): { bedMin: number; bedMax: number | null } {
+  const { bedMin, bedMax } = current;
+  const asMax = n === 4 ? null : n;
+  const isAny = bedMin === 0 && bedMax == null;
+  const isSingle = bedMin === bedMax || (bedMax == null && bedMin === 4);
+
+  if (isAny) return { bedMin: n, bedMax: asMax };
+  if (isSingle) {
+    if (n === bedMin) return { bedMin: 0, bedMax: null };
+    const lo = Math.min(bedMin, n);
+    const hi = Math.max(bedMin, n);
+    return { bedMin: lo, bedMax: hi === 4 ? null : hi };
+  }
+  // A real range: taps outside it stretch it, taps inside restart.
+  const top = bedMax ?? 4;
+  if (n > top) return { bedMin, bedMax: asMax };
+  if (n < bedMin) return { bedMin: n, bedMax };
+  return { bedMin: n, bedMax: asMax };
+}
+
 export default function BedBathPicker({
   value,
   onChange,
@@ -63,27 +101,7 @@ export default function BedBathPicker({
   const isAny = bedMin === 0 && bedMax == null;
 
   function tapBed(n: number) {
-    // 4+ is open-ended by construction.
-    const asMax = n === 4 ? null : n;
-
-    if (isAny) {
-      onChange({ ...value, bedMin: n, bedMax: asMax });
-      return;
-    }
-    // A single selection stretches into a range on the second tap…
-    if (bedMin === bedMax || (bedMax == null && bedMin === 4)) {
-      if (n === bedMin) {
-        // …unless it's the same segment, which clears back to Any.
-        onChange({ ...value, bedMin: 0, bedMax: null });
-        return;
-      }
-      const lo = Math.min(bedMin, n);
-      const hi = Math.max(bedMin, n);
-      onChange({ ...value, bedMin: lo, bedMax: hi === 4 ? null : hi });
-      return;
-    }
-    // A range starts over from the new tap.
-    onChange({ ...value, bedMin: n, bedMax: asMax });
+    onChange({ ...value, ...nextBedRange({ bedMin, bedMax }, n) });
   }
 
   function inRange(n: number): boolean {

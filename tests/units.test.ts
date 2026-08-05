@@ -38,6 +38,7 @@ import { tourDays } from "../src/lib/tourday.ts";
 import { normalizeApartments } from "../src/lib/sources/apartments.ts";
 import { amenityRowsFor } from "../src/components/Compare.tsx";
 import { sweepPlan } from "../src/lib/sweep.ts";
+import { nextBedRange } from "../src/components/BedBathPicker.tsx";
 import {
   nearestStation,
   stationsWithin,
@@ -1570,4 +1571,22 @@ test("exactly at the thresholds, the sweep still runs", () => {
   assert.ok(share.sweepable.has("a"));
   const count = sweepPlan(sweepRows("b", 20, 10));
   assert.ok(count.sweepable.has("b"));
+});
+
+// --- the bed-range picker --------------------------------------------------
+
+test("tapping outside a painted range stretches it", () => {
+  // Studio–1 painted, tap 2: "and 2-beds too", not a restart to bare 2.
+  assert.deepEqual(nextBedRange({ bedMin: 0, bedMax: 1 }, 2), { bedMin: 0, bedMax: 2 });
+  // 1–2 painted, tap Studio: stretches downward.
+  assert.deepEqual(nextBedRange({ bedMin: 1, bedMax: 2 }, 0), { bedMin: 0, bedMax: 2 });
+  // 1–2 painted, tap 4+: open-ended top.
+  assert.deepEqual(nextBedRange({ bedMin: 1, bedMax: 2 }, 4), { bedMin: 1, bedMax: null });
+});
+
+test("tapping inside a range starts over; the singles ladder still works", () => {
+  assert.deepEqual(nextBedRange({ bedMin: 0, bedMax: 2 }, 1), { bedMin: 1, bedMax: 1 });
+  assert.deepEqual(nextBedRange({ bedMin: 0, bedMax: null }, 2), { bedMin: 2, bedMax: 2 });
+  assert.deepEqual(nextBedRange({ bedMin: 2, bedMax: 2 }, 0), { bedMin: 0, bedMax: 2 });
+  assert.deepEqual(nextBedRange({ bedMin: 2, bedMax: 2 }, 2), { bedMin: 0, bedMax: null });
 });
