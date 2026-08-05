@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/supabase/server";
 import App from "@/components/App";
 import AuthArt from "@/components/AuthArt";
@@ -42,7 +43,22 @@ const STEPS: { title: string; body: string }[] = [
   },
 ];
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  /*
+   * A `?code=` on the root is a misrouted OAuth callback.
+   *
+   * When Supabase doesn't recognise the redirect target (an allowlist miss),
+   * it falls back to its configured Site URL — the bare origin, no path. The
+   * dashboard setting is the real fix, but the app shouldn't strand a valid
+   * sign-in code on the landing page while a setting is wrong somewhere else.
+   */
+  const { code } = await searchParams;
+  if (code) redirect(`/auth/callback?code=${encodeURIComponent(code)}`);
+
   const user = await currentUser();
   if (user) return <App />;
 
