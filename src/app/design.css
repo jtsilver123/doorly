@@ -3307,3 +3307,97 @@ button.fact:hover .fact-label { color: var(--accent); }
 .drawer-head-acts { display: flex; align-items: center; gap: var(--s2); flex-shrink: 0; }
 .drawer-share { padding: 5px 10px; font-size: var(--t-sm); }
 .drawer-share.is-done { border-color: var(--good); color: var(--good); }
+
+/* --- passing, with a reason ----------------------------------------------- */
+
+/* The dismiss on a board card: present but quiet, and never competing with
+   the card's own click target. */
+.board-drop {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.board-card:hover .board-drop,
+.board-drop:focus-visible { opacity: 1; }
+.board-drop:hover { background: var(--warn-soft); color: var(--warn); }
+.board-drop:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* Touch has no hover, so on a phone it's always there. */
+@media (hover: none) {
+  .board-drop { opacity: 1; }
+}
+
+.passdialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: 88dvh;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.passdialog-head { display: flex; align-items: flex-start; gap: var(--s3); }
+.passdialog-head h2 { margin: 0; font-size: var(--t-xl); letter-spacing: -0.02em; }
+.passdialog-head p { margin: 2px 0 0; font-size: var(--t-sm); }
+.passdialog-head .btn { margin-left: auto; padding: 5px 8px; flex-shrink: 0; }
+
+/* Why the dialog exists at all, stated once. */
+.passdialog-why {
+  margin: 0;
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+.passdialog-reasons { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.passdialog-note { display: grid; gap: var(--s1); font-size: var(--t-sm); }
+.passdialog-note textarea { resize: vertical; }
+
+.passdialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+/* The calendar handoff, on the card where the tour lives. */
+.board-cal { display: flex; gap: var(--s1); flex-wrap: wrap; }
+.board-cal .btn { padding: 3px 7px; font-size: var(--t-2xs); }
+
+/* Why a place is out, shown to whoever opens it next. */
+.passnote {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  padding: var(--s3);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  font-size: var(--t-sm);
+}
+
+.passnote b { color: var(--warn); }
+.passnote > span { flex: 1; min-width: 0; line-height: var(--lh-body); }

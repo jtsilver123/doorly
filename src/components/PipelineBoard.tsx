@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FeedListing, Stage } from "@/types";
 import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
+import { googleCalendarUrl } from "@/lib/calendar";
 import { nextAction } from "@/lib/nextAction";
 import Icon from "@/components/Icon";
 
@@ -46,6 +47,8 @@ export default function PipelineBoard({
   onQuickAdd,
   onPlanTours,
   crewTag,
+  onPass,
+  onAddToCalendar,
 }: {
   listings: FeedListing[];
   onOpen: (listing: FeedListing) => void;
@@ -59,6 +62,10 @@ export default function PipelineBoard({
    * solo. Computed by the page, which holds the roster.
    */
   crewTag?: (listing: FeedListing) => string | null;
+  /** Take it out of the running — opens the reason dialog upstream. */
+  onPass: (listing: FeedListing) => void;
+  /** Download the .ics for a booked tour. */
+  onAddToCalendar: (listing: FeedListing) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
@@ -179,6 +186,29 @@ export default function PipelineBoard({
                   <span className="board-top">
                     <strong>{money(l.price)}</strong>
                     <RatingDisc rating={l.rating} grade={l.grade} size="sm" />
+                    {/* Anything on the board can leave it. Without this the
+                        only way out of Interested was to open the panel and
+                        hunt through the status menu. */}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="board-drop"
+                      title="Not for me"
+                      aria-label={`Pass on ${l.address}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPass(l);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onPass(l);
+                        }
+                      }}
+                    >
+                      <Icon name="close" size={12} />
+                    </span>
                   </span>
                   <span className="board-addr">
                     {l.address}
@@ -186,6 +216,41 @@ export default function PipelineBoard({
                   </span>
                   <span className="muted board-where">{l.neighborhood}</span>
                   {crewTag?.(l) && <span className="board-crew">{crewTag(l)}</span>}
+
+                  {/* A booked tour's whole point is being somewhere at a
+                      time, so the handoff to your calendar belongs on the
+                      card — not only inside a panel you have to open. */}
+                  {l.stage === "tour" && l.tourAt && (
+                    <span className="board-cal">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="btn btn-quiet"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddToCalendar(l);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onAddToCalendar(l);
+                          }
+                        }}
+                      >
+                        <Icon name="calendar" size={13} /> Calendar
+                      </span>
+                      <a
+                        className="btn btn-quiet"
+                        href={googleCalendarUrl(l) ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Google <Icon name="external" size={11} />
+                      </a>
+                    </span>
+                  )}
                   {/* One source of truth with the cards and the panel, so the
                       board can never disagree about what comes next. */}
                   <span

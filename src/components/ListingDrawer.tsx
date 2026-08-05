@@ -478,6 +478,18 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             </div>
           </dl>
 
+          {/* A passed place explains itself — to you a week later, and to
+              whoever found it. */}
+          {listing.stage === "passed" && listing.passReason && (
+            <div className="passnote">
+              <b>Passed</b>
+              <span>{listing.passReason}</span>
+              <button className="linkish" onClick={() => patch({ action: "unpass" })}>
+                Put it back
+              </button>
+            </div>
+          )}
+
           {/* --- getting around ------------------------------------------ */}
           {(() => {
             const near = nearestStation(listing.lat, listing.lon);

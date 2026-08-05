@@ -35,6 +35,8 @@ import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
 import Changes, { type Change } from "@/components/Changes";
+import PassDialog from "@/components/PassDialog";
+import { icsFor, icsFilename } from "@/lib/calendar";
 import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
 // Client-only: Leaflet reads `window` the moment its module loads, which
@@ -145,6 +147,8 @@ export default function Home() {
   const [open, setOpen] = useState<FeedListing | null>(null);
   /** The tour-day route planner, opened from the pipeline's Tour column. */
   const [planning, setPlanning] = useState(false);
+  /** The listing whose pass dialog is open. */
+  const [passing, setPassing] = useState<FeedListing | null>(null);
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
   const [email, setEmail] = useState("");
@@ -471,6 +475,46 @@ export default function Home() {
     },
     [patch, loadFeed, toast]
   );
+
+  /**
+   * Passing with a reason attached, from the dialog.
+   *
+   * Same optimistic removal and undo as a bare pass — the reason rides along
+   * on the write so the two can never disagree, and undoing clears it.
+   */
+  const passWithReason = useCallback(
+    (listing: FeedListing, reason: string) => {
+      setPassing(null);
+      setListings((list) => list.filter((l) => l.id !== listing.id));
+      patch(listing.id, { action: "pass", reason }, false).catch(() => loadFeed());
+      toast({
+        message: reason
+          ? `Passed on ${listing.address} — reason saved`
+          : `Passed on ${listing.address}`,
+        actionLabel: "Undo",
+        onAction: () => {
+          patch(listing.id, { action: "unpass" }, false)
+            .then(loadFeed)
+            .catch(() => loadFeed());
+        },
+      });
+    },
+    [patch, loadFeed, toast]
+  );
+
+  /** The .ics for a booked tour, shared by the board and the drawer. */
+  const downloadIcs = useCallback((listing: FeedListing) => {
+    const body = icsFor(listing);
+    if (!body) return;
+    const url = URL.createObjectURL(new Blob([body], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = icsFilename(listing);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }, []);
 
   /**
    * One "reach out" action whose behaviour depends on what the listing has.
@@ -1098,6 +1142,8 @@ export default function Home() {
             onMove={moveStage}
             onQuickAdd={quickAdd}
             onPlanTours={() => setPlanning(true)}
+            onPass={(l) => setPassing(l)}
+            onAddToCalendar={downloadIcs}
             crewTag={(l) => {
               if (!crew) return null;
               // Point person first — on a working board, "who's on this" beats
@@ -1182,6 +1228,22 @@ export default function Home() {
           onClose={() => setOpen(null)}
           onChanged={loadFeed}
           crew={crew}
+        />
+      )}
+
+      {/* Passing from the board. In a crew it asks why, so the person who
+          found it learns something; solo it's the same one tap it always was. */}
+      {passing && (
+        <PassDialog
+          listing={passing}
+          finderName={
+            passing.addedById && crew
+              ? (crew.members.find((m) => m.userId === passing.addedById && !m.isYou)?.name ??
+                null)
+              : null
+          }
+          onConfirm={(reason) => passWithReason(passing, reason)}
+          onClose={() => setPassing(null)}
         />
       )}
 

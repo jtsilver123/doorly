@@ -179,6 +179,12 @@ export interface FeedListing extends Listing {
   myContactPhone: string;
   myContactEmail: string;
   myContactName: string;
+  /**
+   * Why this one is out, written for whoever put it in. Empty unless you
+   * passed with a reason.
+   */
+  passReason: string;
+  passedAt: string | null;
   /** When the viewing actually is. A booked tour without a time is just a label. */
   tourAt: string | null;
   /**

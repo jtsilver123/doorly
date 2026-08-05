@@ -80,6 +80,8 @@ interface StateRow {
   tour_kind: string | null;
   tour_ends_at: string | null;
   added_by: string | null;
+  pass_reason: string | null;
+  passed_at: string | null;
   poc_user_id: string | null;
 }
 
@@ -310,6 +312,8 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       myScore: state?.my_score ?? null,
       tourKind: state?.tour_kind === "open_house" ? "open_house" : "private",
       tourEndsAt: state?.tour_ends_at ?? null,
+      passReason: state?.pass_reason ?? "",
+      passedAt: state?.passed_at ?? null,
       addedById: state?.added_by ?? null,
       pocId: state?.poc_user_id ?? null,
       contactCount: contact?.count ?? 0,
@@ -509,6 +513,8 @@ export async function setListingFields(
     contact_phone: string;
     contact_email: string;
     contact_name: string;
+    pass_reason: string;
+    passed_at: string | null;
     tour_at: string | null;
     my_score: number | null;
     tour_kind: string;
@@ -570,6 +576,30 @@ export async function recordFeedback(
  * the training signal too, otherwise the ranker keeps learning from a mistake
  * you already took back.
  */
+/**
+ * Take it out of the running, optionally saying why.
+ *
+ * The reason is for whoever put it in the pipeline — in a crew that's often
+ * somebody else, and a place that silently disappears teaches the person who
+ * volunteered to help absolutely nothing.
+ */
+export async function passListing(listingId: string, reason = ""): Promise<void> {
+  const supabase = await db();
+  const now = new Date().toISOString();
+  await supabase.from("user_listing_state").upsert(
+    {
+      user_id: await pipelineOwnerId(),
+      listing_id: listingId,
+      stage: "passed",
+      stage_changed_at: now,
+      pass_reason: reason.slice(0, 500),
+      passed_at: now,
+      updated_at: now,
+    },
+    { onConflict: "user_id,listing_id" }
+  );
+}
+
 export async function undoPass(listingId: string): Promise<void> {
   const supabase = await db();
   await supabase
@@ -583,6 +613,9 @@ export async function undoPass(listingId: string): Promise<void> {
       listing_id: listingId,
       stage: "inbox",
       stage_changed_at: new Date().toISOString(),
+      // Back in the running means the reason no longer applies.
+      pass_reason: "",
+      passed_at: null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id,listing_id" }

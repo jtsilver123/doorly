@@ -5,6 +5,7 @@ import {
   recordFeedback,
   setListingFields,
   setStage,
+  passListing,
   undoPass,
 } from "@/lib/feed";
 import type { ContactLog, Stage } from "@/types";
@@ -101,6 +102,11 @@ export async function PATCH(request: Request, { params }: Params) {
         await setListingFields(id, { my_score: score });
         break;
       }
+
+      case "pass":
+        // The reason travels with the pass so the two can't disagree.
+        await passListing(id, String(body.reason ?? ""));
+        break;
 
       case "unpass":
         await undoPass(id);
