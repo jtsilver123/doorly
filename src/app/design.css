@@ -1947,6 +1947,9 @@ button.fact:hover { border-color: var(--accent); }
 
 /* --- when the tour is ----------------------------------------------------- */
 
+.tourplan { display: grid; gap: var(--s2); }
+.tourplan-kind { display: flex; gap: var(--s1); }
+
 .tourtime {
   display: grid;
   gap: 5px;
@@ -2032,3 +2035,292 @@ button.fact:hover { border-color: var(--accent); }
   font-size: 10px;
   color: var(--text-muted);
 }
+
+/* The autosave status line. Quiet by design: it replaces a Save button, and a
+   thing that fires on every pause in typing must not flash or move. */
+.savestate {
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+  min-height: 1.2em;
+}
+
+.savestate[data-state="saving"] { color: var(--accent); }
+.savestate[data-state="saved"] { color: var(--good); font-weight: 600; }
+
+/* --- the split map view ---------------------------------------------------- */
+
+/* Zillow's arrangement, because it's correct: the map holds still while the
+   results scroll past it, so geography and inventory are on screen together. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(340px, 44%) minmax(0, 1fr);
+  gap: var(--s4);
+  align-items: start;
+}
+
+.split-map {
+  position: sticky;
+  /* Clears the frozen search header above; the exact figure matters less
+     than being past it, since the map fills to the viewport bottom. */
+  top: 118px;
+  height: calc(100dvh - 134px);
+  min-height: 420px;
+}
+
+.split-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: var(--s4);
+  align-content: start;
+}
+
+.citymap {
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  /* Leaflet's panes stack z-indexes into the hundreds; without a new
+     stacking context they float over the frozen header and the drawer. */
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
+
+.citymap .leaflet-container {
+  height: 100%;
+  width: 100%;
+  font-family: inherit;
+  background: var(--surface-2);
+}
+
+/* Leaflet gives divIcons a white box and a border; ours is just a span. */
+.citymap .pinwrap { background: none; border: none; }
+
+.mappin {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: transform 0.1s ease;
+}
+
+/* The same four grades as the discs — one judgment, two projections. */
+.mappin[data-grade="excellent"] { background: #15803d; }
+.mappin[data-grade="strong"]    { background: #2563eb; }
+.mappin[data-grade="fair"]      { background: #b45309; }
+.mappin[data-grade="weak"]      { background: #6b7280; }
+
+.mappin.is-linked,
+.mappin:hover { transform: translate(-50%, -50%) scale(1.22); }
+
+/* Zoomed out, ordinary pins collapse to dots so density stays readable.
+   Your shortlist (.is-hot) and whatever's hovered keep their price. */
+.citymap[data-tier="far"] .mappin:not(.is-hot):not(.is-linked) {
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  font-size: 0;
+  border-width: 1.5px;
+}
+
+@media (max-width: 860px) {
+  .split { display: block; }
+  .split-map {
+    position: relative;
+    top: auto;
+    height: 300px;
+    min-height: 300px;
+    margin-bottom: var(--s4);
+  }
+}
+
+/* --- your own score ------------------------------------------------------- */
+
+/* Outlined, never filled — the filled discs are the computed rating, and two
+   numbers that look identical would be two numbers nobody can tell apart. */
+.myscore {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.myscore b { font-weight: 760; font-size: var(--t-lg); letter-spacing: -0.025em; }
+.myscore i { font-style: normal; font-size: 9px; opacity: 0.8; text-transform: uppercase; }
+.myscore[data-size="sm"] { padding: 1px 4px; }
+.myscore[data-size="sm"] b { font-size: var(--t-sm); }
+.myscore[data-size="lg"] { padding: 5px 9px; border-radius: var(--r-md); }
+.myscore[data-size="lg"] b { font-size: var(--t-2xl); }
+.myscore[data-size="lg"] i { font-size: var(--t-xs); }
+
+.myscore-field { display: grid; gap: var(--s2); }
+
+.myscore-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.myscore-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+.myscore-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-xs);
+}
+
+/* The payoff for typing in a number, directly under the number. */
+.textnow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s3);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.textnow:hover { border-color: var(--accent); }
+.textnow:focus-visible { outline: none; box-shadow: var(--ring); }
+.textnow-go { font-size: var(--t-xl); line-height: 1; }
+.textnow-copy { display: grid; gap: 2px; min-width: 0; }
+.textnow-copy > b { font-size: var(--t-md); font-weight: 600; color: var(--accent); }
+.textnow-copy > span { font-size: var(--t-xs); color: var(--text-muted); }
+
+/* --- the account button and its menu -------------------------------------- */
+
+/* This shipped with markup and no rules at all, which is why the bottom of the
+   rail was a run of raw text spilling past the border. Everything below is the
+   missing half. */
+
+.account { position: relative; }
+
+.account-btn {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  padding: var(--s2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.account-btn:hover { background: var(--surface-2); border-color: var(--border); }
+.account-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* minmax(0, 1fr) above plus this is what lets a long address actually
+   ellipsis rather than push the caret off the edge of the rail. */
+.account-who { display: grid; gap: 1px; min-width: 0; }
+
+.account-who > b {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.account-who > span {
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.account-who > b,
+.account-who > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-caret {
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+
+.account-btn[aria-expanded="true"] .account-caret { transform: rotate(180deg); }
+
+/* Upward, because the button is the last thing in the column. */
+.accountmenu {
+  position: absolute;
+  bottom: calc(100% + var(--s1));
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: grid;
+  gap: 1px;
+  padding: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+
+.accountmenu-item {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 7px var(--s2);
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.accountmenu-item:hover { background: var(--surface-2); }
+.accountmenu-item:focus-visible { outline: none; box-shadow: var(--ring); }
+.accountmenu-item > b { font-size: var(--t-sm); font-weight: 600; }
+.accountmenu-item > span { font-size: var(--t-xs); color: var(--text-muted); }
+
+/* Signing out is a different kind of thing from opening a settings panel, so
+   it gets a rule above it rather than sitting in the same run. */
+.accountmenu-out {
+  margin-top: var(--s1);
+  padding-top: var(--s1);
+  border-top: 1px solid var(--border);
+}
+
+.accountmenu-out .accountmenu-item > b { color: var(--warn); }

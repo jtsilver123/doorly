@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import type { FeedListing, Source } from "@/types";
 import type { Stage } from "@/types";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
@@ -18,6 +19,8 @@ import { daysUntil } from "@/lib/cost";
 import { applyFilters } from "@/lib/filters";
 import { nextAction } from "@/lib/nextAction";
 import { runwayDays } from "@/lib/runway";
+import { useAutosave, saveLabel } from "@/lib/useAutosave";
+import { formatPhone } from "@/lib/phone";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
@@ -31,7 +34,12 @@ import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
 import Logo from "@/components/Logo";
-import MapView from "@/components/MapView";
+// Client-only: Leaflet reads `window` the moment its module loads, which
+// detonates the server prerender. The map has no server-renderable form anyway.
+const CityMap = dynamic(() => import("@/components/CityMap"), {
+  ssr: false,
+  loading: () => <div className="citymap" aria-busy="true" />,
+});
 
 type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
 
@@ -631,6 +639,9 @@ export default function Home() {
     [profile, loadFeed, toast]
   );
 
+  // No toast: the forms save themselves as you type now, and a "Saved" pop
+  // for every debounced keystroke would be a metronome. Each form shows its
+  // own quiet status line instead.
   async function saveProfile(next: Profile) {
     setProfile(next);
     await fetch("/api/profile", {
@@ -638,7 +649,6 @@ export default function Home() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ profile: next }),
     });
-    toast({ message: "Saved", tone: "good" });
   }
 
   return (
@@ -917,12 +927,38 @@ export default function Home() {
                 onClear={clearFilters}
               />
             ) : view === "map" ? (
-              <MapView
-                listings={visible}
-                onOpen={setOpen}
-                linkedId={linkedId}
-                onHover={setLinkedId}
-              />
+              // Zillow's split: the map holds still on the left while the
+              // results scroll on the right, hover linked both ways.
+              <div className="split">
+                <div className="split-map">
+                  <CityMap
+                    listings={visible}
+                    onOpen={setOpen}
+                    linkedId={linkedId}
+                    onHover={setLinkedId}
+                  />
+                </div>
+                <div className="split-cards">
+                  {visible.slice(0, pageSize).map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      linked={linkedId === listing.id}
+                      preferredSource={profile.preferredSource}
+                      onHover={setLinkedId}
+                      onOpen={setOpen}
+                      onStar={star}
+                      onPass={pass}
+                      onReach={reachOut}
+                    />
+                  ))}
+                  {visible.length > pageSize && (
+                    <div ref={sentinelRef} className="more-sentinel">
+                      Showing {pageSize} of {visible.length.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <div className="grid" ref={gridRef}>
                 {visible.slice(0, pageSize).map((listing, i) => (
@@ -1167,6 +1203,48 @@ function ApiSettings({
     setChecks(String(status.checksPerDay));
   }, [status]);
 
+  /**
+   * Schedule, depth and allowance save themselves. The key deliberately does
+   * not: debouncing a 27-character paste-or-type would write the first half of
+   * a key mid-entry, so it commits on blur or Enter instead.
+   *
+   * Disabled until the first status load — before that the fields hold
+   * defaults, and "saving" the defaults over real stored settings on mount is
+   * how apps quietly reset people's configuration.
+   */
+  const settingsState = useAutosave(
+    { pages, limit, checks },
+    async (next) => {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pagesPerSource: Number(next.pages),
+          monthlyLimit: Number(next.limit),
+          checksPerDay: Number(next.checks),
+        }),
+      });
+      onSaved();
+    },
+    { enabled: Boolean(status) }
+  );
+
+  async function saveKey() {
+    const trimmed = key.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ realtyApiKey: trimmed }),
+    });
+    setKey("");
+    setBusy(false);
+    setNote("Key saved — the next check uses it");
+    setTimeout(() => setNote(""), 4000);
+    onSaved();
+  }
+
   // Measured from this key's actual spend (server-side), scaled if the user is
   // trying a different page depth than the one the measurement was taken at.
   const savedPages = Math.max(status?.pagesPerSource ?? 1, 1);
@@ -1186,24 +1264,6 @@ function ApiSettings({
           month: "short",
           day: "numeric",
         });
-
-  async function save() {
-    setBusy(true);
-    await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        realtyApiKey: key || undefined,
-        pagesPerSource: Number(pages),
-        monthlyLimit: Number(limit),
-        checksPerDay: Number(checks),
-      }),
-    });
-    setKey("");
-    setBusy(false);
-    setNote("Saved");
-    onSaved();
-  }
 
   return (
     <div className="surface" style={{ padding: 20, display: "grid", gap: 12 }}>
@@ -1269,12 +1329,16 @@ function ApiSettings({
 
       <div className="fieldgrid">
       <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-        <span className="muted">New API key</span>
+        <span className="muted">New API key — saves when you click away</span>
         <input
           className="field"
           value={key}
           placeholder="rt_…"
           onChange={(e) => setKey(e.target.value)}
+          onBlur={saveKey}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveKey();
+          }}
         />
       </label>
 
@@ -1302,14 +1366,9 @@ function ApiSettings({
         Raise it only when you want to backfill deeper history.
       </div>
 
-      <button className="btn btn-primary" onClick={save} disabled={busy}>
-        {busy ? "Saving…" : "Save"}
-      </button>
-      {note && (
-        <span className="muted" style={{ fontSize: 12 }}>
-          {note}
-        </span>
-      )}
+      <div className="savestate" data-state={busy ? "saving" : settingsState} role="status">
+        {busy ? "Saving key…" : note || saveLabel(settingsState)}
+      </div>
     </div>
   );
 }
@@ -1327,6 +1386,7 @@ function ProfileForm({
 }) {
   const [draft, setDraft] = useState(profile);
   useEffect(() => setDraft(profile), [profile]);
+  const saveState = useAutosave(draft, onSave);
 
   const owner = draft.employment === "self_employed";
 
@@ -1404,7 +1464,15 @@ function ProfileForm({
               className="field"
               value={String(draft[key] ?? "")}
               placeholder={placeholder}
-              onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+              inputMode={key === "phone" ? "tel" : undefined}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  // Your number ends up in every message you send; digits only,
+                  // punctuated as you type, same as the listing contact field.
+                  [key]: key === "phone" ? formatPhone(e.target.value) : e.target.value,
+                })
+              }
             />
           </label>
         ))}
@@ -1465,16 +1533,18 @@ function ProfileForm({
               address: "55 Morton Street",
               unit: "5J",
               price: 3500,
+              bedrooms: 1,
               neighborhood: "West Village",
+              myContactName: "Jane at Corcoran",
             } as FeedListing,
             draft
           )}
         </pre>
       </div>
 
-      <button className="btn btn-primary" onClick={() => onSave(draft)}>
-        Save
-      </button>
+      <div className="savestate" data-state={saveState} role="status">
+        {saveLabel(saveState)}
+      </div>
     </div>
   );
 }

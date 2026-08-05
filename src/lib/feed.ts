@@ -75,6 +75,9 @@ interface StateRow {
   contact_email: string | null;
   contact_name: string | null;
   tour_at: string | null;
+  my_score: number | null;
+  tour_kind: string | null;
+  tour_ends_at: string | null;
 }
 
 function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
@@ -297,6 +300,9 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       myContactEmail: state?.contact_email ?? "",
       myContactName: state?.contact_name ?? "",
       tourAt: state?.tour_at ?? null,
+      myScore: state?.my_score ?? null,
+      tourKind: state?.tour_kind === "open_house" ? "open_house" : "private",
+      tourEndsAt: state?.tour_ends_at ?? null,
       contactCount: contact?.count ?? 0,
       lastContactAt: contact?.last ?? null,
       lastContactChannel: contact?.channel ?? null,
@@ -482,6 +488,9 @@ export async function setListingFields(
     contact_email: string;
     contact_name: string;
     tour_at: string | null;
+    my_score: number | null;
+    tour_kind: string;
+    tour_ends_at: string | null;
   }>
 ): Promise<void> {
   const supabase = await db();

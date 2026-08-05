@@ -65,10 +65,30 @@ export async function PATCH(request: Request, { params }: Params) {
       case "tourAt":
         await setListingFields(id, {
           tour_at: body.tourAt ? String(body.tourAt) : null,
+          tour_kind: body.tourKind === "open_house" ? "open_house" : "private",
+          // An end time only means something for an open-house window.
+          tour_ends_at:
+            body.tourKind === "open_house" && body.tourEndsAt
+              ? String(body.tourEndsAt)
+              : null,
         });
         // A time implies the tour is booked; saying so saves a second click.
         if (body.tourAt) await setStage(id, "tour");
         break;
+
+      case "myScore": {
+        // Null clears it and hands the listing back to the computed rating.
+        // Anything else is clamped rather than rejected — a slider or a typed
+        // "150" should land on 100, not throw away the edit.
+        const raw = body.myScore;
+        const parsed = raw == null || raw === "" ? null : Number(raw);
+        const score =
+          parsed == null || !Number.isFinite(parsed)
+            ? null
+            : Math.min(100, Math.max(1, Math.round(parsed)));
+        await setListingFields(id, { my_score: score });
+        break;
+      }
 
       case "unpass":
         await undoPass(id);

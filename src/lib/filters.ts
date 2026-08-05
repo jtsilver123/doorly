@@ -99,11 +99,13 @@ export type SortKey =
   | "effective"
   | "allin"
   | "upfront"
-  | "recent_change";
+  | "recent_change"
+  | "myscore";
 
 /** The sort options offered in the UI, in the order they're shown. */
 export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "best", label: "Best for me" },
+  { value: "myscore", label: "My score" },
   { value: "newest", label: "Newest first" },
   { value: "cheapest", label: "Lowest rent" },
   { value: "effective", label: "Lowest after concessions" },
@@ -114,6 +116,10 @@ export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 const SORTERS: Record<SortKey, (a: FeedListing, b: FeedListing) => number> = {
   best: (a, b) => b.rating - a.rating,
+  // Scored places first, highest down; everything unscored falls in behind in
+  // computed-rating order rather than into an arbitrary heap.
+  myscore: (a, b) =>
+    (b.myScore ?? -1) - (a.myScore ?? -1) || b.rating - a.rating,
   newest: (a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt),
   cheapest: (a, b) => a.price - b.price,
   upfront: (a, b) => a.upfrontCost - b.upfrontCost,

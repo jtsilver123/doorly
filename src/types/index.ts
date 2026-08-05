@@ -137,6 +137,14 @@ export const STAGE_LABEL: Record<Stage, string> = {
   passed: "Passed",
 };
 
+/**
+ * How you're seeing the place. A private viewing is an appointment with your
+ * name on it; an open house is a posted window anyone can walk into. They need
+ * different copy — "Sat 11:00 AM – 12:30 PM, just show up" is a different
+ * instruction from "Thu 3:00 PM, don't be late".
+ */
+export type TourKind = "private" | "open_house";
+
 /** Stages that represent an active pursuit, in pipeline order. */
 export const PIPELINE_STAGES: Stage[] = [
   "interested",
@@ -173,6 +181,20 @@ export interface FeedListing extends Listing {
   myContactName: string;
   /** When the viewing actually is. A booked tour without a time is just a label. */
   tourAt: string | null;
+  /**
+   * Most NYC viewings are open houses: a window you turn up to, not a slot
+   * somebody booked you into. The distinction changes what the app should say
+   * and whether an end time means anything.
+   */
+  tourKind: TourKind;
+  /** The far end of an open-house window. Null for a private viewing. */
+  tourEndsAt: string | null;
+  /**
+   * Your own 1-100, sitting beside the computed one rather than replacing it.
+   * The rating can weigh price against comparables; it cannot know the block
+   * was loud or that you walked in and knew. Null until you say.
+   */
+  myScore: number | null;
   contactCount: number;
   lastContactAt: string | null;
   /** How you last reached out — shown on the card so it's visible at a glance. */

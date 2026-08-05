@@ -7,6 +7,7 @@ import type {
   ListingEvent,
   PricePoint,
   Stage,
+  TourKind,
 } from "@/types";
 import {
   EVENT_LABEL,
@@ -17,8 +18,9 @@ import {
 } from "@/types";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
-import { RatingDisc, ProsConsList } from "@/components/Rating";
+import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
+import { formatPhone, isCompletePhone } from "@/lib/phone";
 import {
   bestChannel,
   reachableOn,
@@ -111,10 +113,12 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   const [copied, setCopied] = useState(false);
   const [imageBroken, setImageBroken] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
-  const [phone, setPhone] = useState(listing.myContactPhone);
+  const [phone, setPhone] = useState(formatPhone(listing.myContactPhone));
   const [who, setWho] = useState(listing.myContactName);
   const [email, setEmail] = useState(listing.myContactEmail);
   const [tourAt, setTourAt] = useState(toLocalInput(listing.tourAt));
+  const [tourKind, setTourKind] = useState<TourKind>(listing.tourKind);
+  const [tourEndsAt, setTourEndsAt] = useState(toLocalInput(listing.tourEndsAt));
   /**
    * Stage moves paint immediately and reconcile behind the scenes.
    *
@@ -132,12 +136,14 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   // A different listing in the same panel starts from its own stage.
   useEffect(() => setStage(listing.stage), [listing.id, listing.stage]);
   useEffect(() => {
-    setPhone(listing.myContactPhone);
+    setPhone(formatPhone(listing.myContactPhone));
     setWho(listing.myContactName);
     setEmail(listing.myContactEmail);
     setTourAt(toLocalInput(listing.tourAt));
+    setTourKind(listing.tourKind);
+    setTourEndsAt(toLocalInput(listing.tourEndsAt));
     setEditingContact(false);
-  }, [listing.id, listing.myContactPhone, listing.myContactName, listing.myContactEmail, listing.tourAt]);
+  }, [listing.id, listing.myContactPhone, listing.myContactName, listing.myContactEmail, listing.tourAt, listing.tourKind, listing.tourEndsAt]);
 
   useEffect(() => {
     let live = true;
@@ -223,6 +229,17 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
     patch({ action: "stage", stage: next }).catch(() => setStage(listing.stage));
   }
 
+  /** One write for the whole plan: start, kind, and (open house only) end. */
+  function saveTour(start: string, kind: TourKind, end: string) {
+    patch({
+      action: "tourAt",
+      tourAt: start ? new Date(start).toISOString() : null,
+      tourKind: kind,
+      tourEndsAt:
+        kind === "open_house" && end ? new Date(end).toISOString() : null,
+    });
+  }
+
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
    * then hand off. The CRM writes happen *first* on purpose — an sms:/mailto:
@@ -241,10 +258,13 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
       await patch({ action: "stage", stage: "contacted" });
     }
     if (channel === "text") {
-      window.location.href = smsLink(listing.contactPhone, message);
+      // `contact`, not `listing.contactPhone` — a number you dug up yourself is
+      // the only one most listings have, and sending to the published field
+      // meant the button opened an empty message every time.
+      window.location.href = smsLink(contact.phone, message);
     } else if (channel === "email") {
       window.location.href = mailtoLink(
-        listing.contactEmail,
+        contact.email,
         tourSubject(listing),
         message
       );
@@ -289,12 +309,15 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
             alignItems: "flex-start",
           }}
         >
-          <RatingDisc
-            rating={listing.rating}
-            grade={listing.grade}
-            size="lg"
-            title={`${listing.rating} out of 100 for your search`}
-          />
+          <div style={{ display: "grid", gap: 4, justifyItems: "center" }}>
+            <RatingDisc
+              rating={listing.rating}
+              grade={listing.grade}
+              size="lg"
+              title={`${listing.rating} out of 100 for your search`}
+            />
+            {listing.myScore != null && <MyScoreDisc score={listing.myScore} size="sm" />}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 600 }}>
               {money(listing.price)}
@@ -382,6 +405,17 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
             </label>
             <ProsConsList listing={listing} />
             <Perks keys={listing.perks} limit={10} showLabels />
+
+            {/* The rating knows what the listing published. It does not know
+                the block was loud at 8pm or that the kitchen photo was three
+                years old. After a viewing you have the better number. */}
+            <label className="muted" style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>
+              YOUR SCORE
+            </label>
+            <MyScoreField
+              score={listing.myScore}
+              onChange={(next) => patch({ action: "myScore", myScore: next })}
+            />
           </section>
 
           {/* --- outreach ------------------------------------------------ */}
@@ -468,7 +502,10 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                     inputMode="tel"
                     placeholder="(212) 555-0134"
                     autoFocus
-                    onChange={(e) => setPhone(e.target.value)}
+                    /* Digits only, punctuated as you go. A number copied off a
+                       sign arrives as "212.555.0134" or "+1 212 555 0134", and
+                       three spellings of one broker is three contacts. */
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
                   />
                 </label>
                 <label>
@@ -493,6 +530,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                 <div className="contactedit-actions">
                   <button
                     className="btn btn-primary"
+                    disabled={Boolean(phone.trim()) && !isCompletePhone(phone)}
                     onClick={async () => {
                       await patch({
                         action: "contactDetails",
@@ -508,6 +546,11 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                   <button className="btn" onClick={() => setEditingContact(false)}>
                     Cancel
                   </button>
+                  {phone.trim() && !isCompletePhone(phone) && (
+                    <span className="muted" style={{ fontSize: 11, alignSelf: "center" }}>
+                      Needs 10 digits
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -515,6 +558,31 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                 {contact.phone || contact.email
                   ? "Edit their contact details"
                   : "I have their number — add it"}
+              </button>
+            )}
+
+            {/*
+              The point of typing in a number is texting it. Before this you
+              saved the contact and then had to work out that the button at the
+              top of the panel had quietly changed meaning — so the message,
+              already written, sits right under the number it's going to.
+            */}
+            {!editingContact && contact.phone && (
+              <button
+                className="textnow"
+                onClick={() => reachOut("text")}
+                title={message}
+              >
+                <span className="textnow-go" aria-hidden="true">
+                  💬
+                </span>
+                <span className="textnow-copy">
+                  <b>Text {formatPhone(contact.phone) || contact.phone}</b>
+                  <span>
+                    {contact.who ? `${contact.who} · ` : ""}
+                    Opens your messages with the request already written
+                  </span>
+                </span>
               </button>
             )}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -651,23 +719,70 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
                 one is a label rather than a plan, and it's the thing you'll
                 want to look up on the morning of. */}
             {stage === "tour" && (
-              <label className="tourtime">
-                <span>When is it?</span>
-                <input
-                  id="tour-at"
-                  className="field"
-                  type="datetime-local"
-                  value={tourAt}
-                  onChange={(e) => {
-                    setTourAt(e.target.value);
-                    patch({
-                      action: "tourAt",
-                      tourAt: e.target.value ? new Date(e.target.value).toISOString() : null,
-                    });
-                  }}
-                />
-                {listing.tourAt && <b>{tourWhen(listing.tourAt)}</b>}
-              </label>
+              <div className="tourplan">
+                {/* Which kind first, because it changes what the fields below
+                    mean: an appointment has a time, an open house has a
+                    window. */}
+                <div className="tourplan-kind" role="radiogroup" aria-label="Kind of viewing">
+                  {(
+                    [
+                      ["private", "Private tour"],
+                      ["open_house", "Open house"],
+                    ] as [TourKind, string][]
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      role="radio"
+                      aria-checked={tourKind === value}
+                      className={tourKind === value ? "btn btn-primary" : "btn"}
+                      style={{ fontSize: 12, padding: "4px 9px" }}
+                      onClick={() => {
+                        setTourKind(value);
+                        if (tourAt) saveTour(tourAt, value, tourEndsAt);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="tourtime">
+                  <span>{tourKind === "open_house" ? "Starts" : "When is it?"}</span>
+                  <input
+                    id="tour-at"
+                    className="field"
+                    type="datetime-local"
+                    value={tourAt}
+                    onChange={(e) => {
+                      setTourAt(e.target.value);
+                      saveTour(e.target.value, tourKind, tourEndsAt);
+                    }}
+                  />
+                  {listing.tourAt && <b>{tourWhen(listing.tourAt)}</b>}
+                </label>
+
+                {tourKind === "open_house" && (
+                  <label className="tourtime">
+                    <span>Until</span>
+                    <input
+                      className="field"
+                      type="datetime-local"
+                      value={tourEndsAt}
+                      onChange={(e) => {
+                        setTourEndsAt(e.target.value);
+                        saveTour(tourAt, tourKind, e.target.value);
+                      }}
+                    />
+                    {listing.tourEndsAt && <b>{tourWhen(listing.tourEndsAt)}</b>}
+                  </label>
+                )}
+
+                {tourKind === "open_house" && (
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    A window, not an appointment — show up any time inside it.
+                  </span>
+                )}
+              </div>
             )}
           </section>
 

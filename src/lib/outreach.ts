@@ -90,29 +90,64 @@ export function listingLabel(listing: FeedListing): string {
  * strangers get ignored, and every clause here answers a question the agent
  * would otherwise have to ask.
  */
+/** "Jane at Corcoran" -> "Jane". The greeting wants a name, not a title. */
+function firstNameOf(full: string): string {
+  const word = (full || "").trim().split(/\s+/)[0] ?? "";
+  // "Jane," off a hastily-typed contact still greets as "Jane".
+  return word.replace(/[^\p{L}'-]/gu, "");
+}
+
+/**
+ * The message itself.
+ *
+ * The old draft read like a mortgage application with a greeting stapled on —
+ * six facts about creditworthiness before any human being would have said why
+ * they were writing. Agents skim; a wall of qualifications from a stranger
+ * reads as a form letter and gets a form-letter reply.
+ *
+ * So it talks the way you'd actually text someone: their name if we have it,
+ * which apartment, and one concrete easy ask — a quick video — before the
+ * bigger one, the tour. The qualifications still ride along, but as a "bit
+ * about me" near the end, where they land as reassurance instead of a resume.
+ */
 export function draftTourMessage(listing: FeedListing, profile: Profile): string {
-  const who = profile.name ? `This is ${profile.name}.` : "";
+  const agent = firstNameOf(listing.myContactName || listing.contactName || "");
+  const greeting = agent ? `Hi ${agent}!` : "Hi there!";
+  const me = profile.name ? `I'm ${firstNameOf(profile.name)} —` : "";
+
   const unit = listing.unit ? ` #${listing.unit}` : "";
-  const address = `${listing.address}${unit}`;
-  const price = listing.price ? ` (listed at $${listing.price.toLocaleString()}/mo)` : "";
-
-  const qualifierLine = qualifyingLine(profile);
-
-  const moveIn = profile.moveInDate
-    ? ` I'm looking to move in around ${formatMoveIn(profile.moveInDate)}.`
-    : "";
-
-  const callback = [profile.phone, profile.email].filter(Boolean).join(" / ");
-  const callbackLine = callback ? ` You can reach me here or at ${callback}.` : "";
-
-  return [
-    `Hi! ${who} I saw your listing at ${address}${price} and I'd love to see it as soon as possible — today or tomorrow if there's any availability.`,
-    `${qualifierLine}${moveIn} I can sign quickly and have documents ready to go.`,
-    `What times work for a viewing?${callbackLine}`,
-    profile.extra,
+  const size =
+    listing.bedrooms === 0
+      ? "studio"
+      : Number.isFinite(listing.bedrooms)
+        ? `${listing.bedrooms} bed`
+        : "place";
+  const price = listing.price ? ` listed at $${listing.price.toLocaleString()}` : "";
+  const opener = [
+    greeting,
+    me,
+    `I came across the ${size} at ${listing.address}${unit}${price} and it looks great.`,
   ]
     .filter(Boolean)
-    .join("\n\n");
+    .join(" ");
+
+  // The small ask first. A video costs the agent ninety seconds and filters
+  // out the places that photograph better than they live — then the tour ask
+  // is already teed up for the ones that survive.
+  const ask =
+    "Any chance you could send a quick video walkthrough when you get a minute? If it looks as good as the photos, I'd love to come tour it right after — I'm flexible on timing.";
+
+  const moveIn = profile.moveInDate
+    ? ` Hoping to move in around ${formatMoveIn(profile.moveInDate)}.`
+    : "";
+  const about = `${qualifyingLine(profile)}${moveIn}`.trim();
+
+  const callback = [profile.phone, profile.email].filter(Boolean).join(" / ");
+  const thanks = callback
+    ? `Thanks so much! You can reach me here or at ${callback}.`
+    : "Thanks so much!";
+
+  return [opener, ask, about, thanks, profile.extra].filter(Boolean).join("\n\n");
 }
 
 /**
@@ -142,17 +177,19 @@ export function qualifyingLine(profile: Profile): string {
   }
   if (profile.creditNote) parts.push(profile.creditNote);
 
-  const opener = parts.length
-    ? `I'm a qualified renter — ${joinList(parts)}.`
-    : "I'm a qualified renter.";
+  // "A bit about me" rather than "I'm a qualified renter" — the second is a
+  // claim, the first is a person. The facts underneath are identical.
+  const opener = parts.length ? `A bit about me — ${joinList(parts)}.` : "";
 
   // Only apologise for a missing salary when there is genuinely no figure to
   // give. With income on the return, that framing would undersell you.
   const salaryGap = !profile.income && owner;
   const docs = profile.proofs.filter(Boolean);
 
+  const withOpener = (rest: string) => (opener ? `${opener} ${rest}` : rest);
+
   if (!docs.length) {
-    return `${opener} I can provide proof of income, references and credit on request.`;
+    return withOpener("Happy to share proof of income, references and credit on request.");
   }
 
   const citedReturn = Boolean(profile.income) && owner;
@@ -161,14 +198,14 @@ export function qualifyingLine(profile: Profile): string {
     : docs;
 
   if (!remaining.length) {
-    return `${opener} Happy to share documentation up front.`;
+    return withOpener("Happy to share documentation up front.");
   }
 
   const docLine = salaryGap
     ? `I don't draw a salary from it, but I can show ${joinList(remaining)} up front.`
-    : `I can also show ${joinList(remaining)} up front.`;
+    : `I can also share ${joinList(remaining)} up front.`;
 
-  return `${opener} ${docLine}`;
+  return withOpener(docLine);
 }
 
 function joinList(items: string[]): string {

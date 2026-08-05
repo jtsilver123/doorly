@@ -69,12 +69,27 @@ export function nextAction(listing: FeedListing): NextAction {
           urgent: true,
         };
       }
+      const openHouse = listing.tourKind === "open_house";
+      // An open house isn't over until its window closes — arriving after the
+      // start time is entirely the point of a window.
+      const overAt = new Date(
+        (openHouse && listing.tourEndsAt) || listing.tourAt
+      ).getTime();
       const soon = new Date(listing.tourAt).getTime() - Date.now();
+      const passed = overAt - Date.now() < 0;
       return {
         kind: "tour",
-        label: tourWhen(listing.tourAt),
-        hint: soon < 0 ? "Tour has passed — how was it?" : "Viewing booked",
-        becomes: soon < 0 ? "toured" : undefined,
+        label: openHouse
+          ? `Open house ${tourWhen(listing.tourAt)}`
+          : tourWhen(listing.tourAt),
+        hint: passed
+          ? openHouse
+            ? "The window's closed — did you make it?"
+            : "Tour has passed — how was it?"
+          : openHouse
+            ? `Show up any time${listing.tourEndsAt ? ` until ${tourWhen(listing.tourEndsAt)}` : ""} — no appointment needed`
+            : "Viewing booked",
+        becomes: passed ? "toured" : undefined,
         urgent: soon < DAY,
       };
     }

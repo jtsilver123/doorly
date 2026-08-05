@@ -8,7 +8,7 @@ import { CONTACT_ICON, CONTACT_LABEL } from "@/lib/outreach";
 import { nextAction } from "@/lib/nextAction";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
-import { RatingDisc, ProsConsLine } from "@/components/Rating";
+import { RatingDisc, MyScoreDisc, ProsConsLine } from "@/components/Rating";
 
 /**
  * A listing card.
@@ -128,7 +128,13 @@ export default function ListingCard({
             and the verdict beside it stops it being an unexplained number. */}
         <span className="card-score">
           <RatingDisc rating={listing.rating} grade={listing.grade} />
-          <span className="card-score-word">{listing.ratingHeadline}</span>
+          {/* Once you've scored it yourself, your number is the one that
+              matters — so it sits first among equals and the headline gives up
+              its room rather than the two discs fighting for the corner. */}
+          {listing.myScore != null && <MyScoreDisc score={listing.myScore} size="sm" />}
+          {listing.myScore == null && (
+            <span className="card-score-word">{listing.ratingHeadline}</span>
+          )}
         </span>
 
         {/* Save was a ghost that only appeared on hover, so on a touch screen

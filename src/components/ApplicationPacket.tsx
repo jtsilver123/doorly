@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Profile } from "@/lib/outreach";
 import { DEFAULT_COSTS, type CostAssumptions } from "@/lib/cost";
 import { DOCUMENT_CHECKLIST, buildPacket, packetText, readiness } from "@/lib/packet";
+import { useAutosave, saveLabel } from "@/lib/useAutosave";
 
 /**
  * The application packet, and the assumptions behind the cost figures.
@@ -24,7 +25,26 @@ export default function ApplicationPacket({
 }) {
   const [copied, setCopied] = useState(false);
   const documents = profile.documents ?? [];
-  const costs: CostAssumptions = profile.costs ?? DEFAULT_COSTS;
+  /**
+   * The cost fields are typed into, so they go through a draft and a debounce
+   * — writing "1.5" used to persist "1" and then "1." on the way there. The
+   * document chips stay immediate: a click is already a finished thought.
+   */
+  const stored: CostAssumptions = profile.costs ?? DEFAULT_COSTS;
+  const asText = (c: CostAssumptions) =>
+    Object.fromEntries(Object.entries(c).map(([k, v]) => [k, String(v)])) as Record<
+      keyof CostAssumptions,
+      string
+    >;
+  const [costText, setCostText] = useState(() => asText(stored));
+  const costs: CostAssumptions = {
+    prepaidMonths: Number(costText.prepaidMonths) || 0,
+    depositMonths: Number(costText.depositMonths) || 0,
+    brokerFeeMonths: Number(costText.brokerFeeMonths) || 0,
+    applicationFee: Number(costText.applicationFee) || 0,
+  };
+  const saveState = useAutosave(costs, (next) => onSave({ ...profile, costs: next }));
+
   const sections = buildPacket(profile, documents);
   const { percent, missing } = readiness(profile, documents);
 
@@ -38,11 +58,9 @@ export default function ApplicationPacket({
   }
 
   function setCost(key: keyof CostAssumptions, value: string) {
-    const parsed = Number(value);
-    onSave({
-      ...profile,
-      costs: { ...costs, [key]: Number.isFinite(parsed) ? parsed : 0 },
-    });
+    // Digits and one dot; the half-typed "1." lives in text, so the value can
+    // pass through it on the way to "1.5" instead of snapping back to "1".
+    if (/^\d*\.?\d*$/.test(value)) setCostText({ ...costText, [key]: value });
   }
 
   async function copy() {
@@ -144,7 +162,7 @@ export default function ApplicationPacket({
               <span className="muted">{label}</span>
               <input
                 className="field"
-                value={String(costs[key])}
+                value={costText[key]}
                 inputMode="decimal"
                 onChange={(e) => setCost(key, e.target.value)}
               />
@@ -156,6 +174,9 @@ export default function ApplicationPacket({
           NYC&apos;s FARE Act moved broker fees to whoever hired the broker — so
           the broker-fee default is 0. Raise it if a listing still charges one;
           every card&apos;s move-in figure updates.
+        </div>
+        <div className="savestate" data-state={saveState} role="status">
+          {saveLabel(saveState)}
         </div>
       </div>
     </div>

@@ -315,6 +315,9 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     myContactEmail: "",
     myContactName: "",
     tourAt: null,
+    tourKind: "private" as const,
+    tourEndsAt: null,
+    myScore: null,
     contactCount: 0,
     lastContactAt: null,
     lastContactChannel: null,
@@ -353,13 +356,26 @@ test("the tour message names the address, the rent and the move-in date", () => 
   assert.match(message, /55 Morton Street #5J/);
   assert.match(message, /\$3,500/);
   assert.match(message, /Jake/);
-  assert.match(message, /qualified renter/i);
+  assert.match(message, /about me/i);
   assert.match(message, /September 1/);
+  // The small ask before the big one: video first, then the tour.
+  assert.match(message, /video walkthrough/i);
+  assert.match(message, /tour/i);
+  assert.ok(message.indexOf("video") < message.indexOf("tour"));
+});
+
+test("the message greets the agent by first name when you know it", () => {
+  const message = draftTourMessage(
+    feed({ myContactName: "Jane at Corcoran" }),
+    DEFAULT_PROFILE
+  );
+  assert.match(message, /^Hi Jane!/);
 });
 
 test("the message still qualifies you when the profile is empty", () => {
-  const message = draftTourMessage(feed(), DEFAULT_PROFILE);
-  assert.match(message, /qualified renter/i);
+  const bare = { ...DEFAULT_PROFILE, employer: "", income: "", creditNote: "", proofs: [] };
+  const message = draftTourMessage(feed(), bare);
+  assert.match(message, /proof of income/i);
   assert.match(message, /55 Morton Street/);
 });
 
