@@ -44,7 +44,10 @@ export async function proxy(request: NextRequest) {
   // The root is the marketing site when signed out — the one page a stranger
   // from a group chat is allowed to see. The social card rides along: link
   // unfurlers have no session and give up on a redirect.
-  const isLanding = path === "/" || path === "/opengraph-image";
+  // The service worker must load without a session — the browser fetches it
+  // in its own context, cookieless, and a 307 to /login kills push silently.
+  const isLanding =
+    path === "/" || path === "/opengraph-image" || path === "/sw.js";
 
   if (!user && !isAuthRoute && !isCron && !isLanding) {
     const to = request.nextUrl.clone();
