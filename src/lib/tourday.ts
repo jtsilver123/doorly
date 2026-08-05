@@ -114,8 +114,8 @@ export function tourDays(listings: FeedListing[]): TourDay[] {
         at,
         walkMinutes: walk,
         gapMinutes: gap,
-        // A 30-minute viewing plus the walk has to fit in the gap.
-        tight: walk != null && gap != null && walk + 30 > gap,
+        // A 15-minute viewing plus the walk has to fit in the gap.
+        tight: walk != null && gap != null && walk + 15 > gap,
       });
     }
     days.push({

@@ -2779,3 +2779,150 @@ button.fact:hover .fact-label { color: var(--accent); }
   .planner-map { min-height: 40dvh; }
   .planner-plan { border-left: none; border-top: 1px solid var(--border); }
 }
+
+/* --- the drawer, restructured ---------------------------------------------
+ *
+ * One place to act (the footer), one judgment section, quiet secondaries.
+ * The header and footer are fixed; only the reading scrolls.
+ */
+
+.drawer-head {
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.drawer-head-score { display: grid; gap: var(--s1); justify-items: center; }
+.drawer-head-what { flex: 1; min-width: 0; display: grid; gap: 1px; }
+
+.drawer-head-price {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-head-price > span {
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.drawer-head-addr { font-size: var(--t-md); font-weight: 600; }
+.drawer-head .muted { font-size: var(--t-sm); }
+.drawer-close { padding: 5px 8px; flex-shrink: 0; }
+
+/* Sections: one label style, one rhythm, a hairline between thoughts. */
+.dsec {
+  display: grid;
+  gap: var(--s3);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+}
+
+.dsec-label {
+  margin: 0;
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dsec-sub { display: grid; gap: var(--s2); padding-top: var(--s2); }
+.dsec-sublabel { margin: 0; font-size: var(--t-xs); font-weight: 600; color: var(--text-muted); }
+
+/* Secondary actions: present, findable, and visibly not the main event. */
+.btn-quiet {
+  padding: 4px 9px;
+  font-size: var(--t-sm);
+  background: none;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* The contact card: who, the quiet actions, the message preview — one box. */
+.reachcard {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.reachcard-who {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  font-size: var(--t-md);
+}
+
+.reachcard-who b { font-weight: 600; }
+.reachcard-who .muted { font-size: var(--t-sm); }
+.reachcard-who .linkish { margin-left: auto; font-size: var(--t-sm); }
+.reachcard-row { display: flex; flex-wrap: wrap; gap: 2px; }
+
+.reachcard-preview summary {
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.reachcard-preview pre {
+  margin: var(--s2) 0 0;
+  padding: var(--s3);
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+/* The footer: act here. Never scrolls away. */
+.drawer-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.drawer-foot .control { max-width: 132px; }
+
+/* A quiet pulse while a write is in flight, in place of disabling buttons. */
+.drawer-saving {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--action);
+  animation: saving-pulse 0.9s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes saving-pulse {
+  50% { opacity: 0.25; }
+}
+
+.drawer-log { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.drawer-log li { display: flex; gap: var(--s2); font-size: var(--t-sm); align-items: baseline; }
+.drawer-log li > span:nth-child(2) { flex: 1; }
+
+.drawer-fineprint { font-size: var(--t-xs); line-height: var(--lh-body); margin: 0; }

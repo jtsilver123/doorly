@@ -325,16 +325,25 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
         aria-label={listing.address}
         tabIndex={-1}
       >
-        <header
-          style={{
-            padding: "14px 16px",
-            borderBottom: "1px solid var(--border)",
-            display: "flex",
-            gap: 12,
-            alignItems: "flex-start",
-          }}
-        >
-          <div style={{ display: "grid", gap: 4, justifyItems: "center" }}>
+        {/*
+          The shape of the panel, redrawn.
+
+          It had become nine sections of equal weight with buttons scattered
+          through five of them — the primary action lived mid-scroll, tiny
+          buttons repeated what other buttons did, and finding "what do I do
+          next" meant reading everything. Three rules now:
+
+            1  One place to act. The next action and the stage live in a
+               footer that never scrolls away. Everything else is reading.
+            2  One judgment. Why-this-score, the price check, the red flags
+               and your own score are a single section — they are all the
+               same question.
+            3  Quiet secondaries. Call, log, copy, preview are one row of
+               small equal buttons inside the contact card, not free-floating
+               peers of the primary.
+        */}
+        <header className="drawer-head">
+          <div className="drawer-head-score">
             <RatingDisc
               rating={listing.rating}
               grade={listing.grade}
@@ -343,49 +352,32 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             />
             {listing.myScore != null && <MyScoreDisc score={listing.myScore} size="sm" />}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>
+          <div className="drawer-head-what">
+            <div className="drawer-head-price">
               {money(listing.price)}
-              <span className="muted" style={{ fontSize: 13, fontWeight: 500 }}>
-                {" "}
-                · {listing.ratingHeadline}
-              </span>
+              <span>· {listing.ratingHeadline}</span>
             </div>
-            <div style={{ fontSize: 13 }}>
+            <div className="drawer-head-addr">
               {listing.address}
               {listing.unit ? ` #${listing.unit}` : ""}
             </div>
-            <div className="muted" style={{ fontSize: 12 }}>
+            <div className="muted">
               {listing.neighborhood || listing.borough} ·{" "}
               {listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms} bed`} ·{" "}
               {listing.bathrooms} bath
               {listing.sqft ? ` · ${listing.sqft} ft²` : ""}
             </div>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close">
-            ✕
+          <button className="btn drawer-close" onClick={onClose} aria-label="Close">
+            <Icon name="close" size={15} />
           </button>
         </header>
 
-        {/*
-          Block flow, not grid.
-          
-          This was a grid, and inside a height-constrained scroll container its
-          auto rows collapsed to zero — children rendered at their natural size
-          and overlapped each other, so the photo painted over the figures and
-          the figures over the verdict. Patching each child with a minimum
-          height only moved the problem to the next one I added. Normal flow
-          cannot compress a child below its content, so the whole class of bug
-          goes away with the layout mode.
-        */}
+        {/* Block flow, not grid: inside a height-constrained scroll container
+            grid auto rows collapsed to zero and children overlapped. Normal
+            flow cannot compress a child below its content. */}
         <div className="drawer-body">
-          {/* The panel never showed the apartment. A detail view of a home
-              that omits the photo and the cost of getting in is a summary of
-              everything except what you opened it for. */}
           <div className="drawer-photo">
-            {/* Same under-layer the cards use: an image that never resolves
-                fires no error event, so swapping on error leaves a blank box.
-                Something readable always sits behind it. */}
             <span className="drawer-photo-alt" aria-hidden="true">
               {listing.neighborhood || listing.borough || "No photo"}
             </span>
@@ -423,263 +415,10 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             </div>
           </dl>
 
-          {/* --- the verdict, before anything else ----------------------- */}
-          <section style={{ display: "grid", gap: 10 }}>
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              WHY {listing.rating} OUT OF 100
-            </label>
-            <ProsConsList listing={listing} />
-            <Perks keys={listing.perks} limit={10} showLabels />
+          {/* --- one judgment: the score, the price, the catches, yours -- */}
+          <section className="dsec">
+            <h3 className="dsec-label">Why {listing.rating} out of 100</h3>
 
-            {/* The rating knows what the listing published. It does not know
-                the block was loud at 8pm or that the kitchen photo was three
-                years old. After a viewing you have the better number. */}
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>
-              YOUR SCORE
-            </label>
-            <MyScoreField
-              score={listing.myScore}
-              onChange={(next) => patch({ action: "myScore", myScore: next })}
-            />
-          </section>
-
-          {/* --- outreach ------------------------------------------------ */}
-          <section style={{ display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              {/* What this offers depends on where the listing is. Proposing a
-                  tour on something already booked, or already applied to, makes
-                  you check whether the app has lost track of you. */}
-              {action.kind === "add-contact" ? (
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => setEditingContact(true)}
-                >
-                  {action.label}
-                </button>
-              ) : action.kind === "schedule" ? (
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => document.getElementById("tour-at")?.focus()}
-                >
-                  {action.label}
-                </button>
-              ) : action.kind === "apply" ? (
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => move("applied")}
-                >
-                  {action.label}
-                </button>
-              ) : action.kind === "reach" || action.kind === "chase" ? (
-              <button
-                className="btn btn-primary"
-                style={{ flex: 1 }}
-                onClick={() =>
-                  reachOut(reach.channel === "text" || reach.channel === "email" ? reach.channel : "portal")
-                }
-                title={reach.hint}
-              >
-                {action.kind === "chase" ? "Send a follow-up" : reach.label}
-              </button>
-              ) : (
-                <div className="stagenote" style={{ flex: 1 }}>
-                  <strong>{action.label}</strong>
-                  <span>{action.hint}</span>
-                </div>
-              )}
-              {reach.channel !== "email" && (
-                <button
-                  className="btn"
-                  onClick={() => reachOut("email")}
-                  title="Same message, in an email draft"
-                >
-                  Email
-                </button>
-              )}
-              <button className="btn" onClick={copyMessage}>
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              {contact.phone
-                ? `Texts ${contact.phone}${contact.who ? ` · ${contact.who}` : ""}${contact.mine ? " (you added this)" : ""}. Sending logs it and moves this to Contacted.`
-                : contact.email
-                  ? `Emails ${contact.email}${contact.who ? ` · ${contact.who}` : ""}. Sending logs it and moves this to Contacted.`
-                  : "No phone or email published. The button copies your message and opens the listing, where their contact form lives — or add a number below if you have one."}
-            </div>
-
-            {/*
-              Nothing in the live corpus publishes a phone number, so the one
-              you got by calling around is usually the only one there is. It
-              belongs on the listing, where the app can act on it, rather than
-              in a notes field it can't read.
-            */}
-            {editingContact ? (
-              <div className="contactedit">
-                <label>
-                  <span>Their number</span>
-                  <input
-                    className="field"
-                    value={phone}
-                    inputMode="tel"
-                    placeholder="(212) 555-0134"
-                    autoFocus
-                    /* Digits only, punctuated as you go. A number copied off a
-                       sign arrives as "212.555.0134" or "+1 212 555 0134", and
-                       three spellings of one broker is three contacts. */
-                    onChange={(e) => setPhone(formatPhone(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span>Who is it?</span>
-                  <input
-                    className="field"
-                    value={who}
-                    placeholder="Jane at Corcoran"
-                    onChange={(e) => setWho(e.target.value)}
-                  />
-                </label>
-                <label className="contactedit-wide">
-                  <span>Their email, if you have one</span>
-                  <input
-                    className="field"
-                    value={email}
-                    inputMode="email"
-                    placeholder="jane@example.com"
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </label>
-                <div className="contactedit-actions">
-                  <button
-                    className="btn btn-primary"
-                    disabled={Boolean(phone.trim()) && !isCompletePhone(phone)}
-                    onClick={async () => {
-                      await patch({
-                        action: "contactDetails",
-                        phone: phone.trim(),
-                        email: email.trim(),
-                        who: who.trim(),
-                      });
-                      setEditingContact(false);
-                    }}
-                  >
-                    Save contact
-                  </button>
-                  <button className="btn" onClick={() => setEditingContact(false)}>
-                    Cancel
-                  </button>
-                  {phone.trim() && !isCompletePhone(phone) && (
-                    <span className="muted" style={{ fontSize: 11, alignSelf: "center" }}>
-                      Needs 10 digits
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <button className="linkish" onClick={() => setEditingContact(true)}>
-                {contact.phone || contact.email
-                  ? "Edit their contact details"
-                  : "I have their number — add it"}
-              </button>
-            )}
-
-            {/*
-              The point of typing in a number is texting it. Before this you
-              saved the contact and then had to work out that the button at the
-              top of the panel had quietly changed meaning — so the message,
-              already written, sits right under the number it's going to.
-            */}
-            {!editingContact && contact.phone && (
-              <button
-                className="textnow"
-                onClick={() => reachOut("text")}
-                title={message}
-              >
-                <span className="textnow-go" aria-hidden="true">
-                  <Icon name="message" size={20} />
-                </span>
-                <span className="textnow-copy">
-                  <b>Text {formatPhone(contact.phone) || contact.phone}</b>
-                  <span>
-                    {contact.who ? `${contact.who} · ` : ""}
-                    Opens your messages with the request already written
-                  </span>
-                </span>
-              </button>
-            )}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {listing.contactPhone && (
-                <a
-                  className="btn"
-                  style={{ fontSize: 12, padding: "4px 8px" }}
-                  href={`tel:${listing.contactPhone.replace(/[^\d+]/g, "")}`}
-                  onClick={() =>
-                    patch({
-                      action: "contact",
-                      channel: "phone",
-                      direction: "out",
-                      who: listing.contactName,
-                      note: "Called",
-                    })
-                  }
-                >
-                  <Icon name="phone" size={14} /> Call
-                </a>
-              )}
-              {/* Anything that happened outside the app still belongs in the log. */}
-              <button
-                className="btn"
-                style={{ fontSize: 12, padding: "4px 8px" }}
-                onClick={() =>
-                  patch({
-                    action: "contact",
-                    channel: "phone",
-                    direction: "in",
-                    who: listing.contactName,
-                    note: "They replied",
-                  })
-                }
-              >
-                Log a reply
-              </button>
-              <a
-                className="btn"
-                style={{ fontSize: 12, padding: "4px 8px" }}
-                href={listing.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Listing <Icon name="external" size={13} />
-              </a>
-            </div>
-            <details>
-              <summary className="muted" style={{ fontSize: 12, cursor: "pointer" }}>
-                Preview message
-              </summary>
-              <pre
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontSize: 12,
-                  background: "var(--surface-2)",
-                  padding: 10,
-                  borderRadius: 8,
-                  marginTop: 6,
-                  fontFamily: "inherit",
-                }}
-              >
-                {message}
-              </pre>
-            </details>
-          </section>
-
-          {/* --- is it a good price, and is it real? --------------------- */}
-          <section style={{ display: "grid", gap: 8 }}>
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              PRICE CHECK
-            </label>
             <div
               className={
                 listing.dealVerdict === "steal" || listing.dealVerdict === "good"
@@ -695,6 +434,8 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               )}
             </div>
 
+            <ProsConsList listing={listing} />
+
             {listing.flags.length > 0 && (
               <ul className="flags">
                 {listing.flags.map((flag) => (
@@ -705,86 +446,25 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 ))}
               </ul>
             )}
+
+            <Perks keys={listing.perks} limit={10} showLabels />
+
+            {/* The rating knows what the listing published; it doesn't know
+                the block was loud at 8pm. After a viewing, yours wins. */}
+            <div className="dsec-sub">
+              <h4 className="dsec-sublabel">Your score</h4>
+              <MyScoreField
+                score={listing.myScore}
+                onChange={(next) => patch({ action: "myScore", myScore: next })}
+              />
+            </div>
           </section>
 
-          {/* --- pipeline ------------------------------------------------ */}
-          {/*
-            Eight equal chips wrapping onto two rows asked you to find the one
-            you wanted among choices you'd never pick. Almost every move is to
-            the next stage, so that's a button; the rest is a menu.
-          */}
-          <section style={{ display: "grid", gap: 8 }}>
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              STATUS
-            </label>
-            <div className="stagerow">
-              {advance && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => move(advance)}
-                >
-                  Move to {STAGE_LABEL[advance].toLowerCase()}
-                </button>
-              )}
-              <select
-                className="control control-sm"
-                value={stage}
-                onChange={(e) => move(e.target.value as Stage)}
-                aria-label="Status"
-              >
-                {STAGES.map((option) => (
-                  <option key={option} value={option}>
-                    {STAGE_LABEL[option]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tag-team: whose find, and who owns talking to the agent. The
-                point person exists so two people never both text the same
-                broker about the same apartment. */}
-            {crew && crew.members.length > 1 && (
-              <div className="crewline">
-                {listing.addedById && (
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    Found by{" "}
-                    {crew.members.find((m) => m.userId === listing.addedById)?.isYou
-                      ? "you"
-                      : (crew.members.find((m) => m.userId === listing.addedById)?.name ??
-                        "a former member")}
-                  </span>
-                )}
-                <label className="crewline-poc">
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    Point person
-                  </span>
-                  <select
-                    className="control control-sm"
-                    value={listing.pocId ?? ""}
-                    onChange={(e) =>
-                      patch({ action: "poc", userId: e.target.value || null })
-                    }
-                    aria-label="Who talks to the agent for this one"
-                  >
-                    <option value="">Nobody yet</option>
-                    {crew.members.map((m) => (
-                      <option key={m.userId} value={m.userId}>
-                        {m.isYou ? `${m.name} (you)` : m.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-
-            {/* Only once a tour exists to have a time. "Tour booked" without
-                one is a label rather than a plan, and it's the thing you'll
-                want to look up on the morning of. */}
-            {stage === "tour" && (
+          {/* --- the viewing, when one exists to plan -------------------- */}
+          {stage === "tour" && (
+            <section className="dsec">
+              <h3 className="dsec-label">The viewing</h3>
               <div className="tourplan">
-                {/* Which kind first, because it changes what the fields below
-                    mean: an appointment has a time, an open house has a
-                    window. */}
                 <div className="tourplan-kind" role="radiogroup" aria-label="Kind of viewing">
                   {(
                     [
@@ -845,12 +525,6 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                   </span>
                 )}
 
-                {/*
-                  A viewing that lives only in here is a viewing you miss. You
-                  check your phone on the way out the door, so the appointment
-                  has to leave the app — with the rent, the score, the number
-                  to call from the sidewalk and a link back to the listing.
-                */}
                 {listing.tourAt && (
                   <div className="addcal">
                     <button className="btn" onClick={downloadIcs}>
@@ -872,24 +546,199 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                   </div>
                 )}
               </div>
+            </section>
+          )}
+
+          {/* --- reaching them: one card, everything in it --------------- */}
+          <section className="dsec">
+            <h3 className="dsec-label">Reaching them</h3>
+
+            {editingContact ? (
+              <div className="contactedit">
+                <label>
+                  <span>Their number</span>
+                  <input
+                    className="field"
+                    value={phone}
+                    inputMode="tel"
+                    placeholder="(212) 555-0134"
+                    autoFocus
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                  />
+                </label>
+                <label>
+                  <span>Who is it?</span>
+                  <input
+                    className="field"
+                    value={who}
+                    placeholder="Jane at Corcoran"
+                    onChange={(e) => setWho(e.target.value)}
+                  />
+                </label>
+                <label className="contactedit-wide">
+                  <span>Their email, if you have one</span>
+                  <input
+                    className="field"
+                    value={email}
+                    inputMode="email"
+                    placeholder="jane@example.com"
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+                <div className="contactedit-actions">
+                  <button
+                    className="btn btn-primary"
+                    disabled={Boolean(phone.trim()) && !isCompletePhone(phone)}
+                    onClick={async () => {
+                      await patch({
+                        action: "contactDetails",
+                        phone: phone.trim(),
+                        email: email.trim(),
+                        who: who.trim(),
+                      });
+                      setEditingContact(false);
+                    }}
+                  >
+                    Save contact
+                  </button>
+                  <button className="btn" onClick={() => setEditingContact(false)}>
+                    Cancel
+                  </button>
+                  {phone.trim() && !isCompletePhone(phone) && (
+                    <span className="muted" style={{ fontSize: 11, alignSelf: "center" }}>
+                      Needs 10 digits
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="reachcard">
+                {/* Who you're talking to, or the honest absence of anyone. */}
+                <div className="reachcard-who">
+                  {contact.phone || contact.email ? (
+                    <>
+                      <b>{contact.who || "No name yet"}</b>
+                      <span className="muted">
+                        {[
+                          contact.phone ? formatPhone(contact.phone) || contact.phone : null,
+                          contact.email || null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        {contact.mine ? " · you added this" : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="muted">
+                      Nothing published — the message button copies your draft
+                      and opens the listing's contact form.
+                    </span>
+                  )}
+                  <button className="linkish" onClick={() => setEditingContact(true)}>
+                    {contact.phone || contact.email ? "Edit" : "I have their number"}
+                  </button>
+                </div>
+
+                {/* Small, equal, quiet: none of these is the next action. */}
+                <div className="reachcard-row">
+                  {contact.phone && (
+                    <a
+                      className="btn btn-quiet"
+                      href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+                      onClick={() =>
+                        patch({
+                          action: "contact",
+                          channel: "phone",
+                          direction: "out",
+                          who: contact.who,
+                          note: "Called",
+                        })
+                      }
+                    >
+                      <Icon name="phone" size={14} /> Call
+                    </a>
+                  )}
+                  {reach.channel !== "email" && (contact.email || listing.url) && (
+                    <button
+                      className="btn btn-quiet"
+                      onClick={() => reachOut("email")}
+                      title="Same message, in an email draft"
+                    >
+                      <Icon name="mail" size={14} /> Email
+                    </button>
+                  )}
+                  <button className="btn btn-quiet" onClick={copyMessage}>
+                    {copied ? "Copied" : "Copy message"}
+                  </button>
+                  <button
+                    className="btn btn-quiet"
+                    onClick={() =>
+                      patch({
+                        action: "contact",
+                        channel: "phone",
+                        direction: "in",
+                        who: contact.who,
+                        note: "They replied",
+                      })
+                    }
+                  >
+                    Log a reply
+                  </button>
+                </div>
+
+                <details className="reachcard-preview">
+                  <summary>The message it sends</summary>
+                  <pre>{message}</pre>
+                </details>
+              </div>
+            )}
+
+            {/* Tag-team: whose find, who owns the thread. */}
+            {crew && crew.members.length > 1 && (
+              <div className="crewline">
+                {listing.addedById && (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Found by{" "}
+                    {crew.members.find((m) => m.userId === listing.addedById)?.isYou
+                      ? "you"
+                      : (crew.members.find((m) => m.userId === listing.addedById)?.name ??
+                        "a former member")}
+                  </span>
+                )}
+                <label className="crewline-poc">
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Point person
+                  </span>
+                  <select
+                    className="control control-sm"
+                    value={listing.pocId ?? ""}
+                    onChange={(e) =>
+                      patch({ action: "poc", userId: e.target.value || null })
+                    }
+                    aria-label="Who talks to the agent for this one"
+                  >
+                    <option value="">Nobody yet</option>
+                    {crew.members.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.isYou ? `${m.name} (you)` : m.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             )}
           </section>
 
-          {/* --- price history ------------------------------------------- */}
+          {/* --- the record ---------------------------------------------- */}
           {detail && detail.priceHistory.length > 1 && (
-            <section style={{ display: "grid", gap: 6 }}>
-              <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-                PRICE HISTORY
-              </label>
+            <section className="dsec">
+              <h3 className="dsec-label">Price history</h3>
               <PriceChart points={detail.priceHistory} />
             </section>
           )}
 
-          {/* --- notes --------------------------------------------------- */}
-          <section style={{ display: "grid", gap: 6 }}>
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              NOTES
-            </label>
+          <section className="dsec">
+            <h3 className="dsec-label">Notes</h3>
             <textarea
               className="field"
               rows={3}
@@ -900,24 +749,21 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             />
           </section>
 
-          {/* --- timeline ------------------------------------------------ */}
-          <section style={{ display: "grid", gap: 6 }}>
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              TIMELINE
-            </label>
+          <section className="dsec">
+            <h3 className="dsec-label">Timeline</h3>
             {!detail && <div className="muted" style={{ fontSize: 12 }}>Loading…</div>}
-            {detail?.events.length === 0 && (
+            {detail?.events.length === 0 && detail?.contacts.length === 0 && (
               <div className="muted" style={{ fontSize: 12 }}>
                 Nothing has changed since we first saw it.
               </div>
             )}
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
+            <ul className="drawer-log">
               {detail?.contacts.map((c) => (
-                <li key={`c${c.id}`} style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                <li key={`c${c.id}`}>
                   <span className="chip chip-accent">
                     {c.direction === "out" ? "you →" : "← them"}
                   </span>
-                  <span style={{ flex: 1 }}>
+                  <span>
                     {c.channel}
                     {c.note ? ` · ${c.note}` : ""}
                   </span>
@@ -925,7 +771,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 </li>
               ))}
               {detail?.events.map((e) => (
-                <li key={`e${e.id}`} style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                <li key={`e${e.id}`}>
                   <span
                     className={
                       e.kind === "price_drop"
@@ -937,43 +783,36 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                   >
                     {EVENT_LABEL[e.kind]}
                   </span>
-                  <span style={{ flex: 1 }}>{e.detail}</span>
+                  <span>{e.detail}</span>
                   <span className="muted">{when(e.occurredAt)}</span>
                 </li>
               ))}
             </ul>
           </section>
 
-          {/* --- where it's listed --------------------------------------- */}
-          <section style={{ display: "grid", gap: 6 }}>
-            <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
-              LISTED ON
-            </label>
+          <section className="dsec">
+            <h3 className="dsec-label">Listed on</h3>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {[...listing.alsoOn]
-                .filter((s) => s.url)
+                .filter((so) => so.url)
                 .sort((a, b) => {
                   const order = linkPreference(profile.preferredSource);
                   return order.indexOf(a.source) - order.indexOf(b.source);
                 })
-                .map((s) => (
+                .map((so) => (
                   <a
-                    key={s.source}
-                    className="btn srcbtn"
-                    style={{ fontSize: 12, padding: "4px 9px" }}
-                    href={s.url}
+                    key={so.source}
+                    className="btn btn-quiet srcbtn"
+                    href={so.url}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <SourceMark source={s.source} size={15} />
-                    {SOURCE_LABEL[s.source]}
+                    <SourceMark source={so.source} size={15} />
+                    {SOURCE_LABEL[so.source]}
                   </a>
                 ))}
             </div>
-            {/* Provenance, plainly. Everything here is copied from the sites
-                above — we don't inspect apartments, and saying so is what makes
-                the rest of the numbers credible. */}
-            <p className="muted" style={{ fontSize: 11, lineHeight: 1.45, margin: 0 }}>
+            <p className="muted drawer-fineprint">
               Details come from the listing sites, not from us. Last confirmed
               live {when(listing.lastSeenAt)}; first seen {when(listing.firstSeenAt)}.
               Prices and availability can change without the listing being
@@ -981,6 +820,75 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             </p>
           </section>
         </div>
+
+        {/*
+          The footer is where you act, and it never scrolls away.
+
+          Whatever the state machine says comes next is the one primary
+          button; the stage menu sits beside it for the moves the machine
+          didn't predict. Everything above this line is reading.
+        */}
+        <footer className="drawer-foot">
+          {action.kind === "add-contact" ? (
+            <button
+              className="btn btn-primary btn-block"
+              onClick={() => setEditingContact(true)}
+            >
+              {action.label}
+            </button>
+          ) : action.kind === "schedule" ? (
+            <button
+              className="btn btn-primary btn-block"
+              onClick={() => document.getElementById("tour-at")?.focus()}
+            >
+              {action.label}
+            </button>
+          ) : action.kind === "apply" ? (
+            <button className="btn btn-primary btn-block" onClick={() => move("applied")}>
+              {action.label}
+            </button>
+          ) : action.kind === "reach" || action.kind === "chase" ? (
+            <button
+              className="btn btn-primary btn-block"
+              onClick={() =>
+                reachOut(
+                  reach.channel === "text" || reach.channel === "email"
+                    ? reach.channel
+                    : "portal"
+                )
+              }
+              title={reach.hint}
+            >
+              {action.kind === "chase" ? "Send a follow-up" : reach.label}
+            </button>
+          ) : (
+            <div className="stagenote btn-block">
+              <strong>{action.label}</strong>
+              <span>{action.hint}</span>
+            </div>
+          )}
+
+          {advance && action.becomes !== advance && action.kind !== "apply" && (
+            <button className="btn" onClick={() => move(advance)}>
+              {STAGE_LABEL[advance]}
+            </button>
+          )}
+
+          <select
+            className="control control-sm"
+            value={stage}
+            onChange={(e) => move(e.target.value as Stage)}
+            aria-label="Status"
+          >
+            {STAGES.map((option) => (
+              <option key={option} value={option}>
+                {STAGE_LABEL[option]}
+              </option>
+            ))}
+          </select>
+
+          {saving && <span className="drawer-saving" aria-live="polite" />}
+        </footer>
       </aside>
     </>
   );

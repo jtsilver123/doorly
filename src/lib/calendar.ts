@@ -26,7 +26,8 @@ function stamp(date: Date): string {
 
 /**
  * A private viewing is a slot; an open house is a window you arrive inside.
- * Without a stated end, 30 minutes is the honest guess for a showing.
+ * Without a stated end, 15 minutes is the honest guess — NYC showings are
+ * brisk, and a padded block just makes the next booking look impossible.
  */
 function windowFor(listing: FeedListing): { start: Date; end: Date } | null {
   if (!listing.tourAt) return null;
@@ -36,7 +37,7 @@ function windowFor(listing: FeedListing): { start: Date; end: Date } | null {
   const end =
     stated && !Number.isNaN(stated.getTime()) && stated > start
       ? stated
-      : new Date(start.getTime() + (listing.tourKind === "open_house" ? 60 : 30) * 60_000);
+      : new Date(start.getTime() + (listing.tourKind === "open_house" ? 60 : 15) * 60_000);
   return { start, end };
 }
 

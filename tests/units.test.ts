@@ -1227,11 +1227,11 @@ test("no tour time means no calendar event to hand over", () => {
   assert.equal(googleCalendarUrl(feed({ stage: "tour", tourAt: null })), null);
 });
 
-test("a private viewing with no stated end gets a 30-minute slot", () => {
+test("a private viewing with no stated end gets a 15-minute slot", () => {
   const at = new Date("2026-09-10T15:00:00Z");
   const ics = icsFor(feed({ stage: "tour", tourAt: at.toISOString(), tourKind: "private" }))!;
   assert.match(ics, /DTSTART:20260910T150000Z/);
-  assert.match(ics, /DTEND:20260910T153000Z/);
+  assert.match(ics, /DTEND:20260910T151500Z/);
 });
 
 test("an open house honours its own window rather than guessing", () => {
@@ -1324,7 +1324,7 @@ test("the Google link carries the same window as the file", () => {
   const at = new Date("2026-09-10T15:00:00Z").toISOString();
   const url = googleCalendarUrl(feed({ stage: "tour", tourAt: at }))!;
   const dates = new URL(url).searchParams.get("dates");
-  assert.equal(dates, "20260910T150000Z/20260910T153000Z");
+  assert.equal(dates, "20260910T150000Z/20260910T151500Z");
 });
 
 // --- the tour day ----------------------------------------------------------
@@ -1359,7 +1359,8 @@ test("the walk between stops is estimated and the first leg is null", () => {
 test("a walk that cannot fit its gap is flagged tight", () => {
   const days = tourDays([
     feed({ id: "a", stage: "tour", tourAt: "2026-09-12T17:00:00Z", lat: 40.727, lon: -73.984 }),
-    // 30 minutes later, ~30 minutes' walk away: the viewing itself makes it late.
+    // 30 minutes later, ~30 minutes' walk away: even a 15-minute viewing
+    // makes it late.
     feed({ id: "b", stage: "tour", tourAt: "2026-09-12T17:30:00Z", lat: 40.744, lon: -73.978 }),
   ]);
   assert.equal(days[0].stops[1].tight, true);

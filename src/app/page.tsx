@@ -21,16 +21,24 @@ export const dynamic = "force-dynamic";
 
 const STEPS: { title: string; body: string }[] = [
   {
-    title: "Every site, one list",
+    title: "Every site, one search",
     body: "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, checked twice a day and deduplicated — the same apartment posted four times is one card, not four tabs.",
   },
   {
-    title: "A score you can argue with",
-    body: "Every place gets 1–100 against real comparables and your own budget, with the reasons spelled out. Add your own score after the viewing; yours wins.",
+    title: "A pipeline, not a pile of tabs",
+    body: "One keystroke files each place — interested, contacted, tour booked, seen, applied. The board chases silence for you, so nothing rots in a tab you forgot.",
   },
   {
-    title: "First complete application wins",
-    body: "One tap drafts the text — the agent's name, the apartment, video first. Your income, documents and move-in date ride along, ready before the viewing ends.",
+    title: "Text the agent in one tap",
+    body: "The message is already written — the apartment, your move-in, the ask. Add a number you dug up yourself and the text button appears next to it.",
+  },
+  {
+    title: "Tours land on your calendar",
+    body: "One click puts the viewing in Google Calendar or an invite file — with the rent, the score, your notes and the agent's number for when you're at the door.",
+  },
+  {
+    title: "Compare, then commit",
+    body: "Decision night puts your finalists side by side — rent, true monthly, cash to move in — with the best value marked in every row and your own notes beside them.",
   },
 ];
 

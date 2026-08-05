@@ -23,18 +23,18 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 const CLAIMS: { stat: string; label: string; detail: string }[] = [
   {
     stat: "5",
-    label: "sites, one list",
-    detail: "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, deduplicated.",
+    label: "sites, one search",
+    detail: "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, deduplicated into one scored list.",
   },
   {
-    stat: "1–100",
-    label: "on every place",
-    detail: "Priced against real comparables, weighed against what you actually get.",
+    stat: "1",
+    label: "keystroke to file it",
+    detail: "A pipeline that tracks who you've texted, what's booked and what's gone quiet.",
   },
   {
-    stat: "2×",
-    label: "a day, watched",
-    detail: "Price drops, relists and disappearances — the things no listing site tells you.",
+    stat: "2",
+    label: "taps to reach out",
+    detail: "The text to the agent is pre-written; the tour drops onto your calendar in one click.",
   },
 ];
 
