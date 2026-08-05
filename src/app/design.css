@@ -2997,3 +2997,133 @@ button.fact:hover .fact-label { color: var(--accent); }
 .keyrenew-copy b { font-size: var(--t-md); }
 .keyrenew-copy span { font-size: var(--t-sm); color: var(--text-muted); }
 .keyrenew .btn-primary { white-space: nowrap; }
+
+/* An amenity row is a column of ticks and dashes; the tick carries the colour
+   so the eye can run down it without reading. */
+.compare-has { color: var(--good); }
+
+/* --- changes --------------------------------------------------------------
+ *
+ * Grouped by day, because the timestamp on an event is when our poll ran and
+ * not when the landlord acted — the corpus puts a thousand events in five
+ * distinct hours. Days are the honest grain and the one you'd act on.
+ */
+
+.changes { display: grid; gap: var(--s5); }
+
+.changes-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+.changes-filters { display: flex; gap: var(--s1); flex-wrap: wrap; }
+.changes-none { font-size: var(--t-md); margin: 0; }
+
+.changeday { display: grid; gap: var(--s2); }
+
+/* The day header sticks, so scrolling a long run never leaves you unsure
+   which day you're reading. */
+.changeday-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin: 0;
+  padding: var(--s2) 0;
+  background: var(--bg);
+  font-size: var(--t-md);
+  font-weight: 650;
+}
+
+.changeday-head .muted { font-size: var(--t-xs); font-weight: 500; }
+
+.changelist {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.changerow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  text-align: left;
+  color: inherit;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.changerow > .chip { justify-self: start; }
+.changerow:last-child { border-bottom: none; }
+.changerow:hover:not(:disabled) { background: var(--surface-2); }
+.changerow:focus-visible { outline: none; box-shadow: inset var(--ring); }
+.changerow:disabled { cursor: default; opacity: 0.6; }
+
+/* A drop is the rarest and most valuable signal here — 3 in 1000 on live
+   data — so it gets the one coloured edge on the page. */
+.changerow[data-kind="price_drop"] { box-shadow: inset 3px 0 0 var(--good); }
+.changerow[data-kind="delisted"] { box-shadow: inset 3px 0 0 var(--gone); }
+
+.changerow-what { display: grid; gap: 1px; min-width: 0; }
+.changerow-what b { font-size: var(--t-md); font-weight: 600; }
+.changerow-what .muted,
+.changerow-detail { font-size: var(--t-sm); }
+
+.changerow-what b,
+.changerow-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The move itself: was, is, and what it's worth a month. */
+.changerow-move {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--t-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.changerow-move s { color: var(--text-muted); text-decoration-thickness: 1px; }
+.changerow-move b { font-weight: 650; }
+.changerow-arrow { transform: rotate(-90deg); color: var(--text-muted); align-self: center; }
+
+.changerow-delta {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.changerow-delta.is-good { background: var(--good-soft); color: var(--good); }
+
+@media (max-width: 860px) {
+  /* Two lines on a phone: the label and place, then the movement. */
+  .changerow {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "chip what"
+      "move move";
+    row-gap: var(--s2);
+  }
+  .changerow > .chip { grid-area: chip; }
+  .changerow-what { grid-area: what; }
+  .changerow-move,
+  .changerow-detail { grid-area: move; }
+  .changerow > .ratedisc { display: none; }
+}

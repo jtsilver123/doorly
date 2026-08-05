@@ -34,6 +34,7 @@ import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
+import Changes, { type Change } from "@/components/Changes";
 import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
 // Client-only: Leaflet reads `window` the moment its module loads, which
@@ -49,18 +50,6 @@ type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
 
 /** Every valid tab, so a hand-edited hash can't put the app in a dead state. */
 const TABS: Tab[] = ["today", "feed", "changes", "pipeline", "compare", "profile"];
-
-interface Change {
-  id: number;
-  listingId: string;
-  kind: string;
-  detail: string;
-  occurredAt: string;
-  address: string;
-  neighborhood: string;
-  price: number;
-  url: string;
-}
 
 interface ApiStatus {
   usage: { used: number; limit: number; remaining: number; keyHint: string };
@@ -1064,56 +1053,13 @@ export default function Home() {
         )}
 
         {!loading && tab === "changes" && (
-          <div className={changes.length ? "surface" : undefined} style={{ overflow: "hidden" }}>
-            {changes.length === 0 && (
-              <div className="empty">
-                <div className="empty-title">No changes yet</div>
-                <p className="empty-body">
-                  This is where a place dropping its price, coming back on the
-                  market, or disappearing shows up — the things no listing site
-                  will tell you. Nothing has moved since the last check.
-                </p>
-                <div className="empty-actions">
-                  <button className="btn btn-primary" onClick={refresh} disabled={refreshing}>
-                    {refreshing ? "Checking…" : "Check now"}
-                  </button>
-                </div>
-              </div>
-            )}
-            {changes.map((c) => (
-              <button
-                key={c.id}
-                className="row"
-                onClick={() => {
-                  const hit = listings.find((l) => l.id === c.listingId);
-                  if (hit) setOpen(hit);
-                }}
-              >
-                <span
-                  className={
-                    c.kind === "price_drop"
-                      ? "chip chip-good"
-                      : c.kind === "price_rise" || c.kind === "delisted"
-                        ? "chip chip-warn"
-                        : "chip"
-                  }
-                >
-                  {c.kind.replace(/_/g, " ")}
-                </span>
-                <span style={{ flex: 1, fontSize: 13, minWidth: 0 }}>
-                  {c.address}
-                  <span className="muted"> · {c.neighborhood}</span>
-                </span>
-                <span style={{ fontSize: 13 }}>{c.detail}</span>
-                <span className="muted" style={{ fontSize: 11 }}>
-                  {new Date(c.occurredAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              </button>
-            ))}
-          </div>
+          <Changes
+            changes={changes}
+            listings={listings}
+            onOpen={setOpen}
+            onRefresh={refresh}
+            refreshing={refreshing}
+          />
         )}
 
         {!loading && tab === "pipeline" && (

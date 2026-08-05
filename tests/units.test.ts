@@ -34,6 +34,8 @@ import { amenitiesOf, qualityScore } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
 import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar.ts";
 import { tourDays } from "../src/lib/tourday.ts";
+import { normalizeApartments } from "../src/lib/sources/apartments.ts";
+import { amenityRowsFor } from "../src/components/Compare.tsx";
 import { applyFilters } from "@/lib/filters";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
@@ -1373,4 +1375,56 @@ test("stops without coordinates keep their place but estimate nothing", () => {
   ]);
   assert.equal(days[0].stops.length, 2);
   assert.equal(days[0].stops[1].walkMinutes, null);
+});
+
+// --- source normalisation --------------------------------------------------
+
+test("an address handed over as an object is unwrapped, never stringified", () => {
+  // Apartments.com sometimes returns `address: {streetAddress, city}`. The
+  // old code called String() on it and stored the text "[object Object]",
+  // which reached real cards.
+  const [listing] = normalizeApartments([
+    {
+      id: "a1",
+      address: { streetAddress: "225 East 10th Street", city: "New York" },
+      rent: 3495,
+      url: "https://apartments.com/x",
+    } as never,
+  ]);
+  assert.equal(listing.address, "225 East 10th Street");
+  assert.doesNotMatch(listing.address, /\[object/);
+});
+
+test("an address with no usable text is empty, not nonsense", () => {
+  const [listing] = normalizeApartments([
+    { id: "a2", address: { latitude: 40.7 }, rent: 3000, url: "u" } as never,
+  ]);
+  assert.equal(listing.address, "");
+});
+
+// --- compare: amenities as rows -------------------------------------------
+
+test("an amenity only one finalist has becomes its own row", () => {
+  // The table's job is diffing. A comma-run per column made the reader do it.
+  const a = feed({ id: "a", perks: ["laundry_unit", "dishwasher"] });
+  const b = feed({ id: "b", perks: ["dishwasher"] });
+  const rows = amenityRowsFor([a, b]);
+  const labels = rows.map((r) => r.label);
+  assert.ok(labels.includes("W/D in unit"), "the differing amenity is a row");
+  assert.ok(labels.includes("Dishwasher"), "shared ones are rows too; folding removes them later");
+  assert.ok(!labels.includes("Gym"), "an amenity nobody has is not a row");
+});
+
+test("amenity rows run in decision order, not alphabetically", () => {
+  const a = feed({ id: "a", perks: ["gym", "laundry_unit", "outdoor"] });
+  const rows = amenityRowsFor([a]).map((r) => r.label);
+  assert.deepEqual(rows, ["W/D in unit", "Outdoor space", "Gym"]);
+});
+
+test("an amenity row reads yes or a dash, per listing", () => {
+  const a = feed({ id: "a", perks: ["elevator"] });
+  const b = feed({ id: "b", perks: [] });
+  const row = amenityRowsFor([a, b]).find((r) => r.label === "Elevator")!;
+  assert.equal(row.value(a), "yes");
+  assert.equal(row.value(b), "—");
 });

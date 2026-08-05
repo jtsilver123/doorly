@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FeedListing } from "@/types";
 import { STAGE_LABEL } from "@/types";
 import { CONTACT_LABEL } from "@/lib/outreach";
-import { AMENITIES } from "@/lib/amenities";
+import { AMENITIES, AMENITY_ORDER } from "@/lib/amenities";
 import { RatingDisc } from "@/components/Rating";
 import Icon from "@/components/Icon";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
@@ -136,9 +136,8 @@ const ROWS: Row[] = [
       }`,
   },
   {
-    label: "What you get",
-    value: (l) =>
-      l.perks.length ? l.perks.map((k) => AMENITIES[k].label).join(", ") : "nothing listed",
+    label: "Amenities",
+    value: (l) => (l.perks.length ? `${l.perks.length} listed` : "none listed"),
     num: (l) => l.perks.length,
     invert: true,
   },
@@ -147,6 +146,22 @@ const ROWS: Row[] = [
     value: (l) => l.cons[0] ?? "none found",
   },
 ];
+
+/**
+ * One row per amenity any finalist has, ordered by how much each moves a
+ * decision. Amenities nobody lists are left out entirely; ones everybody
+ * shares are folded away by the same rule that folds any agreeing row.
+ */
+export function amenityRowsFor(finalists: FeedListing[]): Row[] {
+  return AMENITY_ORDER.filter((key) => finalists.some((l) => l.perks.includes(key))).map(
+    (key) => ({
+      label: AMENITIES[key].label,
+      value: (l: FeedListing) => (l.perks.includes(key) ? "yes" : "—"),
+      num: (l: FeedListing) => (l.perks.includes(key) ? 1 : 0),
+      invert: true,
+    })
+  );
+}
 
 export default function Compare({
   listings,
@@ -249,9 +264,22 @@ export default function Compare({
    * same on all five. Those rows are folded away rather than deleted, with a
    * line saying what they agreed on, so nothing is silently lost.
    */
+  /*
+   * Amenities, one per row.
+   *
+   * They used to be a single comma-run per column — "W/D in unit, Dishwasher,
+   * Elevator" against four other comma-runs, which is exactly the diffing
+   * work a comparison table exists to do for you. A row each means the
+   * dishwasher line either has ticks in it or it doesn't, and the
+   * fold-what-agrees rule below removes the ones nobody differs on.
+   *
+   * Ordered by how much each moves a decision, so laundry sits above gym.
+   */
+  const amenityRows = amenityRowsFor(finalists);
+
   const rows: Row[] = [];
   const agreed: string[] = [];
-  for (const row of ROWS) {
+  for (const row of [...ROWS, ...amenityRows]) {
     const values = finalists.map((l) => row.value(l));
     if (new Set(values).size === 1) {
       agreed.push(`${row.label.toLowerCase()}: ${values[0]}`);
@@ -394,8 +422,11 @@ export default function Compare({
                 <td className="muted compare-label">{row.label}</td>
                 {finalists.map((l, i) => (
                   <td key={l.id} className={i === best ? "compare-best" : ""}>
-                    {row.value(l)}
-                    {i === best && <span className="compare-tick"> ✓</span>}
+                    {row.value(l) === "yes" ? (
+                      <Icon name="check" size={15} className="compare-has" />
+                    ) : (
+                      row.value(l)
+                    )}
                   </td>
                 ))}
               </tr>

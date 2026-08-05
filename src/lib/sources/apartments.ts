@@ -44,9 +44,41 @@ function pick(row: ApartmentsListing, ...keys: string[]): unknown {
   return undefined;
 }
 
+/**
+ * Apartments.com sometimes hands back an object where a string belongs —
+ * `address: { streetAddress, city, state }` instead of the line itself. The
+ * old `String(value)` turned that into the literal text "[object Object]",
+ * which then got stored, deduplicated against, and rendered on cards. Never
+ * stringify a container: reach inside it for the field that was wanted, and
+ * return empty rather than nonsense if there isn't one.
+ */
 function pickString(row: ApartmentsListing, ...keys: string[]): string {
   const value = pick(row, ...keys);
-  return typeof value === "string" ? value : value == null ? "" : String(value);
+  return asText(value);
+}
+
+const TEXT_KEYS = ["streetAddress", "street", "line1", "addressLine1", "full", "name", "value"];
+
+function asText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    // First usable element; a list of address parts joins on the caller's terms.
+    for (const item of value) {
+      const text = asText(item);
+      if (text) return text;
+    }
+    return "";
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of TEXT_KEYS) {
+      const text = asText(record[key]);
+      if (text) return text;
+    }
+  }
+  return "";
 }
 
 /** Bed/price on Apartments.com are often ranges ("1-2", {min,max}). */
