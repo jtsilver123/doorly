@@ -458,9 +458,46 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
       .eq("is_active", true)
       .lt("last_seen_at", nowIso);
 
+    /*
+     * The circuit breaker.
+     *
+     * "ok && fetched > 0" is not the same as "answered completely": a source
+     * that returns its first page and then rate-limits reports healthy, and
+     * everything on its deeper pages would read as delisted. That exact
+     * failure flapped half the corpus off- and back-on-market four times in
+     * one afternoon — 78 delists at 3pm, 80 resurrections at 4pm.
+     *
+     * Real markets don't shed a third of their inventory between two polls.
+     * If a source's sweep would delist more than 25% of its active rows (and
+     * more than 10 of them), the fetch was partial: skip that source's sweep
+     * entirely and say so. The listings stay live until a poll that actually
+     * saw the whole picture.
+     */
+    const activePerSource = new Map<string, number>();
+    for (const row of stale ?? []) {
+      activePerSource.set(row.source, (activePerSource.get(row.source) ?? 0) + 1);
+    }
+    const gonePerSource = new Map<string, number>();
+    for (const row of stale ?? []) {
+      if (seenSourceKeys.has(`${row.source}:${row.source_id}`)) continue;
+      gonePerSource.set(row.source, (gonePerSource.get(row.source) ?? 0) + 1);
+    }
+    const sweepable = new Set<string>();
+    for (const [source, active] of activePerSource) {
+      const gone = gonePerSource.get(source) ?? 0;
+      if (gone > 10 && gone / active > 0.25) {
+        errors.push(
+          `sweep skipped for ${source}: would delist ${gone} of ${active} — fetch looks partial`
+        );
+        continue;
+      }
+      sweepable.add(source);
+    }
+
     const goneIds = new Set<string>();
     const goneKeys: { source: string; source_id: string }[] = [];
     for (const row of stale ?? []) {
+      if (!sweepable.has(row.source)) continue;
       if (seenSourceKeys.has(`${row.source}:${row.source_id}`)) continue;
       goneKeys.push({ source: row.source, source_id: row.source_id });
       goneIds.add(row.listing_id);

@@ -162,7 +162,35 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     .limit(1500);
   if (error) throw new Error(`loadFeed: ${error.message}`);
 
-  const listings = (rows ?? []) as ListingRow[];
+  let listings = (rows ?? []) as ListingRow[];
+
+  /*
+   * What you're pursuing never vanishes.
+   *
+   * The active-only filter is right for browsing, but the pipeline is a
+   * record of your own work — and one bad poll marking a listing off-market
+   * was emptying the board mid-hunt. Anything with real state (starred, or
+   * past inbox) rides along regardless of is_active; the card wears its
+   * "Off market" tag instead of disappearing.
+   */
+  if (!filters.includeGone) {
+    const { data: trackedRows } = await supabase
+      .from("user_listing_state")
+      .select("listing_id, stage, starred")
+      .eq("user_id", ownerId);
+    const trackedIds = (trackedRows ?? [])
+      .filter((t) => t.starred || !["inbox", "passed"].includes(t.stage as string))
+      .map((t) => t.listing_id as string)
+      .filter((id) => !listings.some((l) => l.id === id));
+    if (trackedIds.length) {
+      const { data: gone } = await supabase
+        .from("listings")
+        .select("*")
+        .in("id", trackedIds);
+      listings = [...listings, ...((gone ?? []) as ListingRow[])];
+    }
+  }
+
   if (!listings.length) return [];
 
   const ids = listings.map((r) => r.id);
