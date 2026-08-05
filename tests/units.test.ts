@@ -1150,3 +1150,32 @@ test("whitespace is not a contact", () => {
   assert.equal(blank.phone, "");
   assert.equal(nextAction(feed({ stage: "interested", myContactPhone: "  " })).kind, "add-contact");
 });
+
+// --- searching for an address ---------------------------------------------
+
+test("an address matches however it's abbreviated", () => {
+  const list = [feed({ id: "a", address: "91 East Third Street" })];
+  for (const q of ["91 East Third Street", "91 E 3rd", "91 e third st", "91 East 3rd Street"]) {
+    assert.equal(applyFilters(list, { search: q }).length, 1, `"${q}" found nothing`);
+  }
+});
+
+test("words can be typed in any order", () => {
+  const list = [feed({ id: "a", address: "55 Morton Street", unit: "5J" })];
+  assert.equal(applyFilters(list, { search: "morton 5j" }).length, 1);
+  assert.equal(applyFilters(list, { search: "5j morton" }).length, 1);
+});
+
+test("search still reaches neighborhoods and your own notes", () => {
+  const list = [
+    feed({ id: "a", address: "1 A St", neighborhood: "East Village" }),
+    feed({ id: "b", address: "2 B St", notes: "great morning light" }),
+  ];
+  assert.deepEqual(applyFilters(list, { search: "east village" }).map((l) => l.id), ["a"]);
+  assert.deepEqual(applyFilters(list, { search: "morning" }).map((l) => l.id), ["b"]);
+});
+
+test("a search that matches nothing returns nothing, not everything", () => {
+  const list = [feed({ id: "a", address: "91 East Third Street" })];
+  assert.equal(applyFilters(list, { search: "500 Fifth Avenue" }).length, 0);
+});

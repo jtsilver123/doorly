@@ -1,4 +1,54 @@
 import type { FeedListing, Source, Stage } from "@/types";
+import { streetKey } from "@/lib/dedupe";
+
+/**
+ * Search the way people actually type an address.
+ *
+ * A plain substring match meant "91 E 3rd" found nothing while "91 East Third
+ * Street" found the listing — the same building, spelled the way the listing
+ * site happened to spell it. Both sides go through the same canonicaliser the
+ * cross-site dedupe uses, so ordinals, directions and street-type suffixes all
+ * collapse: "E"/"East", "3rd"/"3"/"Third", "St"/"Street".
+ *
+ * The raw text is searched too, so neighborhoods and your own notes still match
+ * even though they aren't addresses.
+ */
+const SPELLED: Record<string, string> = {
+  first: "1", second: "2", third: "3", fourth: "4", fifth: "5",
+  sixth: "6", seventh: "7", eighth: "8", ninth: "9", tenth: "10",
+  eleventh: "11", twelfth: "12",
+};
+
+function spellOut(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(
+      /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)\b/g,
+      (w) => SPELLED[w] ?? w
+    );
+}
+
+/**
+ * What gets searched. Both the canonical address form and the raw text, so a
+ * query can match either.
+ */
+function haystack(text: string): string {
+  const spelled = spellOut(text);
+  return `${streetKey(spelled)} ${spelled}`;
+}
+
+/**
+ * What gets searched *for* — canonical only.
+ *
+ * Including the raw form here was the first attempt and it was wrong: typing
+ * "91 E 3rd" produced the token "3rd", which a canonicalised haystack never
+ * contains, so requiring every token found nothing.
+ */
+function needleWords(text: string): string[] {
+  const spelled = spellOut(text);
+  const canonical = streetKey(spelled);
+  return (canonical || spelled).split(/\s+/).filter(Boolean);
+}
 
 /**
  * Filtering and sorting, as a pure function of the listings you already have.
@@ -120,13 +170,25 @@ export function applyFilters(
     const wanted = new Set(filters.areas.map((a) => a.toLowerCase()));
     result = result.filter((l) => wanted.has(l.neighborhood.toLowerCase()));
   }
-  if (filters.search) {
-    const needle = filters.search.toLowerCase().trim();
-    if (needle) {
-      result = result.filter((l) =>
-        `${l.address} ${l.unit} ${l.neighborhood} ${l.notes}`.toLowerCase().includes(needle)
-      );
-    }
+  if (filters.search?.trim()) {
+    // Try the query both ways. Canonicalising catches "91 E 3rd" against
+    // "91 East Third Street"; the raw form catches everything that isn't an
+    // address at all, where canonicalising can drop a word — streetKey exists
+    // to normalise streets, not neighborhoods or your own notes.
+    const raw = spellOut(filters.search).split(/\s+/).filter(Boolean);
+    const canonical = needleWords(filters.search);
+    result = result.filter((l) => {
+      const hay = haystack(`${l.address} ${l.unit} ${l.neighborhood} ${l.notes}`);
+      const words = new Set(hay.split(/\s+/));
+      /*
+       * Long tokens may match inside a word, so typing "mort" still finds
+       * Morton. Short ones must be whole words — canonicalising turns "East"
+       * into "e", and a substring "e" appears in almost every listing on the
+       * board, which silently made the search match everything.
+       */
+      const has = (w: string) => (w.length >= 3 ? hay.includes(w) : words.has(w));
+      return raw.every(has) || canonical.every(has);
+    });
   }
 
   result = [...result].sort(SORTERS[filters.sort ?? "best"] ?? SORTERS.best);
