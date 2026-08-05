@@ -1,6 +1,6 @@
-# Deploying Homefinder
+# Deploying Doorly
 
-**Live:** https://homefinder-red.vercel.app — production tracks the
+**Live:** https://doorlynyc.vercel.app — production tracks the
 `claude/homefinder-nyc-tracker-pst66m` branch, so every push there deploys.
 
 **GitHub Pages will not work.** It serves static files only, and this app needs

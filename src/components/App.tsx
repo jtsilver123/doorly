@@ -132,7 +132,6 @@ export default function Home() {
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [readyOnly, setReadyOnly] = useState(false);
   const [goodOnly, setGoodOnly] = useState(false);
-  const [view, setView] = useState<"grid" | "map">("grid");
   /** Which panel the profile area opens on, so the menu can deep-link. */
   const [section, setSection] = useState<ProfileSection>("details");
   /**
@@ -481,7 +480,7 @@ export default function Home() {
   // With hundreds of listings the bottleneck is triage speed, so the whole
   // feed is drivable without the mouse.
   useEffect(() => {
-    if (tab !== "feed" || open || view === "map") return;
+    if (tab !== "feed" || open) return;
 
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
@@ -538,7 +537,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, view, visible, focus, pass, star, reachOut, profile.preferredSource]);
+  }, [tab, open, visible, focus, pass, star, reachOut, profile.preferredSource]);
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
@@ -944,8 +943,6 @@ export default function Home() {
               onReset={clearFilters}
               lastCheckedAt={api?.lastCheckedAt}
               sourceCount={ALL_SOURCES.length}
-              view={view}
-              onViewChange={setView}
               />
             )}
           </div>
@@ -959,9 +956,10 @@ export default function Home() {
                 onRefresh={refresh}
                 onClear={clearFilters}
               />
-            ) : view === "map" ? (
-              // Zillow's split: the map holds still on the left while the
-              // results scroll on the right, hover linked both ways.
+            ) : (
+              // Zillow's split, always: the map holds still on the left while
+              // the results scroll on the right, hover linked both ways. The
+              // old Photos/Map toggle was a decision nobody needed to make.
               <div className="split">
                 <div className="split-map">
                   <CityMap
@@ -971,12 +969,13 @@ export default function Home() {
                     onHover={setLinkedId}
                   />
                 </div>
-                <div className="split-cards">
-                  {visible.slice(0, pageSize).map((listing) => (
+                <div className="split-cards" ref={gridRef}>
+                  {visible.slice(0, pageSize).map((listing, i) => (
                     <ListingCard
                       key={listing.id}
                       listing={listing}
                       via={via(listing)}
+                      focused={i === focus}
                       linked={linkedId === listing.id}
                       preferredSource={profile.preferredSource}
                       onHover={setLinkedId}
@@ -992,29 +991,6 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-              </div>
-            ) : (
-              <div className="grid" ref={gridRef}>
-                {visible.slice(0, pageSize).map((listing, i) => (
-                  <ListingCard
-                    key={listing.id}
-                    listing={listing}
-                    via={via(listing)}
-                    focused={i === focus}
-                    linked={linkedId === listing.id}
-                    preferredSource={profile.preferredSource}
-                    onHover={setLinkedId}
-                    onOpen={setOpen}
-                    onStar={star}
-                    onPass={pass}
-                    onReach={reachOut}
-                  />
-                ))}
-              </div>
-            )}
-            {view === "grid" && visible.length > pageSize && (
-              <div ref={sentinelRef} className="more-sentinel">
-                Showing {pageSize} of {visible.length.toLocaleString()}
               </div>
             )}
           </>

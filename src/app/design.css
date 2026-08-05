@@ -1101,30 +1101,8 @@ button.fact:hover { border-color: var(--accent); }
 
 /* Segmented control. Reads as one object with two states rather than two
    buttons that happen to be adjacent. */
-.viewswitch {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-}
 
-.viewswitch button {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--t-md);
-  font-weight: 600;
-  padding: 5px 13px;
-  border-radius: 7px;
-  transition: background 0.14s ease, color 0.14s ease;
-}
 
-.viewswitch button.is-on {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow);
-}
 
 
 /* --- page widths ---------------------------------------------------------

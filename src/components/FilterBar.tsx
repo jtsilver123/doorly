@@ -63,8 +63,6 @@ export default function FilterBar({
   onReset,
   lastCheckedAt,
   sourceCount,
-  view,
-  onViewChange,
 }: {
   filters: Filters;
   onChange: (next: Partial<Filters>) => void;
@@ -72,8 +70,6 @@ export default function FilterBar({
   onReset: () => void;
   lastCheckedAt?: string | null;
   sourceCount?: number;
-  view: "grid" | "map";
-  onViewChange: (view: "grid" | "map") => void;
 }) {
   const [openPanel, setOpenPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -259,25 +255,6 @@ export default function FilterBar({
 
         </div>
 
-        {/* Outside the scrolling strip on purpose: switching between photos and
-            the map is a top-level choice, and on a phone it was parked off the
-            right-hand edge behind a horizontal scroll nobody would find. */}
-        <div className="viewswitch" role="group" aria-label="View">
-          <button
-            className={view === "grid" ? "is-on" : undefined}
-            onClick={() => onViewChange("grid")}
-            aria-pressed={view === "grid"}
-          >
-            Photos
-          </button>
-          <button
-            className={view === "map" ? "is-on" : undefined}
-            onClick={() => onViewChange("map")}
-            aria-pressed={view === "map"}
-          >
-            Map
-          </button>
-        </div>
       </div>
 
       <div className="filterbar-count">

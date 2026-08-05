@@ -1,4 +1,4 @@
--- Homefinder schema.
+-- Doorly schema. (Named Homefinder at the time this migration first ran.)
 --
 -- Split in two halves:
 --
