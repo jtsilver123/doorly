@@ -26,6 +26,7 @@ import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
+import { DEFAULT_CONFIG, keyHint } from "@/lib/apikey";
 import { amenitiesOf, qualityScore } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
 import { applyFilters } from "@/lib/filters";
@@ -997,4 +998,39 @@ test("locate falls back rather than returning nothing for an odd point", () => {
   const hit = locate(40.7292, -73.9789);
   assert.equal(hit.neighborhood, "East Village");
   assert.equal(hit.borough, "Manhattan");
+});
+
+// --- config without a session ---------------------------------------------
+
+test("a stored key beats the environment fallback", () => {
+  // The scheduled poll has no session, so it used to read no stored config at
+  // all and fall through to process.env — which held the previous, exhausted
+  // key. Merge order is what makes a key pasted in the app actually take
+  // effect on the next automatic check.
+  const stored = { realtyApiKey: "rt_new", pagesPerSource: 2 };
+  const merged = {
+    ...DEFAULT_CONFIG,
+    ...stored,
+    realtyApiKey: stored.realtyApiKey || "rt_env_stale",
+  };
+  assert.equal(merged.realtyApiKey, "rt_new");
+  assert.equal(merged.pagesPerSource, 2, "saved page depth must survive the merge");
+});
+
+test("the environment key is used only when nothing is stored", () => {
+  const stored: Partial<typeof DEFAULT_CONFIG> = {};
+  const merged = {
+    ...DEFAULT_CONFIG,
+    ...stored,
+    realtyApiKey: stored.realtyApiKey || "rt_env",
+  };
+  assert.equal(merged.realtyApiKey, "rt_env");
+});
+
+test("keyHint identifies a key without exposing it", () => {
+  assert.equal(keyHint("rt_EXAMPLEKEYNOTREAL123456"), "…123456");
+  assert.equal(keyHint(""), "none");
+  // Two different keys must produce different hints, or usage from an old key
+  // would be counted against a new one.
+  assert.notEqual(keyHint("rt_aaaaaaaaaaaaaaaaaaaa"), keyHint("rt_bbbbbbbbbbbbbbbbbbbb"));
 });

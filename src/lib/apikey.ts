@@ -47,22 +47,52 @@ export const DEFAULT_CONFIG: AppConfig = {
 let cache: { value: AppConfig; at: number } | null = null;
 const CACHE_MS = 15_000;
 
-export async function loadConfig(): Promise<AppConfig> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
-
-  let stored: Partial<AppConfig> = {};
+/**
+ * The stored settings, read whether or not there's a signed-in session.
+ *
+ * This is the bug that made a freshly pasted key look like it hadn't saved.
+ * `currentUserId()` throws when there is no session, and the scheduled poll
+ * has no session — so every automatic check fell into the catch, read no
+ * stored config at all, and ran on `process.env.REALTYAPI_KEY`. That env var
+ * still held the previous, exhausted key, so the cron kept calling a dead key
+ * while the app showed the new one saved and working. The chosen page depth
+ * and check frequency were silently ignored the same way.
+ *
+ * With no session we fall back to the service role and take the most recently
+ * updated row. That is exactly right while this is one person's tool, and it
+ * is the wrong answer the moment two accounts keep different keys — at which
+ * point the poll needs to load config per search owner rather than globally.
+ */
+async function readStored(): Promise<Partial<AppConfig>> {
   try {
     const { data } = await (await db())
       .from("app_config")
       .select("config")
       .eq("user_id", await currentUserId())
       .maybeSingle();
-    stored = (data?.config as Partial<AppConfig>) ?? {};
+    if (data?.config) return data.config as Partial<AppConfig>;
+  } catch {
+    // No session, or no database. Try the service role below.
+  }
+
+  try {
+    const { data } = await adminDb()
+      .from("app_config")
+      .select("config")
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    return ((data?.[0]?.config as Partial<AppConfig>) ?? {}) as Partial<AppConfig>;
   } catch {
     // A missing table or offline database must not stop a poll that could
     // still run from the environment variable.
+    return {};
   }
+}
 
+export async function loadConfig(): Promise<AppConfig> {
+  if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
+
+  const stored = await readStored();
   const value: AppConfig = {
     ...DEFAULT_CONFIG,
     ...stored,
@@ -107,15 +137,19 @@ export async function getUsage(): Promise<Usage> {
   const config = await loadConfig();
   const hint = keyHint(config.realtyApiKey);
   let used = 0;
-  try {
-    const { count } = await (await db())
-      .from("api_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("key_hint", hint)
-      .gte("called_at", monthStart());
-    used = count ?? 0;
-  } catch {
-    used = 0;
+  for (const getClient of [async () => await db(), async () => adminDb()]) {
+    try {
+      const { count, error } = await (await getClient())
+        .from("api_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("key_hint", hint)
+        .gte("called_at", monthStart());
+      if (error) continue;
+      used = count ?? 0;
+      break;
+    } catch {
+      // Try the service role; a poll has no session to read with.
+    }
   }
   return {
     used,
@@ -187,9 +221,13 @@ export async function recordCall(
   path: string,
   ok: boolean
 ): Promise<void> {
-  try {
-    await (await db()).from("api_usage").insert({ key_hint: hint, host, path, ok });
-  } catch {
-    /* ignore */
+  const row = { key_hint: hint, host, path, ok };
+  for (const getClient of [async () => await db(), async () => adminDb()]) {
+    try {
+      const { error } = await (await getClient()).from("api_usage").insert(row);
+      if (!error) return;
+    } catch {
+      // Fall through to the service role.
+    }
   }
 }
