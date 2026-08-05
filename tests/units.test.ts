@@ -47,6 +47,7 @@ import {
   walkMinutes,
 } from "../src/lib/subway.ts";
 import { applyFilters } from "@/lib/filters";
+import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
@@ -1222,6 +1223,46 @@ test("whitespace is not a contact", () => {
   const blank = reachableOn({ contactPhone: "", myContactPhone: "   " });
   assert.equal(blank.phone, "");
   assert.equal(nextAction(feed({ stage: "interested", myContactPhone: "  " })).kind, "add-contact");
+});
+
+// --- tour prep questions ---------------------------------------------------
+
+test("ground floor detection reads unit strings the way buildings label them", () => {
+  assert.equal(looksGroundFloor("1B"), true);
+  assert.equal(looksGroundFloor("#1F"), true);
+  assert.equal(looksGroundFloor("G2"), true);
+  assert.equal(looksGroundFloor("GARDEN"), true);
+  assert.equal(looksGroundFloor("10C"), false); // "1" prefix must not match "10"
+  assert.equal(looksGroundFloor("5J"), false);
+  assert.equal(looksGroundFloor("", "Sunny garden-level one bedroom"), true);
+});
+
+test("tour questions come from this listing's gaps, not a generic checklist", () => {
+  // Described but bare: no laundry, no elevator → the two classic asks.
+  const bare = tourQuestions(
+    feed({ description: "x".repeat(100), perks: [], unit: "5J" })
+  );
+  assert.ok(bare.some((q) => q.ask.toLowerCase().includes("laundromat")));
+  assert.ok(bare.some((q) => q.ask.toLowerCase().includes("flights")));
+
+  // Building laundry swaps the laundromat ask for the machines ask.
+  const bldg = tourQuestions(
+    feed({ description: "x".repeat(100), perks: ["laundry_building"], unit: "5J" })
+  );
+  assert.ok(!bldg.some((q) => q.ask.toLowerCase().includes("laundromat")));
+  assert.ok(bldg.some((q) => q.ask.toLowerCase().includes("machines")));
+
+  // Ground floor asks who's above, and ranks it first.
+  const ground = tourQuestions(feed({ unit: "1B", description: "x".repeat(100) }));
+  assert.ok(ground[0].ask.includes("above"));
+
+  // A concession begets the net-vs-gross question; no-fee kills the fee one.
+  const teaser = tourQuestions(feed({ effectiveRent: 3200, noFee: true }));
+  assert.ok(teaser.some((q) => q.ask.includes("gross")));
+  assert.ok(!teaser.some((q) => q.because.includes("no-fee")));
+
+  // The list stays short enough to read at a door.
+  assert.ok(tourQuestions(feed({ unit: "1B", description: "x".repeat(100) })).length <= 6);
 });
 
 test("a declined place never proposes re-courting the agent", () => {

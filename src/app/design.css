@@ -1796,6 +1796,53 @@ button.fact:hover .fact-label { color: var(--accent); }
 .tourtime > span { font-size: var(--t-xs); font-weight: 600; color: var(--text-muted); }
 .tourtime > b { font-size: var(--t-md); color: var(--accent); }
 
+/* The listing-specific questions to ask at the viewing. Reads as a checklist,
+   with each question carrying the gap in the listing that produced it. */
+.tourprep {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.tourprep-label {
+  font-size: var(--t-xs);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.tourprep ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--s2);
+}
+.tourprep li {
+  display: grid;
+  gap: 1px;
+  padding-left: var(--s4);
+  position: relative;
+}
+.tourprep li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+}
+.tourprep li > span { font-size: var(--t-sm); line-height: var(--lh-body); }
+.tourprep li > i {
+  font-style: normal;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
 @media (max-width: 560px) {
   .contactedit { grid-template-columns: 1fr; }
 }

@@ -21,6 +21,7 @@ import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
+import { tourQuestions } from "@/lib/tourPrep";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
 import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
@@ -694,6 +695,23 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                     <span className="muted">
                       Reminds you an hour before, with everything you need at the door.
                     </span>
+                  </div>
+                )}
+
+                {/* What to check while you're standing in it — each question
+                    comes from a gap in this specific listing, not a generic
+                    viewing checklist. */}
+                {tourQuestions(listing).length > 0 && (
+                  <div className="tourprep">
+                    <span className="tourprep-label">Ask while you&apos;re there</span>
+                    <ul>
+                      {tourQuestions(listing).map((q) => (
+                        <li key={q.ask}>
+                          <span>{q.ask}</span>
+                          <i>{q.because}</i>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
