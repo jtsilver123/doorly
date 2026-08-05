@@ -258,29 +258,38 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.card-star {
+.card-judge {
   position: absolute;
   top: 6px;
   right: 6px;
+  display: flex;
+  gap: 5px;
+}
+
+.card-star,
+.card-pass {
   width: 30px;
   height: 30px;
   border: none;
-  border-radius: 999px;
-  background: rgba(20, 20, 26, 0.5);
+  border-radius: var(--r-full);
+  background: rgba(20, 20, 26, 0.55);
+  backdrop-filter: blur(6px);
   color: #fff;
   font-size: 15px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.14s ease, background 0.14s ease;
+  transition: background 0.14s ease, color 0.14s ease, opacity 0.14s ease;
 }
 
-.card:hover .card-star,
-.card[data-focused="true"] .card-star,
-.card-star[data-on="true"],
-.card-star:focus-visible { opacity: 1; }
+.card-star[data-on="true"] { color: #fbbf24; background: rgba(20, 20, 26, 0.72); }
+.card-star:hover { background: rgba(20, 20, 26, 0.8); }
 
-.card-star[data-on="true"] { color: #fbbf24; }
-.card-star:hover { background: rgba(20, 20, 26, 0.72); }
+/* Dismiss stays quieter than save until you reach for it — the destructive
+   one must not be the one that catches the eye. Dimming the glyph rather than
+   the whole button keeps the two chips the same weight while making only the
+   ✕ recede; fading the button itself lightened the disc and made it *more*
+   conspicuous than the star against a pale photo. */
+.card-pass { font-size: 13px; color: rgba(255, 255, 255, 0.66); }
+.card-pass:hover { color: #fff; background: var(--warn); }
 
 /* The body is a fixed stack: each row has a job and a reserved place. */
 .card-body {
@@ -521,7 +530,10 @@
   border-top: 1px solid var(--border);
 }
 
-.card-actions { display: flex; gap: 6px; }
+.card-actions { display: flex; gap: 6px; align-items: center; }
+
+/* Which sites carry it, on the action line rather than a row of its own. */
+.card-srcs { flex-shrink: 0; }
 
 /* --- filter bar ---------------------------------------------------------- */
 
@@ -1646,3 +1658,106 @@ button.fact:hover { border-color: var(--accent); }
    column — so a "Save" button ended up 1500px wide. Buttons size to their
    label; only ones explicitly marked as block-level fill. */
 .page-panels .surface > .btn:not(.btn-block) { justify-self: start; }
+
+/* The account nav item is a phone-only fallback for the avatar menu, which the
+   bottom tab bar has no room to show. */
+.nav-item[data-key="profile"] { display: none; }
+
+@media (max-width: 860px) {
+  .nav-item[data-key="profile"] { display: flex; }
+}
+
+/* --- profile area --------------------------------------------------------- */
+
+.profilehead { display: grid; gap: var(--s3); }
+
+.profilehead h1 {
+  margin: 0;
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.profiletabs { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* --- listing detail panel ------------------------------------------------- */
+
+.drawer-photo {
+  aspect-ratio: 16 / 10;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.drawer-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/*
+ * The four numbers that decide whether this is possible, before any prose.
+ *
+ * `min-height: fit-content` is load-bearing. Setting `overflow: hidden` — here
+ * only to clip the rounded corners over the cell borders — switches off a grid
+ * item's automatic minimum size, so this box was free to be compressed to
+ * nothing by its parent track. It rendered 2px tall with its contents clipped:
+ * a thin grey strip where four figures should be, with every child still
+ * reporting a correct 75px height, which is what made it look like a styling
+ * ghost rather than a layout rule.
+ */
+.drawer-facts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin: 0;
+  min-height: fit-content;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.drawer-facts > div {
+  background: var(--surface);
+  padding: var(--s3) var(--s2);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drawer-facts dt {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.drawer-facts dd {
+  margin: 0;
+  font-size: var(--t-xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.drawer-facts dd.is-text {
+  font-size: var(--t-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-facts dd span {
+  display: block;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.stagerow { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.stagerow .control { max-width: 160px; }
+
+@media (max-width: 560px) {
+  .drawer-facts { grid-template-columns: repeat(2, 1fr); }
+}

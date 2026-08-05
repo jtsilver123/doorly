@@ -95,6 +95,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [imageBroken, setImageBroken] = useState(false);
   /**
    * Stage moves paint immediately and reconcile behind the scenes.
    *
@@ -183,6 +184,16 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
   }
 
   const reach = bestChannel(listing);
+
+  /** The stage almost everyone moves to next, or null at the end of the line. */
+  const ORDER: Stage[] = ["inbox", "interested", "contacted", "tour", "toured", "applied", "closed"];
+  const at = ORDER.indexOf(stage);
+  const advance = at >= 0 && at < ORDER.length - 1 ? ORDER[at + 1] : null;
+
+  function move(next: Stage) {
+    setStage(next);
+    patch({ action: "stage", stage: next }).catch(() => setStage(listing.stage));
+  }
 
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
@@ -281,6 +292,44 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
         </header>
 
         <div style={{ overflowY: "auto", padding: 16, display: "grid", gap: 18 }}>
+          {/* The panel never showed the apartment. A detail view of a home
+              that omits the photo and the cost of getting in is a summary of
+              everything except what you opened it for. */}
+          {listing.imageUrl && !imageBroken && (
+            <div className="drawer-photo">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={listing.imageUrl}
+                alt={`Photo of ${listing.address}`}
+                onError={() => setImageBroken(true)}
+              />
+            </div>
+          )}
+
+          <dl className="drawer-facts">
+            <div>
+              <dt>Rent</dt>
+              <dd>{money(listing.price)}<span>/mo</span></dd>
+            </div>
+            <div>
+              <dt>To move in</dt>
+              <dd>{money(listing.upfrontCost)}</dd>
+            </div>
+            <div>
+              <dt>True monthly</dt>
+              <dd>
+                {money(listing.allInMonthly)}
+                <span>fees spread</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Available</dt>
+              <dd className="is-text">
+                {listing.availableText || (listing.timing === "ready" ? "In time" : "Not stated")}
+              </dd>
+            </div>
+          </dl>
+
           {/* --- the verdict, before anything else ----------------------- */}
           <section style={{ display: "grid", gap: 10 }}>
             <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
@@ -402,10 +451,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
             >
               <strong>{listing.dealLabel}.</strong>
               {listing.dealVerdict === "steal" && (
-                <span className="muted">
-                  {" "}
-                  Worth seeing today — and worth verifying in person.
-                </span>
+                <span className="muted"> Worth verifying in person.</span>
               )}
             </div>
 
@@ -422,26 +468,36 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged }: 
           </section>
 
           {/* --- pipeline ------------------------------------------------ */}
-          <section style={{ display: "grid", gap: 6 }}>
+          {/*
+            Eight equal chips wrapping onto two rows asked you to find the one
+            you wanted among choices you'd never pick. Almost every move is to
+            the next stage, so that's a button; the rest is a menu.
+          */}
+          <section style={{ display: "grid", gap: 8 }}>
             <label className="muted" style={{ fontSize: 11, fontWeight: 600 }}>
               STATUS
             </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {STAGES.map((option) => (
+            <div className="stagerow">
+              {advance && (
                 <button
-                  key={option}
-                  className={stage === option ? "btn btn-primary" : "btn"}
-                  style={{ fontSize: 12, padding: "5px 9px" }}
-                  onClick={() => {
-                    setStage(option);
-                    patch({ action: "stage", stage: option }).catch(() =>
-                      setStage(listing.stage)
-                    );
-                  }}
+                  className="btn btn-primary"
+                  onClick={() => move(advance)}
                 >
-                  {STAGE_LABEL[option]}
+                  Move to {STAGE_LABEL[advance].toLowerCase()}
                 </button>
-              ))}
+              )}
+              <select
+                className="control control-sm"
+                value={stage}
+                onChange={(e) => move(e.target.value as Stage)}
+                aria-label="Status"
+              >
+                {STAGES.map((option) => (
+                  <option key={option} value={option}>
+                    {STAGE_LABEL[option]}
+                  </option>
+                ))}
+              </select>
             </div>
           </section>
 

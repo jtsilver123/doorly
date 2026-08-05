@@ -25,7 +25,7 @@ import FilterBar, { type Filters } from "@/components/FilterBar";
 import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
-import { signOut } from "@/app/auth/actions";
+import AccountMenu, { type ProfileSection } from "@/components/AccountMenu";
 import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
@@ -65,7 +65,7 @@ const NAV_ICON: Record<string, string> = {
   changes: "↯",
   pipeline: "▦",
   compare: "⇄",
-  profile: "☰",
+  profile: "◍",
 };
 
 const money = (n: number) => `$${n.toLocaleString()}`;
@@ -157,6 +157,8 @@ export default function Home() {
   const [readyOnly, setReadyOnly] = useState(false);
   const [goodOnly, setGoodOnly] = useState(false);
   const [view, setView] = useState<"grid" | "map">("grid");
+  /** Which panel the profile area opens on, so the menu can deep-link. */
+  const [section, setSection] = useState<ProfileSection>("details");
   /**
    * How many cards are mounted.
    *
@@ -625,12 +627,15 @@ export default function Home() {
               ["changes", "Changes", changes.length],
               ["pipeline", "Pipeline", counts.pipeline],
               ["compare", "Compare", finalistCount],
-              ["profile", "Settings", 0],
+              // Phones only: the desktop rail reaches this through the account
+              // button, which the bottom bar has no room for.
+              ["profile", "You", 0],
             ] as [Tab, string, number][]
           ).map(([key, label, count]) => (
             <button
               key={key}
               className="nav-item"
+              data-key={key}
               aria-current={tab === key ? "page" : undefined}
               onClick={() => setTab(key)}
             >
@@ -692,12 +697,14 @@ export default function Home() {
         )}
 
         <div style={{ marginTop: "auto", display: "grid", gap: 6 }}>
-          <div className="account">
-            <span className="muted">{email || "Signed in"}</span>
-            <form action={signOut}>
-              <button type="submit">Sign out</button>
-            </form>
-          </div>
+          <AccountMenu
+            email={email}
+            name={profile.name}
+            onOpenSection={(next) => {
+              setSection(next);
+              setTab("profile");
+            }}
+          />
           <button className="btn" onClick={() => setAdding(true)}>
             + Add a place
           </button>
@@ -990,10 +997,35 @@ export default function Home() {
 
         {!loading && tab === "profile" && (
           <div className="page-panels">
-            <SearchEditor onSaved={loadFeed} />
-            <ProfileForm profile={profile} onSave={saveProfile} />
-            <ApplicationPacket profile={profile} onSave={saveProfile} />
-            <ApiSettings status={api} onSaved={loadApi} />
+            <div className="profilehead">
+              <h1>Your account</h1>
+              <div className="profiletabs" role="tablist">
+                {(
+                  [
+                    ["details", "Your details"],
+                    ["search", "What you're looking for"],
+                    ["packet", "Application packet"],
+                    ["api", "Data & refresh"],
+                  ] as [ProfileSection, string][]
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    role="tab"
+                    aria-selected={section === key}
+                    className={section === key ? "pill is-on" : "pill"}
+                    onClick={() => setSection(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {section === "details" && <ProfileForm profile={profile} onSave={saveProfile} />}
+            {section === "search" && <SearchEditor onSaved={loadFeed} />}
+            {section === "packet" && (
+              <ApplicationPacket profile={profile} onSave={saveProfile} />
+            )}
+            {section === "api" && <ApiSettings status={api} onSaved={loadApi} />}
           </div>
         )}
       </main>

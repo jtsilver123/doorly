@@ -125,18 +125,35 @@ export default function ListingCard({
           <span className="card-score-word">{listing.ratingHeadline}</span>
         </span>
 
-        <button
-          className="card-star"
-          onClick={(e) => {
-            e.stopPropagation();
-            onStar(listing);
-          }}
-          aria-label={listing.starred ? "Remove from saved" : "Save this listing"}
-          aria-pressed={listing.starred}
-          data-on={listing.starred ? "true" : undefined}
-        >
-          {listing.starred ? "★" : "☆"}
-        </button>
+        {/* Save was a ghost that only appeared on hover, so on a touch screen
+            it did not exist and on a desktop most people never found it. Both
+            judgments sit here permanently now, and dismiss is separated from
+            the primary action so a mis-click costs nothing. */}
+        <span className="card-judge">
+          <button
+            className="card-star"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStar(listing);
+            }}
+            aria-label={listing.starred ? "Remove from saved" : "Save this listing"}
+            aria-pressed={listing.starred}
+            data-on={listing.starred ? "true" : undefined}
+          >
+            {listing.starred ? "★" : "☆"}
+          </button>
+          <button
+            className="card-pass"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPass(listing);
+            }}
+            title="Not for me"
+            aria-label={`Not for me: ${listing.address}`}
+          >
+            ✕
+          </button>
+        </span>
       </button>
 
       <div className="card-body">
@@ -164,22 +181,31 @@ export default function ListingCard({
         <ProsConsLine listing={listing} />
 
         <div className="card-foot">
-          <span className="srcrow">
-            {sources.map((s) => (
-              <SourceMark key={s.source} source={s.source} href={s.url} />
-            ))}
-            {listing.stage !== "inbox" && (
-              <b className="tag tag-accent">{STAGE_LABEL[listing.stage]}</b>
-            )}
-            {listing.lastContactChannel && (
-              <b className="tag tag-grey" title={`Last contact ${relative(listing.lastContactAt!)}`}>
-                {CONTACT_ICON[listing.lastContactChannel]}{" "}
-                {CONTACT_LABEL[listing.lastContactChannel]}
-              </b>
-            )}
-          </span>
+          {/* Status only shows when there is a status; an empty row of its own
+              was costing every card a line to say nothing. */}
+          {(listing.stage !== "inbox" || listing.lastContactChannel) && (
+            <span className="srcrow">
+              {listing.stage !== "inbox" && (
+                <b className="tag tag-accent">{STAGE_LABEL[listing.stage]}</b>
+              )}
+              {listing.lastContactChannel && (
+                <b
+                  className="tag tag-grey"
+                  title={`Last contact ${relative(listing.lastContactAt!)}`}
+                >
+                  {CONTACT_ICON[listing.lastContactChannel]}{" "}
+                  {CONTACT_LABEL[listing.lastContactChannel]}
+                </b>
+              )}
+            </span>
+          )}
 
           <div className="card-actions">
+            <span className="srcrow card-srcs">
+              {sources.map((s) => (
+                <SourceMark key={s.source} source={s.source} href={s.url} />
+              ))}
+            </span>
             <button
               className="btn btn-primary btn-block"
               onClick={() => onReach(listing)}
@@ -199,14 +225,6 @@ export default function ListingCard({
                 ↗
               </a>
             )}
-            <button
-              className="btn btn-icon"
-              onClick={() => onPass(listing)}
-              title="Not for me"
-              aria-label={`Dismiss ${listing.address}`}
-            >
-              ✕
-            </button>
           </div>
         </div>
       </div>
