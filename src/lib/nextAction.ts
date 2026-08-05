@@ -118,6 +118,15 @@ export function nextAction(listing: FeedListing): NextAction {
     case "closed":
       return { kind: "done", label: "Closed", hint: "Nothing left to do here" };
 
+    case "no_go":
+      // You saw it and said no. Offering outreach here would propose
+      // re-courting a place you've already declined.
+      return {
+        kind: "done",
+        label: "Not for you",
+        hint: listing.passReason || "You toured it and passed",
+      };
+
     default:
       // inbox, interested, passed — nothing has happened yet.
       if (!reachable) {

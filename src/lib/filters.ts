@@ -65,7 +65,8 @@ function needleWords(text: string): string[] {
  */
 
 export interface FeedFilterOptions {
-  stage?: Stage | "all" | "active";
+  /** "everything" skips stage filtering — the board needs losses too. */
+  stage?: Stage | "all" | "active" | "everything";
   sources?: Source[];
   areas?: string[];
   priceMin?: number;
@@ -135,15 +136,16 @@ export function applyFilters(
 ): FeedListing[] {
   let result = listings;
 
-  if (filters.stage && filters.stage !== "all") {
-    if (filters.stage === "active") {
-      result = result.filter((l) => l.stage !== "inbox" && l.stage !== "passed");
-    } else {
-      result = result.filter((l) => l.stage === filters.stage);
-    }
-  } else {
-    // "All" still hides things you've explicitly rejected.
-    result = result.filter((l) => l.stage !== "passed");
+  if (filters.stage === "active") {
+    result = result.filter(
+      (l) => !["inbox", "passed", "no_go"].includes(l.stage)
+    );
+  } else if (filters.stage && filters.stage !== "all" && filters.stage !== "everything") {
+    result = result.filter((l) => l.stage === filters.stage);
+  } else if (filters.stage !== "everything") {
+    // "All" still hides what you've rejected — dismissed unseen, or toured
+    // and declined. Both are decisions the browse grid should respect.
+    result = result.filter((l) => l.stage !== "passed" && l.stage !== "no_go");
   }
 
   if (filters.priceMin != null) result = result.filter((l) => l.price >= filters.priceMin!);

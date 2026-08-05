@@ -1410,6 +1410,19 @@ button.fact:hover .fact-label { color: var(--accent); }
   background: transparent;
 }
 
+/*
+ * The last two columns are outcomes, not work: Applied is the win pile,
+ * "Didn't like it" the loss pile. The win keeps full color with an accent
+ * head; the loss dims — decided things shouldn't compete for attention with
+ * the ones still in play.
+ */
+.board-col[data-stage="applied"] .board-head span:first-child { color: var(--good); }
+.board-col[data-stage="no_go"] { border-style: dashed; }
+.board-col[data-stage="no_go"] .board-head span:first-child { color: var(--text-muted); }
+.board-col[data-stage="no_go"] .board-card { opacity: 0.66; }
+.board-col[data-stage="no_go"] .board-card:hover,
+.board-col[data-stage="no_go"] .board-card:focus-visible { opacity: 1; }
+
 .board-card {
   display: grid;
   gap: 3px;

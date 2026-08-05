@@ -619,7 +619,9 @@ export async function recordFeedback(
     },
     { onConflict: "user_id,listing_id" }
   );
-  if (action === "pass") await setStage(listingId, "passed");
+  // Routed through passListing, not a bare setStage: a thumbs-down on a
+  // place you already toured is an outcome (no_go), not triage (passed).
+  if (action === "pass") await passListing(listingId);
 
   // A like is a pipeline event, not just a training signal: anything you
   // liked belongs on the board as interested — unless it's already further
@@ -656,12 +658,26 @@ export async function recordFeedback(
  */
 export async function passListing(listingId: string, reason = ""): Promise<void> {
   const supabase = await db();
+  const owner = await pipelineOwnerId();
   const now = new Date().toISOString();
+  /*
+   * Two different kinds of "no": dismissing something you never saw is
+   * triage, but declining a place you actually walked through is an outcome —
+   * it belongs in the board's loss column, not the same bin as a hundred
+   * swiped-away cards. The reason rides on the shared state row either way.
+   */
+  const { data: state } = await supabase
+    .from("user_listing_state")
+    .select("stage")
+    .eq("user_id", owner)
+    .eq("listing_id", listingId)
+    .maybeSingle();
+  const seenIt = ["toured", "applied", "no_go"].includes(state?.stage ?? "inbox");
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: await pipelineOwnerId(),
+      user_id: owner,
       listing_id: listingId,
-      stage: "passed",
+      stage: seenIt ? "no_go" : "passed",
       stage_changed_at: now,
       pass_reason: reason.slice(0, 500),
       passed_at: now,
@@ -673,16 +689,25 @@ export async function passListing(listingId: string, reason = ""): Promise<void>
 
 export async function undoPass(listingId: string): Promise<void> {
   const supabase = await db();
+  const owner = await pipelineOwnerId();
   await supabase
     .from("feedback")
     .delete()
     .eq("user_id", await currentUserId())
     .eq("listing_id", listingId);
+  // Un-declining a place you toured puts it back where the decline happened —
+  // you still saw it, so it returns to "toured", not to the top of the funnel.
+  const { data: state } = await supabase
+    .from("user_listing_state")
+    .select("stage")
+    .eq("user_id", owner)
+    .eq("listing_id", listingId)
+    .maybeSingle();
   await supabase.from("user_listing_state").upsert(
     {
-      user_id: await pipelineOwnerId(),
+      user_id: owner,
       listing_id: listingId,
-      stage: "inbox",
+      stage: state?.stage === "no_go" ? "toured" : "inbox",
       stage_changed_at: new Date().toISOString(),
       // Back in the running means the reason no longer applies.
       pass_reason: "",

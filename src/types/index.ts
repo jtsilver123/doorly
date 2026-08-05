@@ -112,8 +112,9 @@ export type Stage =
   | "tour"         // tour booked
   | "toured"       // been there
   | "applied"      // application in
+  | "no_go"        // toured it, and it's a no — the loss column
   | "closed"       // signed, or you moved on for good
-  | "passed";      // explicitly not for you
+  | "passed";      // explicitly not for you, before ever seeing it
 
 export const STAGES: Stage[] = [
   "inbox",
@@ -122,6 +123,7 @@ export const STAGES: Stage[] = [
   "tour",
   "toured",
   "applied",
+  "no_go",
   "closed",
   "passed",
 ];
@@ -133,6 +135,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
   tour: "Tour booked",
   toured: "Toured",
   applied: "Applied",
+  no_go: "Didn't like it",
   closed: "Closed",
   passed: "Passed",
 };
@@ -145,13 +148,18 @@ export const STAGE_LABEL: Record<Stage, string> = {
  */
 export type TourKind = "private" | "open_house";
 
-/** Stages that represent an active pursuit, in pipeline order. */
+/**
+ * The board's columns, in order. The last two are the outcome pair — win
+ * and loss — because a funnel that only shows wins teaches you nothing
+ * about your own taste.
+ */
 export const PIPELINE_STAGES: Stage[] = [
   "interested",
   "contacted",
   "tour",
   "toured",
   "applied",
+  "no_go",
 ];
 
 /** A listing joined with everything the app knows about it. What the UI renders. */

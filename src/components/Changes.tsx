@@ -129,7 +129,7 @@ export default function Changes({
   /** In your pipeline or starred — the changes that are actually about you. */
   const isMine = (c: Change) => {
     const l = byId.get(c.listingId);
-    return Boolean(l && (l.starred || !["inbox", "passed"].includes(l.stage)));
+    return Boolean(l && (l.starred || !["inbox", "passed", "no_go"].includes(l.stage)));
   };
 
   const counts = useMemo(() => {

@@ -181,7 +181,7 @@ export async function noticesForEvents(
   for (const s of states ?? []) {
     const pursuing =
       (s.starred as boolean) ||
-      !["inbox", "passed"].includes(s.stage as string);
+      !["inbox", "passed", "no_go"].includes(s.stage as string);
     if (!pursuing) continue;
     const list = watchers.get(s.listing_id as string) ?? [];
     list.push(s.user_id as string);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadFeed } from "@/lib/feed";
 import type { FeedFilterOptions, SortKey } from "@/lib/filters";
-import type { Source, Stage } from "@/types";
+import type { Source } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
   const filters: FeedFilterOptions = {
-    stage: (params.get("stage") as Stage | "all" | "active") ?? undefined,
+    stage: (params.get("stage") as FeedFilterOptions["stage"]) ?? undefined,
     sources: (params.get("sources")?.split(",").filter(Boolean) as Source[]) ?? undefined,
     priceMin: num(params.get("priceMin")),
     priceMax: num(params.get("priceMax")),

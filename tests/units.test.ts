@@ -1010,6 +1010,25 @@ test("the default view hides what you've passed on", () => {
   );
 });
 
+test("a toured-and-declined place hides from browsing but not from 'everything'", () => {
+  // "no_go" is the board's loss column: browsing ("all" or default) respects
+  // the decision and hides it; "active" treats it as settled; "everything" is
+  // what the board fetches, and the board needs its losses.
+  const list = [
+    feed({ id: "live", stage: "interested" }),
+    feed({ id: "loss", stage: "no_go" }),
+    feed({ id: "gone", stage: "passed" }),
+  ];
+  assert.deepEqual(applyFilters(list, { stage: "all" }).map((l) => l.id), ["live"]);
+  assert.deepEqual(applyFilters(list, { stage: "active" }).map((l) => l.id), ["live"]);
+  assert.deepEqual(
+    applyFilters(list, { stage: "everything" }).map((l) => l.id).sort(),
+    ["gone", "live", "loss"]
+  );
+  // Asking for the stage by name still works.
+  assert.deepEqual(applyFilters(list, { stage: "no_go" }).map((l) => l.id), ["loss"]);
+});
+
 test("sorting on 'best' uses the rating the user actually sees", () => {
   const list = [feed({ id: "low", rating: 30 }), feed({ id: "high", rating: 90 })];
   assert.deepEqual(
@@ -1203,6 +1222,13 @@ test("whitespace is not a contact", () => {
   const blank = reachableOn({ contactPhone: "", myContactPhone: "   " });
   assert.equal(blank.phone, "");
   assert.equal(nextAction(feed({ stage: "interested", myContactPhone: "  " })).kind, "add-contact");
+});
+
+test("a declined place never proposes re-courting the agent", () => {
+  const action = nextAction(feed({ stage: "no_go", passReason: "Fifth-floor walkup" }));
+  assert.equal(action.kind, "done");
+  assert.equal(action.hint, "Fifth-floor walkup");
+  assert.equal(action.becomes, undefined);
 });
 
 // --- searching for an address ---------------------------------------------

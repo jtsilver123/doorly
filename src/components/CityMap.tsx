@@ -43,7 +43,7 @@ function short(price: number): string {
 
 /** Pills that survive zooming out: your shortlist, not the whole market. */
 function isHot(l: FeedListing): boolean {
-  return l.starred || (l.stage !== "inbox" && l.stage !== "passed");
+  return l.starred || !["inbox", "passed", "no_go"].includes(l.stage);
 }
 
 export default function CityMap({

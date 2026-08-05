@@ -218,7 +218,7 @@ export default function Compare({
   const candidates = useMemo(
     () =>
       listings
-        .filter((l) => l.starred || !["inbox", "passed", "closed"].includes(l.stage))
+        .filter((l) => l.starred || !["inbox", "passed", "no_go", "closed"].includes(l.stage))
         .sort((a, b) => b.rating - a.rating),
     [listings]
   );

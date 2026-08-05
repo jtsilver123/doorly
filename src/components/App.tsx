@@ -218,7 +218,9 @@ export default function Home() {
    */
   const loadFeed = useCallback(async () => {
     try {
-      const res = await fetch("/api/feed?stage=all");
+      // "everything", not "all": the board's loss column holds no_go rows,
+      // which "all" hides. The browse grid re-filters client-side anyway.
+      const res = await fetch("/api/feed?stage=everything");
       const body = await res.json();
       if (body.error) toast({ message: body.error, tone: "warn" });
       setListings(body.listings ?? []);
@@ -487,39 +489,34 @@ export default function Home() {
     [listings, moveStage, toast]
   );
 
+  /**
+   * The optimistic side of a "no". Dismissing something unseen removes it —
+   * that's triage. Declining a place you've toured is an outcome: the card
+   * moves to the board's loss column instead of vanishing, matching what the
+   * server decides in passListing.
+   */
+  const sawIt = (l: FeedListing) => ["toured", "applied", "no_go"].includes(l.stage);
+  const optimisticPass = useCallback((listing: FeedListing, reason = "") => {
+    if (sawIt(listing)) {
+      setListings((list) =>
+        list.map((l) =>
+          l.id === listing.id ? { ...l, stage: "no_go" as const, passReason: reason } : l
+        )
+      );
+    } else {
+      setListings((list) => list.filter((l) => l.id !== listing.id));
+    }
+  }, []);
+
   const pass = useCallback(
     (listing: FeedListing) => {
-      setListings((list) => list.filter((l) => l.id !== listing.id));
+      optimisticPass(listing);
       patch(listing.id, { action: "feedback", value: "pass" }, false).catch(() =>
         loadFeed()
       );
       toast({
-        message: `Passed on ${listing.address}`,
-        actionLabel: "Undo",
-        onAction: () => {
-          patch(listing.id, { action: "unpass" }, false)
-            .then(loadFeed)
-            .catch(() => loadFeed());
-        },
-      });
-    },
-    [patch, loadFeed, toast]
-  );
-
-  /**
-   * Passing with a reason attached, from the dialog.
-   *
-   * Same optimistic removal and undo as a bare pass — the reason rides along
-   * on the write so the two can never disagree, and undoing clears it.
-   */
-  const passWithReason = useCallback(
-    (listing: FeedListing, reason: string) => {
-      setPassing(null);
-      setListings((list) => list.filter((l) => l.id !== listing.id));
-      patch(listing.id, { action: "pass", reason }, false).catch(() => loadFeed());
-      toast({
-        message: reason
-          ? `Passed on ${listing.address} — reason saved`
+        message: sawIt(listing)
+          ? `${listing.address} filed under "Didn't like it"`
           : `Passed on ${listing.address}`,
         actionLabel: "Undo",
         onAction: () => {
@@ -529,7 +526,35 @@ export default function Home() {
         },
       });
     },
-    [patch, loadFeed, toast]
+    [patch, loadFeed, toast, optimisticPass]
+  );
+
+  /**
+   * Passing with a reason attached, from the dialog.
+   *
+   * Same optimistic move-or-remove as a bare pass — the reason rides along
+   * on the write so the two can never disagree, and undoing clears it.
+   */
+  const passWithReason = useCallback(
+    (listing: FeedListing, reason: string) => {
+      setPassing(null);
+      optimisticPass(listing, reason);
+      patch(listing.id, { action: "pass", reason }, false).catch(() => loadFeed());
+      toast({
+        message: sawIt(listing)
+          ? `${listing.address} filed under "Didn't like it"`
+          : reason
+            ? `Passed on ${listing.address} — reason saved`
+            : `Passed on ${listing.address}`,
+        actionLabel: "Undo",
+        onAction: () => {
+          patch(listing.id, { action: "unpass" }, false)
+            .then(loadFeed)
+            .catch(() => loadFeed());
+        },
+      });
+    },
+    [patch, loadFeed, toast, optimisticPass]
   );
 
   /** The .ics for a booked tour, shared by the board and the drawer. */
@@ -744,7 +769,7 @@ export default function Home() {
   const finalistCount = useMemo(
     () =>
       listings.filter(
-        (l) => l.starred || !["inbox", "passed", "closed"].includes(l.stage)
+        (l) => l.starred || !["inbox", "passed", "no_go", "closed"].includes(l.stage)
       ).length,
     [listings]
   );

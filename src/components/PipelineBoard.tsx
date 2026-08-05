@@ -38,6 +38,7 @@ const STAGE_HINT: Record<string, string> = {
   tour: "No viewings booked yet",
   toured: "Nothing seen in person yet",
   applied: "No applications in",
+  no_go: "Toured places you passed on land here",
 };
 
 export default function PipelineBoard({
@@ -130,6 +131,7 @@ export default function PipelineBoard({
           <div
             key={stage}
             className="board-col"
+            data-stage={stage}
             data-over={over === stage && dragging ? "true" : undefined}
             onDragOver={(e) => {
               // Without preventDefault the browser refuses the drop outright.

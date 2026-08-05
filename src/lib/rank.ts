@@ -39,7 +39,9 @@ const POSITIVE_STAGES: Stage[] = ["interested", "contacted", "tour", "toured", "
 
 export function stageImpliesLike(stage: Stage): boolean | null {
   if (POSITIVE_STAGES.includes(stage)) return true;
-  if (stage === "passed") return false;
+  // Both kinds of no: dismissed unseen, or toured and declined. The second is
+  // arguably a *stronger* signal — the photos passed and the reality didn't.
+  if (stage === "passed" || stage === "no_go") return false;
   return null;
 }
 

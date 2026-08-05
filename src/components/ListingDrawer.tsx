@@ -499,9 +499,9 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
 
           {/* A passed place explains itself — to you a week later, and to
               whoever found it. */}
-          {listing.stage === "passed" && listing.passReason && (
+          {(listing.stage === "passed" || listing.stage === "no_go") && listing.passReason && (
             <div className="passnote">
-              <b>Passed</b>
+              <b>{listing.stage === "no_go" ? "Didn't like it" : "Passed"}</b>
               <span>{listing.passReason}</span>
               <button className="linkish" onClick={() => patch({ action: "unpass" })}>
                 Put it back
