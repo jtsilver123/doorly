@@ -153,8 +153,11 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
    * A listing that's gone quiet needs a nudge, not the opening pitch sent a
    * second time — so the message the buttons send, the preview, and the
    * clipboard all switch together. One source, or they disagree.
+   *
+   * The whole contacted stage counts, not just the overdue part: any message
+   * sent after the first one is by definition a follow-up.
    */
-  const chasing = nextAction(listing).kind === "chase";
+  const chasing = listing.stage === "contacted";
   const message = chasing
     ? draftFollowUp(listing, profile)
     : draftTourMessage(listing, profile);

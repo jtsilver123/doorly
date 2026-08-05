@@ -10,6 +10,7 @@ import {
   PROOF_OPTIONS,
   bestChannel,
   draftTourMessage,
+  draftFollowUp,
   mailtoLink,
   smsLink,
   tourSubject,
@@ -35,9 +36,8 @@ import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
 import ListingCard, { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
-import Changes, { type Change } from "@/components/Changes";
+import Changes, { type Change, type Notice } from "@/components/Changes";
 import PassDialog from "@/components/PassDialog";
-import NotificationBell from "@/components/NotificationBell";
 import { icsFor, icsFilename } from "@/lib/calendar";
 import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
@@ -71,7 +71,7 @@ interface ApiStatus {
 const NAV_ICON: Record<string, IconName> = {
   today: "today",
   feed: "listings",
-  changes: "changes",
+  changes: "bell",
   pipeline: "pipeline",
   compare: "compare",
   profile: "profile",
@@ -142,6 +142,9 @@ export default function Home() {
   }, [tab]);
   const [listings, setListings] = useState<FeedListing[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
+  /** Personal notices: crew adds, watched changes, good drops. */
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [unread, setUnread] = useState(0);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -229,6 +232,31 @@ export default function Home() {
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
+
+  const loadNotices = useCallback(async () => {
+    try {
+      const body = await fetch("/api/notifications").then((r) => r.json());
+      setNotices(body.notifications ?? []);
+      setUnread(body.unread ?? 0);
+    } catch {
+      /* the next poll gets another chance */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotices();
+    const timer = setInterval(loadNotices, 120_000);
+    return () => clearInterval(timer);
+  }, [loadNotices]);
+
+  // Visiting Activity reads everything — the badge counts the unseen, and
+  // "seen" means the page was in front of you, not that you clicked each row.
+  useEffect(() => {
+    if (tab !== "changes" || unread === 0) return;
+    fetch("/api/notifications", { method: "PATCH" })
+      .then(() => setUnread(0))
+      .catch(() => {});
+  }, [tab, unread]);
 
   /**
    * ?place=<id> opens that listing.
@@ -542,7 +570,15 @@ export default function Home() {
         return;
       }
       const { channel } = bestChannel(listing);
-      const message = draftTourMessage(listing, profile);
+      /*
+       * Which draft rides the button. Once you've contacted, every later
+       * message from a card is a nudge, never the opening pitch resent —
+       * getting the original again is what makes people look like bots.
+       */
+      const chasing = listing.stage === "contacted";
+      const message = chasing
+        ? draftFollowUp(listing, profile)
+        : draftTourMessage(listing, profile);
 
       await patch(
         listing.id,
@@ -551,7 +587,7 @@ export default function Home() {
           channel,
           direction: "out",
           who: listing.contactName,
-          note: "Tour request",
+          note: chasing ? "Follow-up" : "Tour request",
         },
         false
       );
@@ -831,7 +867,9 @@ export default function Home() {
             [
               ["today", "Today", actions.length],
               ["feed", "Listings", counts.active],
-              ["changes", "Changes", changes.length],
+              // The badge is the unread count — a permanent "200" is noise,
+              // an occasional "3" is news.
+              ["changes", "Activity", unread],
               ["pipeline", "Pipeline", counts.pipeline],
               ["compare", "Compare", finalistCount],
               // Phones only: the desktop rail reaches this through the account
@@ -852,14 +890,6 @@ export default function Home() {
             </button>
           ))}
         </div>
-
-        <NotificationBell
-          onOpenListing={(id) => {
-            const hit = listings.find((l) => l.id === id);
-            if (hit) setOpen(hit);
-            else toast({ message: "That place isn't in your search any more.", tone: "warn" });
-          }}
-        />
 
         {counts.followUp > 0 && (
           <button
@@ -1138,6 +1168,7 @@ export default function Home() {
         {!loading && tab === "changes" && (
           <Changes
             changes={changes}
+            notices={notices}
             listings={listings}
             onOpen={setOpen}
             onRefresh={refresh}

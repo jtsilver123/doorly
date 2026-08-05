@@ -3494,3 +3494,7 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /* Phones reach the bell through the bottom bar's Today/You tabs; in the rail
    layout it's hidden along with the rest of the desktop-only rail parts. */
+
+/* A fresh notice keeps its tint until the next visit, so "what's new since I
+   last looked" survives the badge being cleared. */
+.changerow[data-fresh="true"] { background: var(--accent-soft); }

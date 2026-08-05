@@ -32,6 +32,23 @@ import { RatingDisc } from "@/components/Rating";
  * lets you filter to the kind you care about.
  */
 
+/** A personal notice — the "For you" rows. Same stream the pushes ride. */
+export interface Notice {
+  id: number;
+  kind: "crew_add" | "watched" | "good_drop";
+  listingId: string | null;
+  title: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+}
+
+const NOTICE_KIND: Record<Notice["kind"], string> = {
+  crew_add: "Crew",
+  watched: "Following",
+  good_drop: "Price drop",
+};
+
 export interface Change {
   id: number;
   listingId: string;
@@ -82,18 +99,28 @@ function movement(change: Change): { from: number; to: number } | null {
 
 export default function Changes({
   changes,
+  notices,
   listings,
   onOpen,
   onRefresh,
   refreshing,
 }: {
   changes: Change[];
+  notices: Notice[];
   listings: FeedListing[];
   onOpen: (listing: FeedListing) => void;
   onRefresh: () => void;
   refreshing: boolean;
 }) {
-  const [filter, setFilter] = useState("all");
+  /*
+   * "For you" first when it has anything unread — that's the consolidation:
+   * the bell used to be a second surface for the same stream, and two entry
+   * points for one stream is one too many. Everything personal now fronts
+   * the market feed instead of floating in a popover.
+   */
+  const [filter, setFilter] = useState(() =>
+    notices.some((n) => !n.read) ? "you" : "all"
+  );
   const [minePlace, setMineOnly] = useState(false);
 
   /** Listings by id, so a row can carry the score and know if it's yours. */
@@ -155,6 +182,15 @@ export default function Changes({
     <div className="changes">
       <div className="changes-bar">
         <div className="changes-filters" role="group" aria-label="Kind of change">
+          <button
+            className={filter === "you" ? "pill is-on" : "pill"}
+            aria-pressed={filter === "you"}
+            disabled={notices.length === 0}
+            onClick={() => setFilter("you")}
+          >
+            For you
+            <span className="muted"> {notices.length}</span>
+          </button>
           {FILTERS.map((f) => (
             <button
               key={f.key}
@@ -184,7 +220,45 @@ export default function Changes({
         )}
       </div>
 
-      {shown.length === 0 && (
+      {filter === "you" && (
+        <div className="changelist">
+          {notices.map((n) => {
+            const listing = n.listingId ? byId.get(n.listingId) : undefined;
+            return (
+              <button
+                key={`n${n.id}`}
+                className="changerow"
+                data-fresh={!n.read ? "true" : undefined}
+                disabled={!listing}
+                title={listing ? undefined : "This listing is no longer tracked"}
+                onClick={() => listing && onOpen(listing)}
+              >
+                <span
+                  className={
+                    n.kind === "good_drop"
+                      ? "chip chip-good"
+                      : n.kind === "crew_add"
+                        ? "chip chip-accent"
+                        : "chip"
+                  }
+                >
+                  {NOTICE_KIND[n.kind]}
+                </span>
+                <span className="changerow-what">
+                  <b>{n.title}</b>
+                  {n.body && <span className="muted">{n.body}</span>}
+                </span>
+                <span className="changerow-detail muted">{dayLabel(n.createdAt)}</span>
+                {listing && (
+                  <RatingDisc rating={listing.rating} grade={listing.grade} size="sm" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {filter !== "you" && shown.length === 0 && (
         <p className="changes-none muted">
           Nothing of that kind yet.{" "}
           <button className="linkish" onClick={() => { setFilter("all"); setMineOnly(false); }}>
@@ -193,7 +267,7 @@ export default function Changes({
         </p>
       )}
 
-      {days.map((day) => (
+      {filter !== "you" && days.map((day) => (
         <section key={day.label} className="changeday">
           {/* Days, not clock times: the timestamp is when our poll ran, not
               when the landlord acted, and pretending otherwise invents a
