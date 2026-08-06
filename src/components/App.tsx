@@ -556,12 +556,19 @@ export default function Home() {
       patch(listing.id, { action: "feedback", value: "pass" }, false).catch(() =>
         loadFeed()
       );
+      /*
+       * The quick dismiss stays one tap. Clearing a feed of forty places can't
+       * cost forty dialogs, so the reason is offered rather than demanded —
+       * and a pass with no reason still counts, just against everything.
+       */
       toast({
         message: sawIt(listing)
           ? `${listing.address} filed under "Didn't like it"`
           : `Passed on ${listing.address}`,
-        actionLabel: "Undo",
-        onAction: () => {
+        actionLabel: "Say why",
+        onAction: () => setPassing(listing),
+        secondaryLabel: "Undo",
+        onSecondary: () => {
           patch(listing.id, { action: "unpass" }, false)
             .then(loadFeed)
             .catch(() => loadFeed());
@@ -578,15 +585,17 @@ export default function Home() {
    * on the write so the two can never disagree, and undoing clears it.
    */
   const passWithReason = useCallback(
-    (listing: FeedListing, reason: string) => {
+    (listing: FeedListing, reason: string, reasons: string[] = []) => {
       setPassing(null);
       optimisticPass(listing, reason);
-      patch(listing.id, { action: "pass", reason }, false).catch(() => loadFeed());
+      // `reasons` are codes for the ranking model, `reason` is the note a
+      // crew-mate reads. Both ride on the one write so they can't disagree.
+      patch(listing.id, { action: "pass", reason, reasons }, false).catch(() => loadFeed());
       toast({
         message: sawIt(listing)
           ? `${listing.address} filed under "Didn't like it"`
-          : reason
-            ? `Passed on ${listing.address} — reason saved`
+          : reasons.length
+            ? `Passed on ${listing.address}. Your scores know why.`
             : `Passed on ${listing.address}`,
         actionLabel: "Undo",
         onAction: () => {
@@ -1393,7 +1402,7 @@ export default function Home() {
                 null)
               : null
           }
-          onConfirm={(reason) => passWithReason(passing, reason)}
+          onConfirm={(reason, reasons) => passWithReason(passing, reason, reasons)}
           onClose={() => setPassing(null)}
         />
       )}

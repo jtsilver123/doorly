@@ -211,7 +211,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       .from("contact_log")
       .select("listing_id, occurred_at, channel, direction")
       .eq("user_id", ownerId),
-    supabase.from("feedback").select("listing_id, action").eq("user_id", userId),
+    supabase.from("feedback").select("listing_id, action, reasons").eq("user_id", userId),
   ]);
 
   const stateBy = new Map<string, StateRow>(
@@ -256,15 +256,21 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   }
 
   // --- train on this user's signals -------------------------------------
-  const explicit = new Map<string, boolean>();
+  const explicit = new Map<string, { liked: boolean; reasons: string[] }>();
   for (const row of feedbackRows.data ?? []) {
-    explicit.set(row.listing_id, row.action === "like");
+    explicit.set(row.listing_id, {
+      liked: row.action === "like",
+      // Reason codes scope which features the pass counts against, so a place
+      // turned down on price stops teaching the model to avoid its
+      // neighborhood. See PASS_REASONS in lib/rank.ts.
+      reasons: (row.reasons as string[] | null) ?? [],
+    });
   }
   const byId = new Map(listings.map((r) => [r.id, r]));
   const signals: Signal[] = [];
-  for (const [listingId, liked] of explicit) {
+  for (const [listingId, { liked, reasons }] of explicit) {
     const row = byId.get(listingId);
-    if (row) signals.push({ listing: toListing(row), liked });
+    if (row) signals.push({ listing: toListing(row), liked, reasons });
   }
   for (const [listingId, state] of stateBy) {
     if (explicit.has(listingId)) continue;
@@ -638,7 +644,9 @@ export async function setListingFields(
 
 export async function recordFeedback(
   listingId: string,
-  action: "like" | "pass"
+  action: "like" | "pass",
+  /** Pass reason codes, which scope what the model learns. See lib/rank.ts. */
+  reasons: string[] = []
 ): Promise<void> {
   const supabase = await db();
   await supabase.from("feedback").upsert(
@@ -646,6 +654,7 @@ export async function recordFeedback(
       user_id: await currentUserId(),
       listing_id: listingId,
       action,
+      reasons: action === "pass" ? reasons : [],
       created_at: new Date().toISOString(),
     },
     { onConflict: "user_id,listing_id" }
@@ -687,7 +696,16 @@ export async function recordFeedback(
  * somebody else, and a place that silently disappears teaches the person who
  * volunteered to help absolutely nothing.
  */
-export async function passListing(listingId: string, reason = ""): Promise<void> {
+export async function passListing(
+  listingId: string,
+  reason = "",
+  /**
+   * Reason codes, which are a different thing from the note above them: the
+   * note is written for a crew-mate, the codes are an input to the ranking
+   * model. Kept apart because they answer to different readers.
+   */
+  reasons: string[] = []
+): Promise<void> {
   const supabase = await db();
   const owner = await pipelineOwnerId();
   const now = new Date().toISOString();
@@ -713,6 +731,22 @@ export async function passListing(listingId: string, reason = ""): Promise<void>
       pass_reason: reason.slice(0, 500),
       passed_at: now,
       updated_at: now,
+    },
+    { onConflict: "user_id,listing_id" }
+  );
+
+  /*
+   * The pass is also a training signal, and this is the only path that knows
+   * the codes. Written as the passer rather than the pipeline owner: a crew
+   * shares a board, but taste stays personal.
+   */
+  await supabase.from("feedback").upsert(
+    {
+      user_id: await currentUserId(),
+      listing_id: listingId,
+      action: "pass",
+      reasons,
+      created_at: now,
     },
     { onConflict: "user_id,listing_id" }
   );

@@ -3,31 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { FeedListing } from "@/types";
 import Icon from "@/components/Icon";
+import { PASS_REASONS } from "@/lib/rank";
 
 /**
  * Taking a place out of the running, and saying why.
  *
- * Solo, this is a one-tap dismiss and the dialog never appears. In a crew it
- * matters more: somebody went looking on your behalf, found this, and put it
- * in your pipeline. If it silently disappears they learn nothing, and the
- * next five they send have the same problem as this one.
+ * The reason has two readers, and they want different things. A crew-mate who
+ * found this needs to know what was wrong so the next five are closer. The
+ * ranking model needs to know *which part* was wrong, because a pass with no
+ * reason has to count against every feature of the listing at once: turn down
+ * a $4,200 West Village studio on price, and without a reason the model
+ * quietly learns you dislike the West Village.
  *
- * So the reasons are the ones that actually change what a scout sends next —
- * too expensive, wrong area, too small, bad building — plus a line of your
- * own. All optional: a required explanation would just mean nobody passes
- * anything, and a pipeline you can't clear is worse than a scout who repeats
- * themselves.
+ * So the chips are reason codes rather than free text, and the note underneath
+ * stays free text. Everything is optional. A required explanation just means
+ * nobody clears their pipeline, and a board you can't clear is worse than a
+ * scout who repeats themselves.
  */
-
-const REASONS = [
-  "Too expensive",
-  "Wrong neighborhood",
-  "Too small",
-  "Building looks rough",
-  "Bad layout",
-  "Too far from the train",
-  "Already gone",
-];
 
 export default function PassDialog({
   listing,
@@ -38,7 +30,8 @@ export default function PassDialog({
   listing: FeedListing;
   /** Who found it, when that isn't you. Null means no one to tell. */
   finderName: string | null;
-  onConfirm: (reason: string) => void;
+  /** The human-readable note, and the codes that scope what the model learns. */
+  onConfirm: (reason: string, reasons: string[]) => void;
   onClose: () => void;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
@@ -60,7 +53,23 @@ export default function PassDialog({
     );
   }
 
-  const reason = [picked.join(", "), note.trim()].filter(Boolean).join(" — ");
+  const labelOf = (code: string) =>
+    PASS_REASONS.find((r) => r.code === code)?.label ?? code;
+  // The note a person reads, assembled from the same picks that scope the
+  // model. One choice, two outputs, so the two can never describe different
+  // decisions.
+  const note_ = [picked.map(labelOf).join(", "), note.trim()].filter(Boolean).join(". ");
+
+  // What this pass will and won't teach, said before it's made. The honest
+  // cases are the ones that teach nothing: a place that's already rented is
+  // not a preference, and a bad layout is a fact this model has no feature for.
+  const teaching = picked.filter((c) => PASS_REASONS.find((r) => r.code === c)?.families.length);
+  const learns =
+    picked.length === 0
+      ? "Without a reason this counts against everything about the place."
+      : teaching.length === 0
+        ? "Noted for your crew. Nothing here changes your scores, which is right: this isn't about taste."
+        : "Your scores will stop favoring places like this one, and leave the rest alone.";
 
   return (
     <>
@@ -95,18 +104,22 @@ export default function PassDialog({
         )}
 
         <div className="passdialog-reasons" role="group" aria-label="Why">
-          {REASONS.map((r) => (
+          {PASS_REASONS.map((r) => (
             <button
-              key={r}
-              className={picked.includes(r) ? "pill is-on" : "pill"}
-              aria-pressed={picked.includes(r)}
-              onClick={() => toggle(r)}
+              key={r.code}
+              className={picked.includes(r.code) ? "pill is-on" : "pill"}
+              aria-pressed={picked.includes(r.code)}
+              onClick={() => toggle(r.code)}
             >
-              {picked.includes(r) && <Icon name="check" size={12} />}
-              {r}
+              {picked.includes(r.code) && <Icon name="check" size={12} />}
+              {r.label}
             </button>
           ))}
         </div>
+
+        <p className="passdialog-learns" aria-live="polite">
+          {learns}
+        </p>
 
         <label className="passdialog-note">
           <span className="muted">Anything else</span>
@@ -116,19 +129,19 @@ export default function PassDialog({
             value={note}
             placeholder={
               finderName
-                ? "Photos looked staged, and the block is under scaffolding…"
-                : "Why this one's out…"
+                ? "Photos looked staged, and the block is under scaffolding"
+                : "Anything the chips don't cover"
             }
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
 
         <div className="passdialog-foot">
-          <button className="linkish" onClick={() => onConfirm("")}>
+          <button className="linkish" onClick={() => onConfirm("", [])}>
             Pass without a reason
           </button>
-          <button className="btn btn-primary" onClick={() => onConfirm(reason)}>
-            {finderName && reason ? `Pass and tell ${finderName}` : "Pass"}
+          <button className="btn btn-primary" onClick={() => onConfirm(note_, picked)}>
+            {finderName && note_ ? `Pass and tell ${finderName}` : "Pass"}
           </button>
         </div>
       </div>

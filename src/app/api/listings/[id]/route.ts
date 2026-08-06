@@ -118,15 +118,25 @@ export async function PATCH(request: Request, { params }: Params) {
       }
 
       case "pass":
-        // The reason travels with the pass so the two can't disagree.
-        await passListing(id, String(body.reason ?? ""));
+        // The note and the reason codes travel with the pass so none of the
+        // three can disagree: the note goes to the crew, the codes go to the
+        // ranking model, the stage goes to the board.
+        await passListing(
+          id,
+          String(body.reason ?? ""),
+          Array.isArray(body.reasons) ? body.reasons.map(String).slice(0, 8) : []
+        );
         break;
 
       case "unpass":
         await undoPass(id);
         break;
       case "feedback":
-        await recordFeedback(id, body.value === "like" ? "like" : "pass");
+        await recordFeedback(
+          id,
+          body.value === "like" ? "like" : "pass",
+          Array.isArray(body.reasons) ? body.reasons.map(String).slice(0, 8) : []
+        );
         break;
       case "contact":
         await addContact(id, {

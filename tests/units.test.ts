@@ -49,6 +49,8 @@ import {
 import { applyFilters } from "@/lib/filters";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { withinAreas, nearAreas } from "@/lib/geo";
+import { train } from "@/lib/rank";
+import type { Listing } from "@/types";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
 import { hpdAddress } from "@/lib/nycdata";
 import {
@@ -1807,4 +1809,100 @@ test("a search is scoped by real boundaries, not a radius", () => {
 test("coordinates in no neighborhood at all are excluded", () => {
   // The middle of the East River: a centroid radius would happily claim it.
   assert.equal(withinAreas(40.7461, -73.9645, ["east village", "williamsburg"]), false);
+});
+
+// --- what a pass teaches ---------------------------------------------------
+
+function place(over: Partial<Listing> = {}): Listing {
+  return {
+    id: `l${Math.round(Number(over.price ?? 3000))}${over.neighborhood ?? ""}`,
+    source: "streeteasy",
+    sourceId: "x",
+    address: "1 Test St",
+    unit: "",
+    neighborhood: "West Village",
+    borough: "Manhattan",
+    price: 3000,
+    originalPrice: 3000,
+    bedrooms: 1,
+    bathrooms: 1,
+    sqft: 500,
+    noFee: false,
+    amenities: [],
+    description: "",
+    imageUrl: "",
+    images: [],
+    url: "",
+    lat: 40.73,
+    lon: -74.0,
+    firstSeenAt: "2026-08-01",
+    lastSeenAt: "2026-08-01",
+    ...over,
+  } as Listing;
+}
+
+test("a pass on price stops blaming the neighborhood", () => {
+  /*
+   * The shape that actually poisons a model: the places you can afford happen
+   * to be in one neighborhood, and the ones you turn down on price happen to
+   * be in the one you want. Nothing here is a statement about the West
+   * Village, but an unscoped pass reads it as four of them.
+   */
+  const signals = [
+    ...[2500, 2600, 2700].map((price) => ({
+      listing: place({ price, neighborhood: "Bushwick" }),
+      liked: true,
+    })),
+    ...[4100, 4200, 4300, 4400].map((price) => ({
+      listing: place({ price, neighborhood: "West Village" }),
+      liked: false,
+    })),
+  ];
+
+  const blind = train(signals);
+  assert.ok(
+    blind.weights["hood:West Village"] < 0,
+    "unscoped, the model concludes you dislike the West Village"
+  );
+
+  // The same seven signals, with the passes saying they were about price.
+  const scoped = train(signals.map((s) => (s.liked ? s : { ...s, reasons: ["price"] })));
+  assert.ok(
+    !(scoped.weights["hood:West Village"] < 0),
+    "scoped, the neighborhood is never blamed"
+  );
+  assert.ok(scoped.weights["price:4000-4250"] < 0, "the price band takes the hit instead");
+});
+
+test("passing because it was already gone teaches nothing", () => {
+  const liked = [{ listing: place({ price: 2600 }), liked: true }];
+  const base = train(liked);
+  const withGone = train([
+    ...liked,
+    { listing: place({ price: 2600, neighborhood: "Bushwick" }), liked: false, reasons: ["gone"] },
+  ]);
+  // A rented apartment is not a preference: no weight may move because of it.
+  assert.deepEqual(withGone.weights, base.weights);
+  assert.equal(withGone.passes, base.passes);
+});
+
+test("a reason the model has no feature for is dropped, not spread around", () => {
+  const signals = [
+    { listing: place({ price: 2600 }), liked: true },
+    { listing: place({ price: 2700 }), liked: true },
+    { listing: place({ price: 2800, neighborhood: "Bushwick" }), liked: false, reasons: ["layout"] },
+  ];
+  const model = train(signals);
+  assert.equal(model.passes, 0, "a bad layout is not evidence about Bushwick");
+  assert.ok(!("hood:Bushwick" in model.weights));
+});
+
+test("a pass with no reason still counts against the whole listing", () => {
+  const model = train([
+    { listing: place({ price: 2600 }), liked: true },
+    { listing: place({ price: 2700 }), liked: true },
+    { listing: place({ price: 2800, neighborhood: "Bushwick" }), liked: false },
+  ]);
+  assert.equal(model.passes, 1);
+  assert.ok(model.weights["hood:Bushwick"] < 0);
 });

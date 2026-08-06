@@ -20,6 +20,63 @@ import type { Listing, SearchCriteria, Stage } from "@/types";
 export interface Signal {
   listing: Listing;
   liked: boolean;
+  /** Why it was passed on, when the pass said. See `PASS_REASONS`. */
+  reasons?: string[];
+}
+
+/**
+ * Why a place was passed on, and what that actually teaches.
+ *
+ * A pass with no reason has to be read as "something about this listing was
+ * wrong", so every one of its tokens takes the hit. That is the honest reading
+ * of no information, and it is also how a model quietly poisons itself: pass a
+ * $4,200 West Village studio because it costs too much, and the model learns
+ * you dislike the West Village. Do that four times and the neighborhood you
+ * most want stops surfacing.
+ *
+ * A reason says which part was wrong, so the negative lands only on the
+ * tokens it implicates and everything else on the listing stays neutral.
+ *
+ * Two of these teach nothing, and that is a real answer rather than a gap:
+ * a place that is already rented says nothing about taste, and a bad layout
+ * is a fact about a floor plan this model has no token for. Training on
+ * either would move weights that had nothing to do with the decision, so
+ * those passes are dropped from training instead. They still leave the
+ * pipeline; they just don't pretend to be a preference.
+ */
+export const PASS_REASONS: {
+  code: string;
+  label: string;
+  /** Token prefixes this reason implicates. Empty means it teaches nothing. */
+  families: string[];
+}[] = [
+  { code: "price", label: "Too expensive", families: ["price"] },
+  { code: "area", label: "Wrong neighborhood", families: ["hood", "borough"] },
+  { code: "size", label: "Too small", families: ["sqft", "beds"] },
+  { code: "amenities", label: "Missing what I need", families: ["amenity", "baths"] },
+  { code: "fee", label: "Broker fee", families: ["nofee"] },
+  { code: "listing", label: "Listing tells me nothing", families: ["photos", "source"] },
+  { code: "building", label: "Building looks rough", families: [] },
+  { code: "layout", label: "Bad layout", families: [] },
+  { code: "gone", label: "Already gone", families: [] },
+];
+
+const BY_CODE = new Map(PASS_REASONS.map((r) => [r.code, r]));
+
+/**
+ * Which tokens a pass should count against, or null when it should not be
+ * trained on at all.
+ */
+function blamedTokens(tokens: string[], reasons: string[] | undefined): string[] | null {
+  if (!reasons?.length) return tokens; // no reason given: blame the whole listing
+  const families = new Set<string>();
+  for (const code of reasons) {
+    for (const family of BY_CODE.get(code)?.families ?? []) families.add(family);
+  }
+  // Every reason given was one this model has no token for. Training on it
+  // would move weights that had nothing to do with the decision.
+  if (!families.size) return null;
+  return tokens.filter((t) => families.has(t.split(":")[0]));
 }
 
 export interface Model {
@@ -102,13 +159,22 @@ export function train(signals: Signal[]): Model {
   let likes = 0;
   let passes = 0;
 
-  for (const { listing, liked } of signals) {
-    const counts = liked ? likeCounts : passCounts;
-    if (liked) likes++;
-    else passes++;
-    for (const token of new Set(features(listing))) {
-      counts.set(token, (counts.get(token) ?? 0) + 1);
+  for (const { listing, liked, reasons } of signals) {
+    const tokens = [...new Set(features(listing))];
+
+    if (liked) {
+      likes++;
+      for (const token of tokens) likeCounts.set(token, (likeCounts.get(token) ?? 0) + 1);
+      continue;
     }
+
+    const blamed = blamedTokens(tokens, reasons);
+    // A pass we can't learn anything from doesn't get to shift the totals
+    // either — counting it would drag every weight toward "pass" through the
+    // smoothing denominator without ever saying what was wrong.
+    if (blamed === null) continue;
+    passes++;
+    for (const token of blamed) passCounts.set(token, (passCounts.get(token) ?? 0) + 1);
   }
 
   const weights: Record<string, number> = {};

@@ -4410,6 +4410,20 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 
 
+/* What the pass will teach, said before it's made. */
+.passdialog-learns {
+  margin: 0;
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* The second toast action reads as the quieter of the two. */
+.toast-action-2 { opacity: 0.72; font-weight: 550; }
+
 /* --- touch targets -------------------------------------------------------- */
 
 /*

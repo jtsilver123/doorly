@@ -19,6 +19,14 @@ export interface Toast {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /*
+   * A second action, for the one case that genuinely has two: passing on a
+   * place, where "say why" and "undo" are both worth offering and neither is
+   * the obvious default. Two is the ceiling — a toast with three buttons is a
+   * dialog that forgot to ask.
+   */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   tone?: "default" | "good" | "warn";
 }
 
@@ -85,6 +93,17 @@ export default function Toasts({
               }}
             >
               {toast.actionLabel}
+            </button>
+          )}
+          {toast.secondaryLabel && toast.onSecondary && (
+            <button
+              className="toast-action toast-action-2"
+              onClick={() => {
+                toast.onSecondary?.();
+                onDismiss(toast.id);
+              }}
+            >
+              {toast.secondaryLabel}
             </button>
           )}
           <button
