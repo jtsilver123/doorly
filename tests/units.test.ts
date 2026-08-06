@@ -47,6 +47,7 @@ import {
   walkMinutes,
 } from "../src/lib/subway.ts";
 import { applyFilters } from "@/lib/filters";
+import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
 import { hpdAddress } from "@/lib/nycdata";
 import {
@@ -1762,4 +1763,29 @@ test("tapping inside a range starts over; the singles ladder still works", () =>
   assert.deepEqual(nextBedRange({ bedMin: 0, bedMax: null }, 2), { bedMin: 2, bedMax: 2 });
   assert.deepEqual(nextBedRange({ bedMin: 2, bedMax: 2 }, 0), { bedMin: 0, bedMax: 2 });
   assert.deepEqual(nextBedRange({ bedMin: 2, bedMax: 2 }, 2), { bedMin: 0, bedMax: null });
+});
+
+// --- the marketing / app host split ----------------------------------------
+
+test("a real domain splits into two origins and one cookie scope", () => {
+  for (const host of ["damnlease.com", "www.damnlease.com", "app.damnlease.com"]) {
+    assert.deepEqual(originsFor(host), {
+      app: "https://app.damnlease.com",
+      marketing: "https://damnlease.com",
+    });
+    // One cookie domain from either side, or the session doesn't survive
+    // the hop from sign-in to the board.
+    assert.equal(cookieDomainFor(host), ".damnlease.com");
+  }
+  assert.ok(isAppHost("app.damnlease.com"));
+  assert.ok(!isAppHost("damnlease.com"));
+});
+
+test("local development gets no split and no cookie domain", () => {
+  // Browsers drop a domain-scoped cookie on a bare host, and there is no
+  // app.localhost to redirect anyone to — so every rule must no-op.
+  for (const host of ["localhost:3000", "127.0.0.1:3000", "192.168.1.9", "", null]) {
+    assert.equal(originsFor(host), null);
+    assert.equal(cookieDomainFor(host), undefined);
+  }
 });

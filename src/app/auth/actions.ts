@@ -2,8 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/supabase/server";
+import { cookieDomainFor, originsFor } from "@/lib/hosts";
 
 /**
  * Email + password auth. Deliberately the simplest thing that works: this is a
@@ -19,29 +20,37 @@ export interface AuthResult {
 /**
  * Where to send someone after they authenticate.
  *
- * Decided here rather than left to the proxy: a server-action redirect doesn't
- * re-enter middleware, so relying on it would flash the empty app before
- * bouncing to setup.
+ * Decided here rather than left to the middleware: a server-action redirect
+ * doesn't re-enter middleware, so relying on it would flash the empty app
+ * before bouncing to setup.
+ *
+ * The destination is absolute, because signing in happens on the marketing
+ * host and the app answers on its own. Locally there's no such split and
+ * these stay relative paths.
  */
 async function landingPath(): Promise<string> {
+  const host = (await headers()).get("host");
+  const origins = originsFor(host);
+  const onApp = (path: string) => (origins ? `${origins.app}${path}` : path);
+
   const supabase = await supabaseServer();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return "/login";
+  if (!data.user) return origins ? `${origins.marketing}/login` : "/login";
 
   // An invite link that bounced through signup finishes its journey first —
   // the person clicked "join Emma's search", not "set up your own".
   const jar = await cookies();
   const invite = jar.get("pending_invite")?.value;
   if (invite) {
-    jar.delete("pending_invite");
-    return `/join/${invite}`;
+    jar.set("pending_invite", "", { domain: cookieDomainFor(host), path: "/", maxAge: 0 });
+    return onApp(`/join/${invite}`);
   }
 
   const { count } = await supabase
     .from("saved_searches")
     .select("id", { count: "exact", head: true })
     .eq("user_id", data.user.id);
-  if (count) return "/app";
+  if (count) return onApp("/app");
 
   // No search of their own, but a crew to work: scouts and partners came for
   // somebody else's pipeline, and setup would ask them to start their own.
@@ -49,7 +58,7 @@ async function landingPath(): Promise<string> {
     .from("crew_members")
     .select("crew_id", { count: "exact", head: true })
     .eq("user_id", data.user.id);
-  return crews ? "/app" : "/welcome";
+  return onApp(crews ? "/app" : "/welcome");
 }
 
 export async function signIn(_prev: AuthResult, formData: FormData): Promise<AuthResult> {
@@ -114,5 +123,8 @@ export async function signOut(): Promise<void> {
   const supabase = await supabaseServer();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/login");
+  // Signing out from the app lands back on the marketing side, where the
+  // sign-in form lives.
+  const origins = originsFor((await headers()).get("host"));
+  redirect(origins ? `${origins.marketing}/login` : "/login");
 }

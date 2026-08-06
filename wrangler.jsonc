@@ -1,7 +1,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "damnlease",
-  "main": ".open-next/worker.js",
+  // Wraps OpenNext's generated worker to add the cron handler — see the file.
+  "main": "worker-entry.js",
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
   "compatibility_date": "2026-01-01",
   // nodejs_compat is not optional here: the app uses AsyncLocalStorage to
   // carry the acting user's API key through a poll, and web-push signs VAPID
@@ -15,6 +19,15 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Tour footage. Video is the one thing here that's genuinely big and
+  // genuinely re-watched, which is exactly R2's shape: cheap to store and
+  // free to serve back.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "damnlease-media"
+    }
+  ],
   "observability": {
     "enabled": true
   }

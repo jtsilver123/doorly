@@ -17,10 +17,10 @@ import Icon from "@/components/Icon";
  * Photos lie by omission — every listing looks the same after the fourth
  * tour, and the thing that decides it ("remember the traffic noise?", "the
  * bedroom fit test") is on someone's phone in a camera roll nobody can find.
- * Files go straight from the phone to storage (video can't ride through an
- * API route — serverless bodies cap at a few MB) via the module-level upload
- * queue, so closing this panel doesn't kill a half-sent walkthrough. Crew-
- * mates see each other's clips; only the person who shot one can delete it.
+ * Files stream from the phone through this app's own Worker into R2 via the
+ * module-level upload queue, so closing this panel doesn't kill a half-sent
+ * walkthrough and the browser never holds a storage credential. Crew-mates
+ * see each other's clips; only the person who shot one can delete it.
  */
 
 interface MediaItem {
@@ -151,10 +151,14 @@ export default function TourMedia({ listingId }: { listingId: string }) {
                 <button
                   className="tourmedia-del"
                   onClick={async () => {
-                    const supabase = supabaseBrowser();
+                    // The route drops the row and the R2 object together, so a
+                    // delete can't leave bytes paying rent with nothing
+                    // pointing at them.
                     setItems((list) => list.filter((m) => m.id !== item.id));
-                    await supabase.from("user_listing_media").delete().eq("id", item.id);
-                    await supabase.storage.from("tour-media").remove([item.path]);
+                    await fetch(
+                      `/api/media/${item.path.split("/").map(encodeURIComponent).join("/")}`,
+                      { method: "DELETE" }
+                    );
                   }}
                   aria-label="Delete this file"
                 >

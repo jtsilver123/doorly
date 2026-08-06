@@ -14,3 +14,7 @@ data/
 
 # Cloudflare Workers build output
 .open-next/
+
+# Local Miniflare state — a scratch copy of R2/KV for `wrangler dev`.
+.wrangler/
+.open-next/

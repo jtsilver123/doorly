@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/supabase/server";
+import { appUrl } from "@/lib/site";
 import AuthArt from "@/components/AuthArt";
 import Logo from "@/components/Logo";
 
@@ -65,7 +66,9 @@ export default async function Home({
   if (place) redirect(`/app?place=${encodeURIComponent(place)}`);
 
   const user = await currentUser();
-  const go = user ? "/app" : "/signup";
+  // Signed in, the product is a hostname away — link straight there rather
+  // than bouncing through a redirect the app would only issue anyway.
+  const go = user ? appUrl("/app") : "/signup";
   const goLabel = user ? "Open DamnLease" : "Secure a place";
 
   return (
@@ -85,7 +88,7 @@ export default async function Home({
             <Logo size={26} />
             DamnLease
           </span>
-          <Link className="btn landing-signin" href={user ? "/app" : "/login"}>
+          <Link className="btn landing-signin" href={user ? appUrl("/app") : "/login"}>
             {user ? "Open the app" : "Sign in"}
           </Link>
         </header>

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cookieDomainFor } from "@/lib/hosts";
 
 /**
  * Request-scoped client carrying the signed-in user's session.
@@ -11,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 export async function supabaseServer(): Promise<SupabaseClient> {
   const store = await cookies();
+  const host = (await headers()).get("host");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
@@ -21,6 +23,8 @@ export async function supabaseServer(): Promise<SupabaseClient> {
   }
 
   return createServerClient(url, key, {
+    // One session across damnlease.com and app.damnlease.com — see hosts.ts.
+    cookieOptions: { domain: cookieDomainFor(host) },
     cookies: {
       getAll: () => store.getAll(),
       setAll: (list) => {

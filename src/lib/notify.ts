@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { adminDb } from "@/lib/supabase";
-import { siteUrl } from "@/lib/site";
+import { appUrl } from "@/lib/site";
 import type { Profile } from "@/lib/outreach";
 
 /**
@@ -121,8 +121,8 @@ export async function deliver(notices: Notice[]): Promise<void> {
                 title: notice.title,
                 body: notice.body,
                 url: notice.listingId
-                  ? siteUrl(`/app?place=${encodeURIComponent(notice.listingId)}`)
-                  : siteUrl("/app"),
+                  ? appUrl(`/app?place=${encodeURIComponent(notice.listingId)}`)
+                  : appUrl("/app"),
               })
             );
           } catch (err) {

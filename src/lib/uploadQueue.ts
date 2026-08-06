@@ -1,6 +1,5 @@
 "use client";
 
-import { supabaseBrowser } from "@/lib/supabase/client";
 
 /**
  * Uploads that outlive the panel that started them.
@@ -58,25 +57,36 @@ function guard(e: BeforeUnloadEvent) {
   e.preventDefault();
 }
 
-async function doUpload(job: UploadJob): Promise<void> {
-  const supabase = supabaseBrowser();
-  const { data: auth } = await supabase.auth.getSession();
-  const uid = auth.session?.user?.id;
-  if (!uid) throw new Error("signed out");
+/** Cloudflare's request-body ceiling on this plan, minus room for headers. */
+const MAX_BYTES = 60 * 1024 * 1024;
 
-  const safe = job.file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
-  const path = `${uid}/${job.listingId}/${Date.now()}-${safe}`;
-  const { error: upErr } = await supabase.storage
-    .from("tour-media")
-    .upload(path, job.file, { contentType: job.file.type || undefined });
-  if (upErr) throw new Error(upErr.message);
-  const { error: rowErr } = await supabase.from("user_listing_media").insert({
-    user_id: uid,
-    listing_id: job.listingId,
-    path,
-    kind: job.kind,
-  });
-  if (rowErr) throw new Error(rowErr.message);
+async function doUpload(job: UploadJob): Promise<void> {
+  if (job.file.size > MAX_BYTES) {
+    throw new Error(
+      `too big (${Math.round(job.file.size / 1048576)}MB) — trim the clip or film at 1080p (60MB max)`
+    );
+  }
+
+  /*
+   * Straight to our own Worker, which streams it into R2.
+   *
+   * This used to hand the file to Supabase Storage from the browser. R2 is
+   * the better home for video — free egress, so re-watching a walkthrough on
+   * decision night costs nothing — and routing through the app means the
+   * browser never holds a storage credential.
+   */
+  const res = await fetch(
+    `/api/listings/${encodeURIComponent(job.listingId)}/media?name=${encodeURIComponent(job.file.name)}`,
+    {
+      method: "POST",
+      headers: { "content-type": job.file.type || "application/octet-stream" },
+      body: job.file,
+    }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `upload failed (${res.status})`);
+  }
 }
 
 async function pump(): Promise<void> {

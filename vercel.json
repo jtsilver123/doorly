@@ -1,5 +1,24 @@
 {
-  "crons": [
-    { "path": "/api/cron/poll", "schedule": "0 13 * * *" }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "comment": [
+    "This project no longer runs the app — DamnLease serves from Cloudflare",
+    "Workers at damnlease.com. What's left here is a forwarding address, so",
+    "links people already have (shared listings, delivered push notifications,",
+    "bookmarks of doorlynyc.vercel.app) still land on the real site instead of",
+    "a stale copy writing to the same database.",
+    "Cron is gone too: the hourly poll is a Cloudflare cron trigger now, and",
+    "Vercel's Hobby plan could only ever fire it once a day."
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://damnlease.com/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "destination": "https://damnlease.com/:path*",
+      "permanent": true
+    }
   ]
 }

@@ -17,6 +17,8 @@
  * fallback to `location.origin` keeps localhost working without configuration.
  */
 
+import { appOrigin } from "@/lib/hosts";
+
 const CONFIGURED = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
 
 export function siteOrigin(): string {
@@ -28,4 +30,17 @@ export function siteOrigin(): string {
 /** An absolute URL on the canonical host. `path` should start with "/". */
 export function siteUrl(path: string): string {
   return `${siteOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+/**
+ * An absolute URL on the app host.
+ *
+ * Use this for links that only make sense signed in — a push notification
+ * about a price drop, say. Those always belong to someone with a session, so
+ * pointing them at the marketing host just buys a redirect. Links meant for
+ * other people (invites, a listing shared with a crew-mate) keep using
+ * `siteUrl`, which works signed out and forwards on its own.
+ */
+export function appUrl(path: string): string {
+  return `${appOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
 }
