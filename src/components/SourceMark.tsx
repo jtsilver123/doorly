@@ -111,8 +111,8 @@ function Glyph({ source }: { source: Source }) {
       // Added by hand.
       return (
         <svg viewBox="0 0 24 24" className="srcglyph" aria-hidden="true">
-          <rect width="24" height="24" rx="4" fill="#2fbf71" />
-          <path d="M12 6.5v11M6.5 12h11" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+          <rect width="24" height="24" rx="4" fill="#d6f84b" />
+          <path d="M12 6.5v11M6.5 12h11" stroke="#14141a" strokeWidth="2.4" strokeLinecap="round" />
         </svg>
       );
   }

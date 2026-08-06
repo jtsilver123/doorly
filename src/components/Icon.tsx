@@ -22,6 +22,9 @@ export type IconName =
   | "pipeline"
   | "compare"
   | "profile"
+  | "play"
+  | "image"
+  | "video"
   | "search"
   | "filter"
   | "sort"
@@ -131,6 +134,21 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   close: <path d="m6.5 6.5 11 11M17.5 6.5l-11 11" />,
+  /* Filled, unlike the rest: a play badge sits on top of a photograph, and a
+     1.75px outline disappears against a busy frame. */
+  play: <path d="M9 6.5 18 12l-9 5.5Z" fill="currentColor" stroke="none" />,
+  image: (
+    <>
+      <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
+      <path d="m4.5 16 4.2-4.2a1.6 1.6 0 0 1 2.2 0L15 15.5m-1.2-1.2 1.8-1.8a1.6 1.6 0 0 1 2.2 0l1.7 1.7" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="2.5" y="6" width="13" height="12" rx="2.5" />
+      <path d="m15.5 13 5 3V8l-5 3Z" />
+    </>
+  ),
   check: <path d="m5 12.5 4.5 4.5L19 7" />,
   alert: (
     <>

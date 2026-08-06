@@ -1,34 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Serif, Instrument_Sans } from "next/font/google";
+import { Archivo } from "next/font/google";
 import "./globals.css";
 
 /**
- * The typefaces.
+ * The typeface. Singular.
  *
- * The app ran on `system-ui` — which is to say, on nothing. A stack with no
- * opinion produces screens with no voice, and it's the first thing that makes
- * software look like a template.
+ * One family, stretched across its own width axis, does the job two families
+ * used to. Archivo is a variable font with `wdth` as well as `wght`, so the
+ * same file that sets a dense table of rents at normal width also sets the
+ * headline at 125% — poster-wide, near-black, unmistakably one voice rather
+ * than a serif borrowed to look editorial.
  *
- * Two faces, one family of intent. Instrument Serif carries the brand and the
- * headlines: it's an editorial face, and an apartment hunt is closer to
- * reading a listings page in a newspaper than to filling in a dashboard.
- * Instrument Sans does the work — dense metadata, prices, controls — with the
- * tall x-height and tabular figures that a wall of rents needs.
+ * That's the brand argument, not a technical one. A product claiming to know
+ * what the market is really doing shouldn't sound like two different
+ * companies between the pitch and the pipeline. It should sound like the same
+ * flat, exact voice getting louder.
  *
- * Self-hosted at build time by next/font, so there's no third-party request,
- * no layout shift, and no flash of the fallback.
+ * Practically it's also the cheapest possible type system: one woff2 covers
+ * every weight and width in the app. Self-hosted at build time by next/font,
+ * so there's no third-party request, no layout shift, no flash of fallback.
  */
 
-const display = Instrument_Serif({
-  weight: "400",
-  style: ["normal", "italic"],
+const archivo = Archivo({
   subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const sans = Instrument_Sans({
-  subsets: ["latin"],
+  // The width axis is the whole point; without it `font-stretch` is inert
+  // and every headline quietly collapses back to normal.
+  axes: ["wdth"],
   variable: "--font-sans-real",
   display: "swap",
 });
@@ -39,20 +36,20 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://damnlease.com"),
   title: "DamnLease",
   description:
-    "DamnLease watches every NYC listing site at once, scores each apartment 1–100 for you, and drafts the message that gets the viewing.",
+    "Every NYC listing site, the building's violation record and the comps on the block — then the number to argue with and the message to send.",
   openGraph: {
-    title: "DamnLease — NYC apartments go in a day. So will you.",
+    title: "DamnLease — Rent like you know someone.",
     description:
-      "Every listing site in one list, each place scored against what you actually want, and one-tap outreach. Hunt solo or as a team.",
+      "Every listing site in one list, each place priced against its own comps, the building's record pulled from city data, and the message already written. The other applicants have the listing photos.",
     url: "https://damnlease.com",
     siteName: "DamnLease",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "DamnLease — NYC apartments go in a day. So will you.",
+    title: "DamnLease — Rent like you know someone.",
     description:
-      "Every listing site in one list, each place scored against what you actually want, and one-tap outreach.",
+      "Every listing site in one list, priced against real comps, with the building's record and the message already written.",
   },
 };
 
@@ -60,14 +57,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8f7f3" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f151c" },
+    { media: "(prefers-color-scheme: light)", color: "#f1eee5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0c0f" },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable}`}>
+    <html lang="en" className={archivo.variable}>
       <body>{children}</body>
     </html>
   );

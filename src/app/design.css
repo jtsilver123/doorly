@@ -69,10 +69,64 @@
   --r-lg: 14px;
   --r-full: 999px;
 
-  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--action) 55%, transparent);
+
+  /* The top of Archivo's width axis. Headlines only — set a paragraph this
+     wide and it stops being a voice and starts being a wall. */
+  --wide: 125%;
 }
 
 /* --- primitives ---------------------------------------------------------- */
+
+/*
+ * The highlighter.
+ *
+ * The brand's one gesture, and it has a job: it marks the single fact on the
+ * screen that the other applicants don't have. The rent that's over comps.
+ * The building's open violations. The line that says move now.
+ *
+ * Discipline is what makes it work — one per view, at most. A page with three
+ * highlights has none, which is exactly how a real highlighter fails.
+ */
+.mark {
+  background: var(--action);
+  color: var(--on-action);
+  padding: 0.04em 0.22em;
+  border-radius: 2px;
+  /* Wrapped lines each get their own swipe, rather than one box behind both. */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/*
+ * Display type: the same face, pushed to the top of its width axis.
+ *
+ * `font-stretch` rather than a second font file — Archivo is loaded with its
+ * `wdth` axis, so this is free. Tight tracking is not optional at this width;
+ * expanded type set at default letter-spacing reads as stretched-out rather
+ * than as drawn wide.
+ */
+.display {
+  font-family: var(--font-display);
+  font-stretch: var(--wide);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+
+/*
+ * Small caps-ish labels: the other half of the voice. Wide letterspacing at a
+ * tiny size reads as a legend on a document, which is the register the whole
+ * product is going for.
+ */
+.overline {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 
 .tag {
   display: inline-flex;
@@ -111,7 +165,7 @@
 .pill.is-on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .linkish {
@@ -226,7 +280,7 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
 .card:hover,
 .card[data-linked="true"] {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.11);
+  box-shadow: 0 10px 28px rgba(30, 26, 16, 0.14);
   transform: translateY(-3px);
 }
 
@@ -1107,7 +1161,7 @@ button.fact:hover .fact-label { color: var(--accent); }
   padding: var(--s2) var(--s4);
   border-radius: var(--r-md);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: var(--t-md);
   font-weight: 600;
   text-decoration: none;
@@ -1149,7 +1203,7 @@ button.fact:hover .fact-label { color: var(--accent); }
   padding: 0 4px;
   border-radius: var(--r-full);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: var(--t-2xs);
   font-weight: 700;
 }
@@ -1542,14 +1596,26 @@ button.fact:hover .fact-label { color: var(--accent); }
   scrollbar-width: none;
 }
 .gallery-strip::-webkit-scrollbar { display: none; }
-.drawer-photo .gallery-strip img {
+/* The snap target is the button that wraps each photo now, so the sizing
+   and snapping move up one level. */
+.drawer-photo .gallery-strip .gallery-shot {
   position: static;
   flex: 0 0 100%;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  padding: 0;
+  border: 0;
+  background: none;
   scroll-snap-align: start;
   scroll-snap-stop: always;
+  cursor: zoom-in;
+}
+.drawer-photo .gallery-strip .gallery-shot img {
+  position: static;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .gallery-arrow {
@@ -1943,13 +2009,13 @@ button.fact:hover .fact-label { color: var(--accent); }
 .brandblock { display: grid; gap: var(--s3); }
 .brandrow { display: flex; align-items: center; gap: var(--s2); }
 
-/* The mark follows the accent, so it reads in either theme rather than being
-   a fixed-colour asset fighting the background. */
+/* The unmarked lines follow the text colour and the highlight is always acid,
+   so the mark reads in either theme rather than being a fixed-colour asset
+   fighting the background. `--logo-dim` lets a coloured surface — the hero,
+   the auth panel — restate the grey lines without restyling the glyph. */
 .logo { flex-shrink: 0; }
-.logo-face { fill: var(--accent); }
-.logo-pane { fill: color-mix(in srgb, #fff 78%, var(--accent)); opacity: 0.42; }
-.logo-lit { fill: #ffd66b; }
-.logo-door { stroke: color-mix(in srgb, #fff 78%, var(--accent)); stroke-width: 1.6; opacity: 0.5; }
+.logo-line { fill: var(--logo-dim, var(--text)); opacity: 0.32; }
+.logo-lit { fill: var(--action); }
 
 .brandmeta {
   display: grid;
@@ -2367,7 +2433,7 @@ button.fact:hover .fact-label { color: var(--accent); }
   height: 28px;
   border-radius: var(--r-full);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -2920,7 +2986,7 @@ button.fact:hover .fact-label { color: var(--accent); }
   height: 26px;
   border-radius: var(--r-full);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: var(--t-sm);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -3161,7 +3227,7 @@ button.fact:hover .fact-label { color: var(--accent); }
 .seg > button.is-on {
   background: var(--accent);
   border-right-color: color-mix(in srgb, #fff 22%, var(--accent));
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -3371,7 +3437,7 @@ button.fact:hover .fact-label { color: var(--accent); }
 .bullet[data-route="L"] { background: #a7a9ac; }
 /* Broadway — yellow, dark text for contrast */
 .bullet[data-route="N"], .bullet[data-route="Q"],
-.bullet[data-route="R"], .bullet[data-route="W"] { background: #fccc0a; color: #16324f; }
+.bullet[data-route="R"], .bullet[data-route="W"] { background: #fccc0a; color: #14141a; }
 /* Broadway–7th Av — red */
 .bullet[data-route="1"], .bullet[data-route="2"], .bullet[data-route="3"] { background: #ee352e; }
 /* Lexington — green */
@@ -3489,7 +3555,7 @@ button.fact:hover .fact-label { color: var(--accent); }
 .spotmap-station i[data-route="J"], .spotmap-station i[data-route="Z"] { background: #996633; }
 .spotmap-station i[data-route="L"] { background: #a7a9ac; }
 .spotmap-station i[data-route="N"], .spotmap-station i[data-route="Q"],
-.spotmap-station i[data-route="R"], .spotmap-station i[data-route="W"] { background: #fccc0a; color: #16324f; }
+.spotmap-station i[data-route="R"], .spotmap-station i[data-route="W"] { background: #fccc0a; color: #14141a; }
 .spotmap-station i[data-route="1"], .spotmap-station i[data-route="2"],
 .spotmap-station i[data-route="3"] { background: #ee352e; }
 .spotmap-station i[data-route="4"], .spotmap-station i[data-route="5"],
@@ -3775,12 +3841,39 @@ button.fact:hover .fact-label { color: var(--accent); }
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
+.tourmedia-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
 .tourmedia-item img,
 .tourmedia-item video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+/* A play badge over the poster frame — without it a muted, control-less video
+   tile is indistinguishable from a photo. */
+.tourmedia-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  pointer-events: none;
+}
+.tourmedia-play svg {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: var(--r-full);
+  background: rgba(20, 20, 26, 0.62);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 .tourmedia-del {
   position: absolute;
@@ -3998,34 +4091,186 @@ button.fact:hover .fact-label { color: var(--accent); }
 .anchoradd .field { flex: 1; min-width: 110px; }
 
 /* The upload heartbeat: alive anywhere in the app while files move. */
+/*
+ * The upload pill.
+ *
+ * A spinner says "something is happening"; a bar says "you have about a
+ * minute". On a 200MB walkthrough over hotel wifi that difference decides
+ * whether someone waits or closes the tab and loses the footage.
+ */
 .uploadpill {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(74px + env(safe-area-inset-bottom, 0px));
   z-index: 75;
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: var(--s2) var(--s4);
-  border-radius: var(--r-full);
-  background: var(--ink, #1c2523);
-  color: #fff;
+  width: min(340px, calc(100vw - var(--s5)));
+  display: grid;
+  gap: 6px;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-md);
+  background: var(--ink);
+  color: #f4f2ea;
   font-size: var(--t-sm);
   font-weight: 600;
   box-shadow: var(--shadow-lg);
 }
-.uploadpill-spin {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-  animation: uploadspin 0.9s linear infinite;
+.uploadpill-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+.uploadpill-top b { font-variant-numeric: tabular-nums; }
+.uploadpill-sub { font-size: var(--t-xs); font-weight: 500; opacity: 0.6; }
+
+/* The bar itself, shared with the per-file rows in the panel. */
+.uploadbar {
+  height: 5px;
+  border-radius: var(--r-full);
+  background: rgba(244, 242, 234, 0.16);
+  overflow: hidden;
 }
+.uploadbar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--action);
+  transition: width 0.2s var(--ease);
+}
+/* Queued, not moving: striped so a stalled-looking bar is legibly "waiting"
+   rather than "stuck". */
+.uploadbar > span[data-idle="true"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(244, 242, 234, 0.4) 0 6px,
+    rgba(244, 242, 234, 0.15) 6px 12px
+  );
+}
+
 @keyframes uploadspin { to { transform: rotate(360deg); } }
 @media (min-width: 861px) {
   .uploadpill { bottom: 18px; }
+}
+
+/* --- per-file upload rows, inside the tour-media panel ------------------- */
+
+.uprows { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.uprow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: var(--t-sm);
+}
+.uprow-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uprow-pct { font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 600; }
+.uprow-x {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--text-muted);
+}
+.uprow-x:hover { background: var(--surface-2); color: var(--text); }
+/* The bar spans the whole row under the label, so a long filename can't
+   squeeze it to nothing. */
+.uprow-bar { grid-column: 1 / -1; background: var(--surface-2); }
+
+/* --- the full-screen viewer ---------------------------------------------- */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: clamp(var(--s4), 4vw, var(--s7));
+  background: rgba(10, 10, 12, 0.94);
+  outline: none;
+  /* Above the tab bar and clear of the notch. */
+  padding-bottom: max(clamp(var(--s4), 4vw, var(--s7)), env(safe-area-inset-bottom, 0px));
+}
+
+.lightbox-stage {
+  margin: 0;
+  display: grid;
+  gap: var(--s3);
+  justify-items: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+.lightbox-stage img,
+.lightbox-stage video {
+  display: block;
+  max-width: 100%;
+  /* Room for the top bar, so a portrait photo doesn't slide under the close
+     button on a phone. */
+  max-height: calc(100dvh - 7rem);
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  background: #000;
+}
+.lightbox-stage figcaption {
+  font-size: var(--t-sm);
+  color: rgba(244, 242, 234, 0.7);
+  text-align: center;
+}
+
+.lightbox-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s4);
+  padding-top: max(var(--s4), env(safe-area-inset-top, 0px));
+  color: #f4f2ea;
+}
+.lightbox-count {
+  font-size: var(--t-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: rgba(244, 242, 234, 0.14);
+}
+/* Pushed right when there's no counter (a single item). */
+.lightbox-bar > .lightbox-x:only-child { margin-left: auto; }
+
+.lightbox-x,
+.lightbox-nav {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-full);
+  background: rgba(244, 242, 234, 0.14);
+  color: #f4f2ea;
+  transition: background var(--t-fast) var(--ease);
+}
+.lightbox-x { width: 40px; height: 40px; }
+.lightbox-x:hover,
+.lightbox-nav:hover { background: rgba(244, 242, 234, 0.28); }
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+}
+.lightbox-prev { left: var(--s3); }
+.lightbox-next { right: var(--s3); }
+
+/* Touch gets the swipe instead — on-screen arrows over a photo on a 390px
+   screen cover the thing you're trying to look at. */
+@media (max-width: 620px) {
+  .lightbox-nav { display: none; }
 }
 
 /* Straight line to the person who builds this. Quiet on purpose — it lives
@@ -4080,14 +4325,14 @@ button.fact:hover .fact-label { color: var(--accent); }
     border-radius: var(--r-full);
     background: rgba(255, 255, 255, 0.92);
     color: var(--text);
-    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.18);
+    box-shadow: 0 2px 10px rgba(30, 26, 16, 0.2);
     cursor: pointer;
   }
   .photo-pill {
     display: flex;
     border-radius: var(--r-full);
     background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.18);
+    box-shadow: 0 2px 10px rgba(30, 26, 16, 0.2);
   }
   .photo-btn-flat { background: transparent; box-shadow: none; }
 
@@ -4162,6 +4407,6 @@ button.fact:hover .fact-label { color: var(--accent); }
     max-height: 62dvh;
     overflow-y: auto;
     border-radius: var(--r-lg) var(--r-lg) 0 0;
-    box-shadow: 0 -12px 32px rgba(16, 24, 40, 0.18);
+    box-shadow: 0 -12px 32px rgba(30, 26, 16, 0.2);
   }
 }

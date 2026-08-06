@@ -17,6 +17,20 @@ const nextConfig: NextConfig = {
      */
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    /*
+     * The app answers on two hostnames now, and Server Actions carry a CSRF
+     * check that compares the request's Origin against its Host. Behind a
+     * Worker those two don't always agree — a forwarded host, a redirect
+     * between the marketing site and the app — and when they disagree Next
+     * rejects the action outright. The visible symptom is sign-in appearing
+     * to do nothing, which is exactly the kind of failure nobody can debug
+     * from the outside. Naming both origins removes the ambiguity.
+     */
+    serverActions: {
+      allowedOrigins: ["damnlease.com", "app.damnlease.com", "www.damnlease.com"],
+    },
+  },
 };
 
 export default nextConfig;

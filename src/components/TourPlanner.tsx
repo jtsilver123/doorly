@@ -98,7 +98,8 @@ export default function TourPlanner({
     if (points.length >= 2) {
       // Dashed: this is the order of visits, not a walking route promise.
       L.polyline(points, {
-        color: "#16324f",
+        // Ink, matching the brand rather than a palette entry Leaflet can't read.
+        color: "#14141a",
         weight: 2.5,
         dashArray: "6 7",
         opacity: 0.75,

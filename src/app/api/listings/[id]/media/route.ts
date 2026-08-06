@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, currentUserId } from "@/lib/supabase";
-import { mediaBucket, mediaKey, MAX_UPLOAD_BYTES } from "@/lib/r2";
+import { mediaBucket, mediaKey, SINGLE_SHOT_BYTES } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +65,9 @@ export async function POST(
       return NextResponse.json({ error: "only photos and video" }, { status: 415 });
     }
     const declared = Number(request.headers.get("content-length") ?? 0);
-    if (declared > MAX_UPLOAD_BYTES) {
+    if (declared > SINGLE_SHOT_BYTES) {
       return NextResponse.json(
-        { error: "that file is too big — trim the clip or drop the resolution" },
+        { error: "too big for one request — send it in parts" },
         { status: 413 }
       );
     }
@@ -80,15 +80,17 @@ export async function POST(
      * hands a route handler is exactly that — piping it through a
      * FixedLengthStream doesn't help, because by then it isn't the runtime's
      * own stream any more. Reading it into a buffer gives R2 the known length
-     * it wants. That buffer is why MAX_UPLOAD_BYTES is what it is: a Worker
-     * gets 128MB of memory, and the file has to fit inside it with room to
-     * spare.
+     * it wants, and that buffer is why this path is capped at
+     * SINGLE_SHOT_BYTES rather than at the product limit: a Worker gets 128MB
+     * of memory. Anything larger goes to the multipart route next door, which
+     * never holds more than one part at a time.
      */
     const key = mediaKey(userId, id, filename);
     const bytes = await request.arrayBuffer();
-    if (bytes.byteLength > MAX_UPLOAD_BYTES) {
+    // Re-checked against the real body: content-length is a client claim.
+    if (bytes.byteLength > SINGLE_SHOT_BYTES) {
       return NextResponse.json(
-        { error: "that file is too big — trim the clip or drop the resolution" },
+        { error: "too big for one request — send it in parts" },
         { status: 413 }
       );
     }

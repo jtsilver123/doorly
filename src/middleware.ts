@@ -18,34 +18,45 @@ import { cookieDomainFor, isAppHost, originsFor } from "@/lib/hosts";
  */
 
 /**
- * Bumped when the auth cookie's scope changes, so the retirement below runs
- * exactly once per browser instead of on every request forever.
+ * Bumped when the auth cookie's scope changes, so the one-time retirement
+ * below runs once per browser rather than on every request forever.
  */
 const SCOPE_MARK = "dl_scope1";
 
 /**
- * Retire the pre-split auth cookies, once per browser.
+ * Clear host-only auth cookies, so a stale copy can't shadow a real session.
  *
- * Before the split, the session cookie was host-only on damnlease.com. New
- * ones name a domain so they reach the subdomain too — but a browser will
- * happily hold both, same name, and send both on every request. The server
- * sees one `Cookie:` line with two values for one name and picks by header
- * order; once Supabase rotates the token, one of those two is a stale refresh
- * token, and spending it can invalidate the real session. Sign-in loops that
- * survive a password reset are made of exactly this.
+ * A browser will happily hold two cookies with the same name — one host-only
+ * from before the marketing/app split, one domain-scoped from after — and send
+ * both on every request. The server reads whichever the header order hands it,
+ * so a stale copy can shadow a perfectly good session: sign in, get bounced
+ * back to login, sign in again, forever. It survives a password reset, because
+ * the password was never the problem.
  *
- * Carrying the old value over into a domain-scoped cookie would avoid a
- * re-login, but it can't be done in one response: Next's cookie store is a map
- * keyed by name, so it will not emit two Set-Cookie lines for one name, and it
- * clears any raw header appended alongside. So the old cookies are simply
- * expired. Everyone signs in once more, and the ambiguous state never exists.
+ * Two moments are safe to clear them, and this runs at both:
+ *
+ *  - Once per browser, marked by `SCOPE_MARK`, to retire cookies written
+ *    before the split existed. Carrying their value over into a domain-scoped
+ *    cookie would avoid a re-login, but it can't be done in one response:
+ *    Next's cookie store is a map keyed by name, so it will not emit two
+ *    Set-Cookie lines for one name and it clears any raw header appended
+ *    alongside. So they're expired instead and everyone signs in once more.
+ *
+ *  - Any time auth cookies are present and still resolve to nobody. They are
+ *    junk by definition then, there is no session left to protect, and this is
+ *    what breaks the loop for a user already stuck in it — on every request,
+ *    because a browser can acquire a stale copy again at any time.
  */
-function retireHostOnlyCookies(
+function clearHostOnlyCookies(
   request: NextRequest,
   response: NextResponse,
-  domain: string
+  domain: string,
+  signedIn: boolean
 ): NextResponse {
-  if (request.cookies.has(SCOPE_MARK)) return response;
+  const marked = request.cookies.has(SCOPE_MARK);
+  // Signed in and already past the one-time retirement: nothing to do, and
+  // nothing worth risking.
+  if (marked && signedIn) return response;
   // Sign-in writes the replacement cookie through a different channel than
   // this one, so stay out of its way and pick this up on the next navigation.
   if (request.nextUrl.pathname.startsWith("/auth")) return response;
@@ -62,7 +73,9 @@ function retireHostOnlyCookies(
     // its domain-scoped replacement — a different cookie — untouched.
     response.cookies.set(name, "", { path: "/", maxAge: 0 });
   }
-  response.cookies.set(SCOPE_MARK, "1", { domain, path: "/", maxAge: 60 * 60 * 24 * 365 });
+  if (!marked) {
+    response.cookies.set(SCOPE_MARK, "1", { domain, path: "/", maxAge: 60 * 60 * 24 * 365 });
+  }
   return response;
 }
 
@@ -74,8 +87,11 @@ export async function middleware(request: NextRequest) {
   const search = request.nextUrl.search;
   const isApi = path.startsWith("/api");
   const domain = cookieDomainFor(host);
+  // Filled in once `getUser()` has run; every early return below happens
+  // before there is any session to reason about.
+  let signedIn = false;
   const finish = (res: NextResponse) =>
-    domain ? retireHostOnlyCookies(request, res, domain) : res;
+    domain ? clearHostOnlyCookies(request, res, domain, signedIn) : res;
 
   /*
    * One address. Vercel serves every deployment on its own generated
@@ -118,6 +134,7 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  signedIn = Boolean(user);
 
   const isAuthRoute =
     path.startsWith("/login") || path.startsWith("/signup") || path.startsWith("/auth");
@@ -126,6 +143,13 @@ export async function middleware(request: NextRequest) {
   const isJoin = path.startsWith("/join/");
   // The cron endpoint authenticates with a shared secret, not a session.
   const isCron = path.startsWith("/api/cron");
+  /*
+   * The hunt estimator runs on the landing page, before an account exists.
+   * The whole claim is "this is a definable process" — gating the definition
+   * behind a sign-up would be the joke telling itself. It returns aggregate
+   * counts and a median asking price; nothing personal crosses it.
+   */
+  const isPublicApi = path === "/api/estimate";
 
   /*
    * The social card rides along: link unfurlers have no session and give up
@@ -136,7 +160,17 @@ export async function middleware(request: NextRequest) {
    * The root is the pitch on the marketing host and the app on the app host,
    * which is the whole point of the split.
    */
-  const isLanding = path === "/opengraph-image" || path === "/sw.js" || (path === "/" && !onApp);
+  const isLanding =
+    path === "/opengraph-image" ||
+    path === "/apple-icon" ||
+    path === "/sw.js" ||
+    // Privacy and terms are the pages people read *before* deciding to sign
+    // up, and the ones a store or a link-checker fetches with no session at
+    // all. Gating them behind login is the classic way to make a policy page
+    // useless.
+    path === "/privacy" ||
+    path === "/terms" ||
+    (path === "/" && !onApp);
 
   /*
    * Signing in stays on the marketing host, always. Google's callback has to
@@ -148,7 +182,7 @@ export async function middleware(request: NextRequest) {
     return finish(NextResponse.redirect(new URL(path + search, origins.marketing), 307));
   }
 
-  if (!user && !isAuthRoute && !isCron && !isLanding) {
+  if (!user && !isAuthRoute && !isCron && !isPublicApi && !isLanding) {
     const to = origins ? new URL(`/login${search}`, origins.marketing) : request.nextUrl.clone();
     if (!origins) to.pathname = "/login";
     const redirectResponse = NextResponse.redirect(to);

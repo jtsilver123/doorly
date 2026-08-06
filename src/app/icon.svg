@@ -1,8 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <rect width="24" height="24" rx="5" fill="#16324f"/>
-  <rect x="4" y="3.5" width="16" height="17" rx="2" fill="#dceaf5"/>
-  <rect x="7" y="6.5" width="3.6" height="3.6" rx="0.8" fill="#16324f" opacity="0.55"/>
-  <rect x="13.4" y="6.5" width="3.6" height="3.6" rx="0.8" fill="#16324f" opacity="0.55"/>
-  <rect x="7" y="12" width="3.6" height="3.6" rx="0.8" fill="#16324f" opacity="0.55"/>
-  <rect x="13.4" y="12" width="3.6" height="3.6" rx="0.8" fill="#ffd66b"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!--
+    The mark inverted: acid tile, ink highlight.
+
+    In the app the glyph sits on the page and inherits its colours. A favicon
+    can't — it lands on whatever chrome the browser happens to have, light or
+    dark, beside twenty other tabs. An ink tile disappears into a dark tab
+    strip; an acid one is findable at 16px against anything, which is the only
+    job a favicon has.
+  -->
+  <rect width="24" height="24" rx="5" fill="#d6f84b"/>
+  <rect x="4" y="4.5" width="12" height="3" rx="1.5" fill="#14141a" opacity="0.4"/>
+  <rect x="2.5" y="9.8" width="19" height="5.8" rx="1.3" fill="#14141a"/>
+  <rect x="4" y="18" width="14" height="3" rx="1.5" fill="#14141a" opacity="0.4"/>
 </svg>

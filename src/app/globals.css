@@ -5,12 +5,23 @@
 @import "./design.css";
 
 /*
- * DamnLease's visual language.
+ * DamnLease's visual language: Ink, Bone and Acid.
  *
- * A dense, calm surface: apartment hunting means scanning a lot of near-identical
- * cards quickly, so the design leans on generous whitespace between rows, one
- * accent colour, and colour-coded semantics for the things that actually change
- * (price drops green, increases amber, gone grey).
+ * The name already does all the shouting a brand needs. So everything after it
+ * is deliberately quiet and exact — near-black type on warm paper, dense rows,
+ * no gradients, no decoration. The irreverence is in the name; the credibility
+ * is in the restraint. A tool that claims to know what the market is really
+ * doing has to look like it reads documents, not like it sells you things.
+ *
+ * Then there's acid. One near-fluorescent chartreuse, used the way a
+ * highlighter is used: never as decoration, never as a large field, and never
+ * more than once per view. It marks the single thing you know that the other
+ * applicants don't — the price that's over comps, the button that moves the
+ * hunt, the window that's free. That's the whole promise of the product,
+ * rendered as a colour.
+ *
+ * The rule that keeps it honest: acid is a background, never a foreground.
+ * Text on acid is always ink. There is no legible way to set chartreuse type.
  */
 
 @theme {
@@ -18,70 +29,88 @@
      each is only what renders in the ~80ms before the woff2 lands. */
   --font-sans: var(--font-sans-real), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: var(--font-display), Georgia, "Times New Roman", serif;
+  /* Same family, wider cut — see layout.tsx. Headlines are Archivo pushed to
+     the top of its width axis, which is the loudest the brand gets. */
+  --font-display: var(--font-sans-real), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 :root {
   /*
-   * DamnLease's palette.
-   *
-   * Navy is the brand: identity, links, active states, the logo. Green is
-   * the *action* — every button that moves the hunt forward. They're split
-   * on purpose: when the one green thing on a card is the thing to do next,
-   * the eye finds it without reading. Coral is urgency, never decoration.
+   * Ink is the brand: identity, links, active states, the mark. Acid is the
+   * *action* and the highlight — never both at once in one view. They're
+   * split on purpose: when exactly one thing on a card is acid, the eye finds
+   * it without reading a word.
    */
-  --bg: #f8f7f3;
+  --ink: #14141a;
+  --bg: #f1eee5;
   --surface: #ffffff;
-  --surface-2: #f1efe9;
-  --border: #e3e0d6;
-  --text: #20242a;
-  --text-muted: #697077;
-  --accent: #16324f;
-  --accent-soft: #dceaf5;
-  --action: #2fbf71;
-  --action-soft: #e2f7ec;
-  --good: #1b8a50;
-  --good-soft: #e2f7ec;
-  --warn: #d6503c;
-  --warn-soft: #fdebe6;
-  --urgent: #f26b5b;
+  --surface-2: #e8e4d8;
+  --border: #dbd5c6;
+  --border-strong: #c3bba6;
+  --text: #14141a;
+  --text-muted: #6b6960;
+  --accent: #14141a;
+  --accent-soft: #e4e0d2;
+  --action: #d6f84b;
+  --action-soft: #eefbc6;
+  /* What text is legible *on* each of those. Never hardcode #fff again: in
+     dark mode the accent becomes acid, and white on acid is unreadable. */
+  --on-accent: #fbfaf6;
+  --on-action: #14141a;
+  --good: #12784a;
+  --good-soft: #dbf1e3;
+  --warn: #c43a1e;
+  --warn-soft: #f9e4dd;
+  --urgent: #e23a16;
   /* The four grades, shared by rating discs, map pins and the legend. */
-  --grade-excellent: #1f9d5b;
-  --grade-strong: #16324f;
-  --grade-fair: #b9821d;
-  --grade-weak: #737b84;
-  --border-strong: #cfcabb;
-  --gone: #98a2b3;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
+  --grade-excellent: #12784a;
+  --grade-strong: #14141a;
+  --grade-fair: #8f5400;
+  --grade-weak: #8a857a;
+  --gone: #9c978b;
+  /* Warm, to sit on paper rather than float above a blue-grey app. */
+  --shadow: 0 1px 2px rgba(40, 34, 20, 0.05), 0 1px 3px rgba(40, 34, 20, 0.07);
+  --shadow-lg: 0 14px 36px rgba(30, 26, 16, 0.16);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Dark keeps the navy family: a night sky, not a different brand. */
-    --bg: #0f151c;
-    --surface: #171f28;
-    --surface-2: #1e2833;
-    --border: #2c3946;
-    --text: #eceff2;
-    --text-muted: #96a1ab;
-    --accent: #85aed3;
-    --accent-soft: #1b2c3e;
-    --action: #2fbf71;
-    --action-soft: #0e3323;
-    --good: #4ade94;
-    --good-soft: #0a2e1e;
-    --warn: #f2705b;
-    --warn-soft: #3b1912;
-    --urgent: #f26b5b;
-    --grade-excellent: #27b268;
-    --grade-strong: #3c6a94;
-    --grade-fair: #c08e2a;
-    --grade-weak: #5d656e;
-    --border-strong: #3d4c5b;
-    --gone: #6b7280;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+    /*
+     * Night inverts the paper, not the roles. Ink becomes the page and bone
+     * becomes the type — but the accent stays a neutral, and acid stays
+     * exactly as rare as it is in daylight.
+     *
+     * Promoting acid to `--accent` here was tried and is a trap: the accent
+     * drives nav highlights, active chips, map pins and half a dozen other
+     * ambient states, so the highlighter ended up on eight things at once and
+     * marked nothing. Whatever is acid has to stay countable on one hand.
+     */
+    --bg: #0c0c0f;
+    --surface: #151519;
+    --surface-2: #1d1d23;
+    --border: #2a2a32;
+    --border-strong: #3b3b46;
+    --text: #edebe3;
+    --text-muted: #918e86;
+    --accent: #e6e3d8;
+    --accent-soft: #26262e;
+    --action: #d6f84b;
+    --action-soft: #23280e;
+    --on-accent: #14141a;
+    --on-action: #14141a;
+    --good: #45d68a;
+    --good-soft: #0c2c1d;
+    --warn: #f0765a;
+    --warn-soft: #351510;
+    --urgent: #ff5a33;
+    --grade-excellent: #45d68a;
+    --grade-strong: #cfcbbd;
+    --grade-fair: #d6a03c;
+    --grade-weak: #6e6a62;
+    --gone: #6e6a62;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.7);
   }
 }
 
@@ -197,15 +226,19 @@ textarea {
   cursor: not-allowed;
 }
 
-/* Green means go: the action colour belongs to buttons alone. */
+/* Acid means go. One per object — one on the page, one on a card, one in a
+   panel. If two things in the same frame are acid, one of them isn't really
+   the next move and should be a plain button. */
 .btn-primary {
   background: var(--action);
   border-color: var(--action);
-  color: #fff;
+  color: var(--on-action);
+  font-weight: 650;
 }
 
+/* Down, not up: brightening a near-fluorescent only washes it out. */
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.06);
+  filter: brightness(0.94);
   background: var(--action);
 }
 
@@ -219,9 +252,12 @@ textarea {
   outline: none;
 }
 
+/* Focus is acid, in both themes. It's the one place the brand colour is
+   allowed to appear unbidden, and it makes keyboard use feel deliberate
+   rather than tolerated. */
 .field:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--action) 60%, transparent);
 }
 
 /*
@@ -276,7 +312,7 @@ textarea {
 
 .nav-item[aria-current="page"] .chip {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: transparent;
 }
 
@@ -872,30 +908,247 @@ kbd {
 
 .auth-google { gap: var(--s2); padding: 10px 12px; font-weight: 600; }
 
+/* --- site chrome: the bar and footer every marketing page shares --------- */
+
+.site { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
+.site > .landing, .site > .legal { flex: 1; }
+
+/*
+ * The bar starts invisible over the hero and materialises on scroll — see
+ * ScrollBar.tsx. Both states are declared here so the transition is the
+ * browser's job and scrolling never waits on React.
+ */
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) clamp(var(--s4), 5vw, var(--s7));
+  padding-top: max(var(--s3), env(safe-area-inset-top, 0px));
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--t-slow) var(--ease), border-color var(--t-slow) var(--ease),
+    backdrop-filter var(--t-slow) var(--ease);
+}
+
+/* Over the dark hero: no chrome at all until the page moves. */
+.site[data-hero="true"] .site-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  background: transparent;
+  border-bottom-color: transparent;
+  color: #f4f2ea;
+  --logo-dim: #f4f2ea;
+}
+.site[data-hero="true"] .site-bar[data-stuck="true"] {
+  background: color-mix(in srgb, var(--ink) 88%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
+  border-bottom-color: rgba(244, 242, 234, 0.14);
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-xl);
+  font-weight: 700;
+  font-stretch: 112%;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  color: inherit;
+}
+.site-brand-sm { font-size: var(--t-lg); }
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin-left: auto;
+  font-size: var(--t-md);
+  font-weight: 550;
+}
+.site-nav a {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.72;
+  position: relative;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.site-nav a:hover { opacity: 1; }
+
+/* The underline grows from the left rather than fading in — small, but it's
+   the difference between a link that responds and one that just changes. */
+.site-nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 1.5px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t-slow) var(--ease);
+}
+.site-nav a:hover::after { transform: scaleX(1); }
+
+/* The claim, stated in the furniture rather than in a paragraph. */
+.site-free {
+  padding: 2px 9px;
+  border-radius: var(--r-full);
+  background: var(--action);
+  color: var(--on-action);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.site-cta { font-weight: 600; }
+.site[data-hero="true"] .site-cta {
+  background: transparent;
+  border-color: rgba(244, 242, 234, 0.3);
+  color: #f4f2ea;
+}
+.site[data-hero="true"] .site-cta:hover { background: rgba(244, 242, 234, 0.12); }
+
+@media (max-width: 720px) {
+  /* The section links go; the brand, the free badge and the button are what
+     matter on a phone, and three of them already fill the bar. */
+  .site-nav a { display: none; }
+  .site-nav { margin-left: auto; gap: var(--s2); }
+}
+
+.site-foot {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s6) clamp(var(--s5), 6vw, var(--s8));
+  padding-bottom: max(var(--s6), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+}
+.site-foot-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  color: var(--text);
+}
+.site-foot-top nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
+.site-foot-top a { color: var(--text-muted); text-decoration: none; }
+.site-foot-top a:hover { color: var(--text); text-decoration: underline; }
+.site-foot p { margin: 0; max-width: 62ch; line-height: 1.6; }
+
+/* --- privacy and terms --------------------------------------------------- */
+
+.legal {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: clamp(var(--s6), 7vw, var(--s8)) clamp(var(--s5), 6vw, var(--s7));
+}
+.legal h1 { margin: var(--s2) 0 var(--s4); font-size: clamp(2rem, 5vw, 3rem); }
+.legal-lede {
+  margin: 0 0 var(--s6);
+  font-size: var(--t-lg);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.legal h2 {
+  margin: var(--s6) 0 var(--s3);
+  font-size: var(--t-xl);
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+.legal p, .legal li { line-height: 1.65; color: var(--text-muted); }
+.legal p { margin: 0 0 var(--s3); }
+.legal ul { margin: 0 0 var(--s3); padding-left: 1.1rem; display: grid; gap: var(--s3); }
+.legal b { color: var(--text); font-weight: 650; }
+.legal a { color: var(--text); text-underline-offset: 3px; }
+.legal-note {
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+  font-size: var(--t-md);
+}
+
+/* --- reveal on scroll ---------------------------------------------------- */
+
+/*
+ * One-way, eight pixels, once. `data-shown` starts true and is only set false
+ * by the observer, so no-JS readers and crawlers see the content rather than
+ * an empty column — see Reveal.tsx.
+ */
+.reveal {
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+}
+.reveal[data-shown="false"] { opacity: 0; transform: translateY(8px); }
+.reveal[data-shown="true"] { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { transition: none; }
+  .reveal[data-shown="false"] { opacity: 1; transform: none; }
+}
+
+/* --- why it's free ------------------------------------------------------- */
+
+.landing-maker {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: clamp(var(--s6), 7vw, var(--s8)) clamp(var(--s5), 6vw, var(--s8));
+  border-top: 1px solid var(--border);
+}
+.landing-maker-body {
+  margin: var(--s4) 0 0;
+  max-width: 58ch;
+  font-size: clamp(var(--t-lg), 1.5vw, 19px);
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+.landing-maker-sign {
+  margin: var(--s5) 0 0;
+  font-size: var(--t-md);
+  font-weight: 650;
+  color: var(--text);
+}
+
 /* --- the landing page ---------------------------------------------------- */
 
+/*
+ * One page, two temperatures.
+ *
+ * The hero is a flat ink field — no gradient, no photograph, no glow. The
+ * whole visual argument is that this thing is exact, and a gradient is the
+ * fastest way to look like it's selling rather than reporting. Everything
+ * below returns to paper, where the reading happens.
+ */
 .landing {
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
 }
 
-/* The hero shares the auth panel's night navy and the same lit-map art — one
-   brand, seen from the street. */
 .landing-hero {
   position: relative;
-  overflow: hidden;
   display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 88dvh;
-  padding: var(--s5) clamp(var(--s5), 6vw, var(--s8));
-  color: #f4f6f8;
-  background: linear-gradient(150deg, #1e415f 0%, #16324f 46%, #0a1929 100%);
+  grid-template-rows: 1fr auto;
+  gap: var(--s6);
+  min-height: 92dvh;
+  /* Top padding clears the fixed bar, which floats over this section. */
+  padding: calc(var(--s8) + var(--s4)) clamp(var(--s5), 6vw, var(--s8)) 0;
+  background: var(--ink);
+  color: #f4f2ea;
+  /* The unlit panes of the mark restate against ink rather than against the
+     page's text colour, which on this field would be invisible. */
+  --logo-dim: #f4f2ea;
 }
 
 .landing-nav {
-  position: relative;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -906,114 +1159,196 @@ kbd {
   align-items: center;
   gap: var(--s2);
   font-size: var(--t-xl);
-  font-weight: 750;
+  font-weight: 700;
+  font-stretch: 112%;
   letter-spacing: -0.02em;
 }
 
-/* The landing logo sits on navy, so the facade goes light. */
-.landing-brand .logo-face { fill: #dceaf5; }
-.landing-brand .logo-pane { fill: #16324f; opacity: 0.55; }
-.landing-brand .logo-door { stroke: #16324f; }
-
 .landing-signin {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #f4f6f8;
+  border-color: rgba(244, 242, 234, 0.28);
+  color: #f4f2ea;
 }
 
-.landing-signin:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.landing-signin:hover:not(:disabled) {
+  background: rgba(244, 242, 234, 0.1);
+  border-color: rgba(244, 242, 234, 0.5);
+}
 
 .landing-hero-inner {
-  position: relative;
-  z-index: 2;
   align-self: center;
-  max-width: 46rem;
+  max-width: 54rem;
   display: grid;
   gap: var(--s5);
   padding: var(--s7) 0;
 }
 
+.landing-eyebrow { color: rgba(244, 242, 234, 0.5); }
+
+/*
+ * The headline. Archivo at the top of its width axis, as large as the
+ * viewport allows, tracked tight enough that the expansion reads as drawn
+ * rather than stretched.
+ */
+/*
+ * The headline sizes down further than it looks like it should. At 125% width
+ * a phrase like "know someone." is one very wide unbreakable object, and a
+ * floor set by taste rather than by measurement pushed it past the viewport —
+ * taking the whole hero, and the sign-in button, off the right edge with it.
+ */
 .landing-hero h1 {
   margin: 0;
-  font-size: clamp(2.6rem, 6vw, 4.6rem);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-  font-weight: 780;
-  text-wrap: balance;
+  font-size: clamp(2.05rem, 8.2vw, 6.4rem);
+  overflow-wrap: break-word;
 }
 
-.landing-hero h1 b { color: #ffd66b; }
-
-.landing-hero p {
+.landing-sub {
   margin: 0;
-  max-width: 36rem;
-  font-size: clamp(var(--t-lg), 1.6vw, 19px);
+  max-width: 44rem;
+  font-size: clamp(var(--t-lg), 1.5vw, 19px);
   line-height: 1.55;
-  color: rgba(244, 246, 248, 0.78);
+  color: rgba(244, 242, 234, 0.72);
 }
 
 .landing-cta { display: grid; gap: var(--s3); justify-items: start; }
 
-/* The button. There is no second call to action; this is the one. */
+/* The button. There is no second call to action; this is the one, and it is
+   the only acid on the screen apart from the highlight in the headline. */
 .landing-go {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 44px;
-  border-radius: var(--r-lg);
+  padding: 18px 40px;
+  border-radius: var(--r-md);
   background: var(--action);
-  color: #fff;
-  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  color: var(--on-action);
+  font-size: clamp(1.05rem, 1.8vw, 1.3rem);
   font-weight: 700;
   letter-spacing: -0.01em;
   text-decoration: none;
-  box-shadow: 0 10px 30px rgba(47, 191, 113, 0.35);
   transition: transform 0.08s ease, filter 0.12s ease;
 }
 
-.landing-go:hover { filter: brightness(1.06); transform: translateY(-1px); }
-.landing-go:active { transform: translateY(1px); }
+/* Lifts on hover, sits down hard on press. The shadow appearing only on hover
+   is what sells the lift — a button that moves without its shadow following
+   reads as a glitch. */
+.landing-go:hover {
+  filter: brightness(0.94);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--action) 40%, transparent);
+}
+.landing-go:active { transform: translateY(1px); box-shadow: none; }
 
-.landing-cta-sub { font-size: var(--t-sm); color: rgba(244, 246, 248, 0.6); }
+.landing-cta-sub { font-size: var(--t-sm); color: rgba(244, 242, 234, 0.55); }
 
-.landing-steps {
+/*
+ * The proof strip.
+ *
+ * Live counts off the same corpus every search reads, because "watches every
+ * listing site" is a claim and 4,182 is not. It sits at the bottom edge of
+ * the hero like a masthead's circulation figures.
+ */
+.landing-proof {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--s5);
-  padding: clamp(var(--s6), 7vw, var(--s8)) clamp(var(--s5), 6vw, var(--s8));
-  max-width: 78rem;
-  margin: 0 auto;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--s4);
+  margin: 0;
+  padding: var(--s4) 0 var(--s5);
+  border-top: 1px solid rgba(244, 242, 234, 0.16);
 }
 
-.landing-steps article { display: grid; gap: var(--s2); align-content: start; }
+.landing-proof div { display: grid; gap: 2px; }
 
-.landing-step-n {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--r-full);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 750;
+.landing-proof dt {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(244, 242, 234, 0.45);
+}
+
+.landing-proof dd {
+  margin: 0;
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  font-stretch: 118%;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
-.landing-steps h2 {
+/* --- what you walk in knowing -------------------------------------------- */
+
+.landing-edge {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: clamp(var(--s6), 7vw, var(--s8)) clamp(var(--s5), 6vw, var(--s8));
+  display: grid;
+  gap: var(--s6);
+}
+
+.landing-edge > h2,
+.landing-vs > h2,
+.landing-team h2 {
   margin: 0;
-  font-size: var(--t-xl);
+  font-size: clamp(1.8rem, 4.2vw, 2.9rem);
+}
+
+/*
+ * Rows, not cards.
+ *
+ * A rule between entries reads as a document; a box around each reads as a
+ * feature grid, and a feature grid is what every other product in this
+ * category ships. The label in the margin is the tell that this is a record
+ * of something rather than a list of promises.
+ */
+.landing-edge-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0;
+}
+
+.landing-edge-rows li {
+  padding: var(--s5) 0;
+  border-top: 1px solid var(--border);
+}
+
+.landing-edge-rows li:last-child { border-bottom: 1px solid var(--border); }
+
+/* Label in the margin, heading and body in the column beside it — a record of
+   something rather than a feature grid. */
+.landing-edge-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: var(--s3) var(--s5);
+  align-items: start;
+}
+
+.landing-edge-rows .overline { padding-top: 5px; }
+
+.landing-edge-rows h3 {
+  margin: 0 0 var(--s2);
+  font-size: clamp(var(--t-xl), 2.2vw, 1.55rem);
+  font-stretch: 108%;
   letter-spacing: -0.02em;
 }
 
-.landing-steps p {
+.landing-edge-rows p {
   margin: 0;
-  font-size: var(--t-md);
+  font-size: var(--t-lg);
   line-height: 1.6;
   color: var(--text-muted);
+  max-width: 58ch;
 }
 
-/* The objection section: the question everyone asks, answered in rows that
-   each end with what a listing site gives you instead. */
+@media (max-width: 720px) {
+  .landing-edge-inner { grid-template-columns: 1fr; gap: var(--s2); }
+  .landing-edge-rows .overline { padding-top: 0; }
+}
+
+/* --- the objection ------------------------------------------------------- */
+
 .landing-vs {
   max-width: 78rem;
   margin: 0 auto;
@@ -1022,19 +1357,15 @@ kbd {
   gap: var(--s5);
   border-top: 1px solid var(--border);
 }
-.landing-vs > h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.7rem, 4vw, 2.4rem);
-  letter-spacing: -0.02em;
-}
-.landing-vs > p {
+
+.landing-vs-lede {
   margin: 0;
   font-size: var(--t-lg);
   line-height: 1.6;
   color: var(--text-muted);
   max-width: 62ch;
 }
+
 .landing-vs-rows {
   margin: 0;
   padding: 0;
@@ -1043,22 +1374,31 @@ kbd {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--s5);
 }
+
 .landing-vs-rows li {
   display: grid;
   gap: var(--s2);
   align-content: start;
   padding: var(--s4);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   background: var(--surface);
 }
-.landing-vs-rows h3 { margin: 0; font-size: var(--t-lg); letter-spacing: -0.01em; }
+
+.landing-vs-rows h3 {
+  margin: 0;
+  font-size: var(--t-lg);
+  font-stretch: 106%;
+  letter-spacing: -0.01em;
+}
+
 .landing-vs-rows p {
   margin: 0;
   font-size: var(--t-md);
   line-height: 1.55;
   color: var(--text-muted);
 }
+
 .landing-vs-them {
   font-size: var(--t-sm);
   color: var(--text-muted);
@@ -1066,11 +1406,13 @@ kbd {
   border-top: 1px dashed var(--border);
   padding-top: var(--s2);
 }
+
 .landing-vs-close {
   margin: 0;
-  font-size: var(--t-xl);
-  letter-spacing: -0.01em;
+  font-size: clamp(1.3rem, 3vw, 2rem);
 }
+
+/* --- crew + footer ------------------------------------------------------- */
 
 .landing-team {
   display: flex;
@@ -1081,14 +1423,14 @@ kbd {
   max-width: 72rem;
   margin: 0 auto clamp(var(--s6), 7vw, var(--s8));
   padding: clamp(var(--s5), 4vw, var(--s7));
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
   background: var(--surface);
 }
 
-.landing-team h2 { margin: 0 0 var(--s2); letter-spacing: -0.02em; }
+.landing-team h2 { margin: 0 0 var(--s3); font-size: clamp(1.5rem, 3vw, 2.1rem); }
 .landing-team p { margin: 0; max-width: 40rem; color: var(--text-muted); line-height: 1.6; }
-.landing-go-sm { padding: 14px 28px; font-size: var(--t-lg); box-shadow: none; }
+.landing-go-sm { padding: 14px 28px; font-size: var(--t-lg); }
 
 .landing-foot {
   display: flex;
@@ -1111,9 +1453,11 @@ kbd {
   display: grid;
   align-items: center;
   padding: 6vh 5vw;
-  color: #f4f6f8;
-  /* DamnLease navy, deepening to night. */
-  background: linear-gradient(150deg, #1e415f 0%, #16324f 46%, #0a1929 100%);
+  color: #f4f2ea;
+  /* Flat ink, matching the landing hero. The pitch and the product are the
+     same surface seen twice; a gradient here would make them two brands. */
+  background: var(--ink);
+  --logo-dim: #f4f2ea;
 }
 
 .authart {
@@ -1124,15 +1468,14 @@ kbd {
   opacity: 0.5;
 }
 
-.authart-area { fill: rgba(255, 255, 255, 0.045); stroke: rgba(255, 255, 255, 0.09); stroke-width: 0.8; }
+.authart-area { fill: rgba(244, 242, 234, 0.04); stroke: rgba(244, 242, 234, 0.09); stroke-width: 0.8; }
 
-/* The neighborhoods the app is pointed at, lit from underneath — the same
-   warm window-light as the logo's one lit pane. Fixed colours, not tokens:
-   this panel is night navy in both themes, and the light-mode accent is now
-   navy-on-navy. */
+/* The neighborhoods the app is pointed at, highlighted — the map read the
+   same way the product reads a listing, with one thing marked and the rest
+   left alone. Fixed colours, not tokens: this panel is ink in both themes. */
 .authart-lit {
-  fill: rgba(255, 214, 107, 0.34);
-  stroke: rgba(255, 224, 138, 0.85);
+  fill: rgba(214, 248, 75, 0.2);
+  stroke: rgba(214, 248, 75, 0.75);
   stroke-width: 1.1;
 }
 
@@ -1143,16 +1486,17 @@ kbd {
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  /* Fixed for the same reason as the art: always on night navy. */
-  color: #bcd7ec;
+  /* Fixed for the same reason as the art: always on ink. */
+  color: rgba(244, 242, 234, 0.5);
 }
 
 .auth-pitch h1 {
   margin: 0;
-  font-size: clamp(2.2rem, 4.2vw, 3.6rem);
-  line-height: 1.04;
-  letter-spacing: -0.035em;
-  font-weight: 750;
+  font-size: clamp(2.2rem, 4.6vw, 3.8rem);
+  font-stretch: var(--wide);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.03em;
+  font-weight: 700;
   text-wrap: balance;
 }
 
@@ -1161,7 +1505,7 @@ kbd {
   max-width: 34rem;
   font-size: var(--t-lg);
   line-height: 1.55;
-  color: rgba(244, 244, 247, 0.72);
+  color: rgba(244, 242, 234, 0.72);
 }
 
 .auth-claims { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s4); }
@@ -1180,12 +1524,13 @@ kbd {
   font-weight: 750;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  color: #fff;
+  font-stretch: 115%;
+  color: #f4f2ea;
   white-space: nowrap;
 }
 
-.auth-claims span { font-size: var(--t-md); line-height: 1.5; color: rgba(244, 244, 247, 0.66); }
-.auth-claims strong { display: block; color: #fff; font-weight: 600; font-size: var(--t-lg); }
+.auth-claims span { font-size: var(--t-md); line-height: 1.5; color: rgba(244, 242, 234, 0.66); }
+.auth-claims strong { display: block; color: #f4f2ea; font-weight: 600; font-size: var(--t-lg); }
 
 /* Right: the form, and nothing competing with it. */
 .auth-panel {

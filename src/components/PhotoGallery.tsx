@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
+import Lightbox from "@/components/Lightbox";
 
 /**
  * Every photo the sources published, in one strip you can actually flip
@@ -30,6 +31,7 @@ export default function PhotoGallery({
   const strip = useRef<HTMLDivElement>(null);
   const [urls, setUrls] = useState(images);
   const [at, setAt] = useState(0);
+  const [full, setFull] = useState<number | null>(null);
 
   const go = (delta: number) => {
     const el = strip.current;
@@ -54,14 +56,26 @@ export default function PhotoGallery({
           }}
         >
           {urls.map((url, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            /*
+             * A button, not a bare image: the strip is for flipping, but
+             * deciding whether that's a real bedroom or a wall six feet from
+             * the window needs the photo at full size. Tapping opens it there.
+             */
+            <button
               key={url}
-              src={url}
-              alt={i === 0 ? alt : `${alt} — photo ${i + 1}`}
-              loading={i === 0 ? "eager" : "lazy"}
-              onError={() => setUrls((list) => list.filter((u) => u !== url))}
-            />
+              type="button"
+              className="gallery-shot"
+              onClick={() => setFull(i)}
+              aria-label={`View photo ${i + 1} of ${urls.length} full screen`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt={i === 0 ? alt : `${alt} — photo ${i + 1}`}
+                loading={i === 0 ? "eager" : "lazy"}
+                onError={() => setUrls((list) => list.filter((u) => u !== url))}
+              />
+            </button>
           ))}
         </div>
       )}
@@ -94,6 +108,14 @@ export default function PhotoGallery({
           as the gallery being broken. The site link has the rest. */}
       {urls.length === 1 && (
         <span className="gallery-count">1 photo — more on the listing site</span>
+      )}
+
+      {full !== null && (
+        <Lightbox
+          items={urls.map((url) => ({ url, kind: "photo" as const }))}
+          start={full}
+          onClose={() => setFull(null)}
+        />
       )}
     </div>
   );

@@ -8,8 +8,10 @@ import {
   uploadJobs,
   pendingUploads,
   clearUploadError,
+  cancelUpload,
 } from "@/lib/uploadQueue";
 import Icon from "@/components/Icon";
+import Lightbox from "@/components/Lightbox";
 
 /**
  * Your own footage from the viewing, pinned to the listing.
@@ -38,6 +40,10 @@ export default function TourMedia({ listingId }: { listingId: string }) {
   const [me, setMe] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [dragOver, setDragOver] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null);
+  // Bumped on every queue event so the in-flight rows below re-render with
+  // fresh percentages; the queue itself owns the numbers.
+  const [, setTick] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -68,14 +74,15 @@ export default function TourMedia({ listingId }: { listingId: string }) {
     return subscribeUploads(() => {
       const now = pendingUploads(listingId);
       setPending(now);
+      setTick((n) => n + 1);
       if (now < had) load();
       had = now;
     });
   }, [listingId, load]);
 
-  const failures = uploadJobs().filter(
-    (j) => j.listingId === listingId && j.state === "error"
-  );
+  const mine = uploadJobs().filter((j) => j.listingId === listingId);
+  const failures = mine.filter((j) => j.state === "error");
+  const inFlight = mine.filter((j) => j.state === "queued" || j.state === "uploading");
 
   return (
     <div
@@ -99,9 +106,7 @@ export default function TourMedia({ listingId }: { listingId: string }) {
       <div className="tourmedia-head">
         <button className="btn" onClick={() => fileRef.current?.click()}>
           <Icon name="plus" size={14} />
-          {pending > 0
-            ? `Uploading ${pending} — add more`
-            : "Add video or photos"}
+          {pending > 0 ? `Uploading ${pending} — add more` : "Add video or photos"}
         </button>
         <input
           ref={fileRef}
@@ -117,7 +122,8 @@ export default function TourMedia({ listingId }: { listingId: string }) {
         {items.length === 0 && pending === 0 && (
           <span className="muted tourmedia-hint">
             What you film at the viewing lives here — or drop files anywhere
-            in this box. Uploads keep going if you close the panel.
+            in this box. Up to 200MB each; uploads keep going if you close the
+            panel.
           </span>
         )}
       </div>
@@ -126,6 +132,42 @@ export default function TourMedia({ listingId }: { listingId: string }) {
         <div className="tourmedia-dropnote" aria-hidden="true">
           Drop to attach to this listing
         </div>
+      )}
+
+      {inFlight.length > 0 && (
+        <ul className="uprows">
+          {inFlight.map((job) => {
+            const pct = Math.round(job.progress * 100);
+            return (
+              <li key={job.id} className="uprow">
+                <Icon name={job.kind === "video" ? "video" : "image"} size={14} />
+                <span className="uprow-name">{job.name}</span>
+                <span className="uprow-pct">
+                  {job.state === "queued" ? "waiting" : `${pct}%`}
+                </span>
+                <button
+                  className="uprow-x"
+                  onClick={() => cancelUpload(job.id)}
+                  aria-label={`Cancel upload of ${job.name}`}
+                >
+                  <Icon name="close" size={12} />
+                </button>
+                <div
+                  className="uploadbar uprow-bar"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <span
+                    style={{ width: `${Math.max(2, pct)}%` }}
+                    data-idle={job.state === "queued" ? "true" : undefined}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       {failures.map((job) => (
@@ -139,14 +181,31 @@ export default function TourMedia({ listingId }: { listingId: string }) {
 
       {items.length > 0 && (
         <div className="tourmedia-grid">
-          {items.map((item) => (
+          {items.map((item, i) => (
             <figure key={item.id} className="tourmedia-item">
-              {item.kind === "video" ? (
-                <video src={item.url} controls playsInline preload="metadata" />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.url} alt={item.caption || "Tour photo"} loading="lazy" />
-              )}
+              {/*
+                * The tile opens the viewer rather than playing in place. A
+                * 150px video with native controls is unwatchable — the scrubber
+                * is wider than the picture — and the whole reason the footage
+                * exists is to be looked at properly on decision night.
+                */}
+              <button
+                className="tourmedia-open"
+                onClick={() => setViewing(i)}
+                aria-label={`View ${item.kind === "video" ? "video" : "photo"} full screen`}
+              >
+                {item.kind === "video" ? (
+                  <>
+                    <video src={item.url} playsInline preload="metadata" muted />
+                    <span className="tourmedia-play" aria-hidden="true">
+                      <Icon name="play" size={16} />
+                    </span>
+                  </>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.url} alt={item.caption || "Tour photo"} loading="lazy" />
+                )}
+              </button>
               {item.user_id === me && (
                 <button
                   className="tourmedia-del"
@@ -168,6 +227,14 @@ export default function TourMedia({ listingId }: { listingId: string }) {
             </figure>
           ))}
         </div>
+      )}
+
+      {viewing !== null && (
+        <Lightbox
+          items={items.map((m) => ({ url: m.url, kind: m.kind, caption: m.caption }))}
+          start={viewing}
+          onClose={() => setViewing(null)}
+        />
       )}
     </div>
   );
