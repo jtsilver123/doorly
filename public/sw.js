@@ -6,7 +6,7 @@
  */
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "Doorly", body: "", url: "/" };
+  let payload = { title: "Doorly", body: "", url: "/app" };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch {

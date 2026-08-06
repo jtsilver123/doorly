@@ -358,7 +358,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
    * else.
    */
   async function share() {
-    const url = siteUrl(`/?place=${encodeURIComponent(listing.id)}`);
+    const url = siteUrl(`/app?place=${encodeURIComponent(listing.id)}`);
     const title = `${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`;
     const text = `${money(listing.price)}/mo · ${listing.neighborhood} · ${listing.rating}/100 on Doorly`;
     if (navigator.share) {
@@ -551,28 +551,37 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
 
           {/* The way out to the source, right at the top — checking the full
               listing is the first thing people do, and these buttons lived at
-              the very bottom of the scroll. */}
-          <div className="drawer-sites">
-            {[...listing.alsoOn]
+              the very bottom of the scroll. A listing with no cross-site
+              records still has its own page; an empty row read as broken. */}
+          {(() => {
+            const sites = [...listing.alsoOn]
               .filter((so) => so.url)
               .sort((a, b) => {
                 const order = linkPreference(profile.preferredSource);
                 return order.indexOf(a.source) - order.indexOf(b.source);
-              })
-              .map((so) => (
-                <a
-                  key={so.source}
-                  className="btn btn-quiet srcbtn"
-                  href={so.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <SourceMark source={so.source} size={15} />
-                  View on {SOURCE_LABEL[so.source]}
-                  <Icon name="external" size={12} />
-                </a>
-              ))}
-          </div>
+              });
+            if (!sites.length && listing.url) {
+              sites.push({ source: listing.source, url: listing.url });
+            }
+            if (!sites.length) return null;
+            return (
+              <div className="drawer-sites">
+                {sites.map((so) => (
+                  <a
+                    key={so.source}
+                    className="btn btn-quiet srcbtn"
+                    href={so.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <SourceMark source={so.source} size={15} />
+                    View on {SOURCE_LABEL[so.source]}
+                    <Icon name="external" size={12} />
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* A passed place explains itself — to you a week later, and to
               whoever found it. */}

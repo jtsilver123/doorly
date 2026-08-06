@@ -1226,6 +1226,12 @@ button.fact:hover .fact-label { color: var(--accent); }
 .page-pipeline p { max-width: 78ch; }
 .pipeline-view { justify-self: start; }
 
+/* On a phone the board is the point of this page, and the timeline was
+   costing it the entire first screen. The clock reads fine below the work. */
+@media (max-width: 700px) {
+  .page-pipeline > .timeline { order: 3; }
+}
+
 /*
  * Settings panels.
  *

@@ -41,9 +41,9 @@ export async function proxy(request: NextRequest) {
   // The cron endpoint authenticates with a shared secret, not a session.
   const isCron = path.startsWith("/api/cron");
 
-  // The root is the marketing site when signed out — the one page a stranger
-  // from a group chat is allowed to see. The social card rides along: link
-  // unfurlers have no session and give up on a redirect.
+  // The root is the marketing site for everyone now — the app lives at /app.
+  // The social card rides along: link unfurlers have no session and give up
+  // on a redirect.
   // The service worker must load without a session — the browser fetches it
   // in its own context, cookieless, and a 307 to /login kills push silently.
   const isLanding =
@@ -66,14 +66,15 @@ export async function proxy(request: NextRequest) {
   }
   if (user && isAuthRoute && !path.startsWith("/auth")) {
     const to = request.nextUrl.clone();
-    to.pathname = "/";
+    to.pathname = "/app";
     return NextResponse.redirect(to);
   }
 
   // A signed-in account with no saved search has nothing to show, so send it to
   // setup. Checked here rather than in the page so every route is covered, and
-  // skipped for API calls so onboarding itself can save.
-  if (user && !isWelcome && !isJoin && !path.startsWith("/api")) {
+  // skipped for API calls so onboarding itself can save. The landing is also
+  // exempt — reading the pitch while signed in shouldn't teleport you to setup.
+  if (user && !isWelcome && !isJoin && !isLanding && !path.startsWith("/api")) {
     const { count } = await supabase
       .from("saved_searches")
       .select("id", { count: "exact", head: true })

@@ -41,7 +41,7 @@ async function landingPath(): Promise<string> {
     .from("saved_searches")
     .select("id", { count: "exact", head: true })
     .eq("user_id", data.user.id);
-  if (count) return "/";
+  if (count) return "/app";
 
   // No search of their own, but a crew to work: scouts and partners came for
   // somebody else's pipeline, and setup would ask them to start their own.
@@ -49,7 +49,7 @@ async function landingPath(): Promise<string> {
     .from("crew_members")
     .select("crew_id", { count: "exact", head: true })
     .eq("user_id", data.user.id);
-  return crews ? "/" : "/welcome";
+  return crews ? "/app" : "/welcome";
 }
 
 export async function signIn(_prev: AuthResult, formData: FormData): Promise<AuthResult> {

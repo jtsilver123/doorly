@@ -157,6 +157,11 @@ export default function Home() {
     if (window.location.hash.replace(/^#/, "") !== tab) {
       window.history.replaceState(null, "", `#${tab}`);
     }
+    // A new tab starts at its top. Carrying the last tab's scroll position
+    // over opened Pipeline mid-page on a phone, with the view toggle clipped
+    // above the fold.
+    window.scrollTo({ top: 0 });
+    document.querySelector(".main")?.scrollTo?.({ top: 0 });
   }, [tab]);
   const [listings, setListings] = useState<FeedListing[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);

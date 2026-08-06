@@ -121,8 +121,8 @@ export async function deliver(notices: Notice[]): Promise<void> {
                 title: notice.title,
                 body: notice.body,
                 url: notice.listingId
-                  ? siteUrl(`/?place=${encodeURIComponent(notice.listingId)}`)
-                  : siteUrl("/"),
+                  ? siteUrl(`/app?place=${encodeURIComponent(notice.listingId)}`)
+                  : siteUrl("/app"),
               })
             );
           } catch (err) {

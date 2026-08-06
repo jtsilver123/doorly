@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     if (!error) {
       const invite = request.cookies.get("pending_invite")?.value;
       const to = NextResponse.redirect(
-        new URL(invite ? `/join/${invite}` : "/", request.url)
+        new URL(invite ? `/join/${invite}` : "/app", request.url)
       );
       if (invite) to.cookies.delete("pending_invite");
       return to;

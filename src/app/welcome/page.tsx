@@ -139,7 +139,7 @@ export default function Welcome() {
   }
 
   function finish() {
-    router.push("/");
+    router.push("/app");
     router.refresh();
   }
 

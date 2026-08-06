@@ -1,21 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/supabase/server";
-import App from "@/components/App";
 import AuthArt from "@/components/AuthArt";
 import Logo from "@/components/Logo";
 
 /**
- * The front door.
+ * The front door — the marketing site, for everyone.
  *
- * Signed in, this is the app. Signed out, it's the pitch — a real landing
- * page rather than a login wall, because the first thing a link from a group
- * chat should do is explain why this exists, and the second thing is one
- * enormous unmissable button.
+ * The app lives at /app now; this page's job is the pitch, whether or not
+ * you're signed in. For a stranger from a group chat that means one
+ * enormous unmissable button; for a signed-in visitor the same buttons
+ * simply open the app instead of the signup form.
  *
- * Server component on purpose: the split keeps the landing page in plain
- * HTML with the map art rendered server-side, and only signed-in visitors
- * pay for the client app bundle's hydration.
+ * Server component on purpose: plain HTML with the map art rendered
+ * server-side — nobody pays for the app bundle's hydration here.
  */
 
 export const dynamic = "force-dynamic";
@@ -60,7 +58,8 @@ export default async function Home({
   if (code) redirect(`/auth/callback?code=${encodeURIComponent(code)}`);
 
   const user = await currentUser();
-  if (user) return <App />;
+  const go = user ? "/app" : "/signup";
+  const goLabel = user ? "Open Doorly" : "Secure a place";
 
   return (
     <main className="landing">
@@ -71,8 +70,8 @@ export default async function Home({
             <Logo size={26} />
             Doorly
           </span>
-          <Link className="btn landing-signin" href="/login">
-            Sign in
+          <Link className="btn landing-signin" href={user ? "/app" : "/login"}>
+            {user ? "Open the app" : "Sign in"}
           </Link>
         </header>
 
@@ -87,11 +86,13 @@ export default async function Home({
             tabs.
           </p>
           <div className="landing-cta">
-            <Link className="landing-go" href="/signup">
-              Secure a place
+            <Link className="landing-go" href={go}>
+              {goLabel}
             </Link>
             <span className="landing-cta-sub">
-              Free · two minutes to set up · bring your roommate
+              {user
+                ? "Your pipeline is where you left it"
+                : "Free · two minutes to set up · bring your roommate"}
             </span>
           </div>
         </div>
@@ -116,8 +117,8 @@ export default async function Home({
             every find carries their name, and the final say stays yours.
           </p>
         </div>
-        <Link className="landing-go landing-go-sm" href="/signup">
-          Secure a place
+        <Link className="landing-go landing-go-sm" href={go}>
+          {goLabel}
         </Link>
       </section>
 

@@ -43,7 +43,7 @@ export default async function JoinPage({
   async function join() {
     "use server";
     await acceptInvite(token);
-    redirect("/");
+    redirect("/app");
   }
 
   return (
