@@ -123,6 +123,63 @@ export default async function Home({
         ))}
       </section>
 
+      {/* The objection everyone raises, answered head-on rather than dodged.
+          A browsing site and a hunting tool are different machines. */}
+      <section className="landing-vs">
+        <h2>&ldquo;Why not just use Zillow?&rdquo;</h2>
+        <p>
+          Because Zillow is a catalog, and the hunt isn&apos;t browsing — it&apos;s
+          texting agents, booking tours, comparing finalists and racing other
+          applicants. That part currently lives in twelve tabs, a group chat
+          and a spreadsheet. That part is Doorly.
+        </p>
+        <ul className="landing-vs-rows">
+          {(
+            [
+              [
+                "Every site at once",
+                "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, deduplicated — in NYC no single site has the inventory.",
+                "One site's slice of the market",
+              ],
+              [
+                "What it really costs",
+                "Concessions spread over the lease, fees amortized, cash to move in — and whether your income clears the 40× rule.",
+                "The asking rent",
+              ],
+              [
+                "A price check with teeth",
+                "Every listing measured against its own comps, with a ready-to-send negotiation script — or a warning to move fast instead.",
+                "“Contact agent”",
+              ],
+              [
+                "The building's record",
+                "Open HPD violations, bedbug filings and the block's 311 noise complaints, from city data.",
+                "The listing's own photos",
+              ],
+              [
+                "A pipeline that chases",
+                "Every place you pursue tracked from first text to signed lease; silence gets flagged and follow-ups draft themselves.",
+                "Browser tabs and memory",
+              ],
+              [
+                "A crew, not a group chat",
+                "One shared board with your roommate or family — tours, videos from viewings, and who's on point for which agent.",
+                "Forwarded links",
+              ],
+            ] as [string, string, string][]
+          ).map(([title, ours, theirs]) => (
+            <li key={title}>
+              <h3>{title}</h3>
+              <p>{ours}</p>
+              <span className="landing-vs-them">Listing sites: {theirs}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="landing-vs-close">
+          Zillow shows you apartments. <b>Doorly wins you one.</b>
+        </p>
+      </section>
+
       <section className="landing-team">
         <div>
           <h2>Hunt as a team</h2>
