@@ -256,6 +256,10 @@ export async function nextCheckDue(userId?: string): Promise<{
   // Called from two places with different auth: the cron route (no session, so
   // it needs the service role) and the settings route (session, no service key
   // required). Try both rather than assuming either.
+  // Any completed run counts, not only ok=true ones. A run that carried
+  // warnings (a skipped sweep, one flaky source) still spent its requests —
+  // pacing off "perfect runs only" made a user whose every poll warns re-poll
+  // on every hourly tick, which is exactly the budget burn this guards.
   let lastAt: string | null = null;
   let read = false;
   for (const getClient of [
@@ -264,10 +268,7 @@ export async function nextCheckDue(userId?: string): Promise<{
   ]) {
     try {
       const client = await getClient();
-      let query = client
-        .from("poll_runs")
-        .select("started_at")
-        .eq("ok", true);
+      let query = client.from("poll_runs").select("started_at");
       if (userId) query = query.eq("user_id", userId);
       const { data, error } = await query
         .order("started_at", { ascending: false })
