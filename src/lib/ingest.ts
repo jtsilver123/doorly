@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/supabase";
 import { fingerprint, contentHash, matchConfidence } from "@/lib/dedupe";
 import { deliver, noticesForEvents } from "@/lib/notify";
 import { sweepPlan } from "@/lib/sweep";
+import { inBounds } from "@/lib/criteria";
 import { runSearch, type SourceReport } from "@/lib/sources";
 
 /**
@@ -472,46 +473,76 @@ export async function ingest(
     allReports.filter((r) => r.ok && r.fetched > 0).map((r) => r.source)
   );
   if (healthySources.size > 0) {
-    const { data: stale } = await supabase
+    /*
+     * The delist sweep, scoped in two directions the original wasn't.
+     *
+     * In scope only: with several users pulling their own searches into one
+     * corpus, this poll has no opinion about listings it never searched for —
+     * judging the whole pool against one user's slice made every fetch "look
+     * partial" and quietly stopped anything from ever going off-market.
+     *
+     * By absence, not by this poll: a newest-first page-one fetch never
+     * re-sees the deep corpus, so "not in this fetch" means nothing. "Not
+     * seen by ANY poll in 36 hours" — three-plus missed checks at the
+     * default cadence — is a real disappearance.
+     */
+    const cutoffIso = new Date(startedAt.getTime() - 36 * 3_600_000).toISOString();
+    const { data: activeRows } = await supabase
       .from("listing_sources")
-      .select("source, source_id, listing_id")
+      .select(
+        "source, source_id, listing_id, last_seen_at, listings!inner(price, bedrooms, bathrooms, no_fee, lat, lon, neighborhood, address)"
+      )
       .in("source", [...healthySources])
-      .eq("is_active", true)
-      .lt("last_seen_at", nowIso);
+      .eq("is_active", true);
+
+    const polledCriteria = [...distinct.values()].map((s) => s.criteria);
+    const inScope = (activeRows ?? []).filter((row) => {
+      const l = row.listings as unknown as Record<string, unknown>;
+      if (!l) return false;
+      return polledCriteria.some((c) =>
+        inBounds(
+          {
+            price: (l.price as number) ?? 0,
+            bedrooms: (l.bedrooms as number) ?? 0,
+            bathrooms: (l.bathrooms as number) ?? 1,
+            noFee: Boolean(l.no_fee),
+            lat: (l.lat as number | null) ?? null,
+            lon: (l.lon as number | null) ?? null,
+            neighborhood: (l.neighborhood as string) ?? "",
+            address: (l.address as string) ?? "",
+          },
+          c
+        )
+      );
+    });
 
     /*
-     * The circuit breaker.
-     *
-     * "ok && fetched > 0" is not the same as "answered completely": a source
-     * that returns its first page and then rate-limits reports healthy, and
-     * everything on its deeper pages would read as delisted. That exact
-     * failure flapped half the corpus off- and back-on-market four times in
-     * one afternoon — 78 delists at 3pm, 80 resurrections at 4pm.
-     *
-     * Real markets don't shed a third of their inventory between two polls.
-     * If a source's sweep would delist more than 25% of its active rows (and
-     * more than 10 of them), the fetch was partial: skip that source's sweep
-     * entirely and say so. The listings stay live until a poll that actually
-     * saw the whole picture.
+     * The circuit breaker still guards the sweep: if a source would lose more
+     * than 25% of its in-scope rows at once (and more than 10), that's a
+     * source outage reading as a market move — skip it and say so. Real
+     * markets don't shed a quarter of a neighborhood in a day and a half.
      */
-    const rows = (stale ?? []).map((row) => ({
+    const isGone = (row: { source: string; source_id: string; last_seen_at: string }) =>
+      row.last_seen_at < cutoffIso &&
+      !seenSourceKeys.has(`${row.source}:${row.source_id}`);
+    const rows = inScope.map((row) => ({
       source: row.source as string,
-      gone: !seenSourceKeys.has(`${row.source}:${row.source_id}`),
+      gone: isGone(row as { source: string; source_id: string; last_seen_at: string }),
     }));
     const { sweepable, skipped } = sweepPlan(rows);
     for (const skip of skipped) {
       errors.push(
-        `sweep skipped for ${skip.source}: would delist ${skip.gone} of ${skip.active} — fetch looks partial`
+        `sweep skipped for ${skip.source}: would delist ${skip.gone} of ${skip.active} in-scope — source looks down`
       );
     }
 
     const goneIds = new Set<string>();
     const goneKeys: { source: string; source_id: string }[] = [];
-    for (const row of stale ?? []) {
-      if (!sweepable.has(row.source)) continue;
-      if (seenSourceKeys.has(`${row.source}:${row.source_id}`)) continue;
-      goneKeys.push({ source: row.source, source_id: row.source_id });
-      goneIds.add(row.listing_id);
+    for (const row of inScope) {
+      if (!sweepable.has(row.source as string)) continue;
+      if (!isGone(row as { source: string; source_id: string; last_seen_at: string })) continue;
+      goneKeys.push({ source: row.source as string, source_id: row.source_id as string });
+      goneIds.add(row.listing_id as string);
     }
 
     for (const batch of chunk(goneKeys, 200)) {

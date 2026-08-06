@@ -52,9 +52,16 @@ export function criteriaSummary(c: SearchCriteria, areaLabels: string[]): string
 /**
  * Post-filter. Sources apply criteria loosely (Craigslist can only search a
  * whole borough, Zillow rounds bed counts), so everything gets re-checked here
- * before it reaches the database.
+ * before it reaches the database. Structurally typed so the sweep can ask the
+ * same question of a bare row without inventing a full Listing.
  */
-export function inBounds(listing: Listing, c: SearchCriteria): boolean {
+export function inBounds(
+  listing: Pick<
+    Listing,
+    "price" | "bedrooms" | "bathrooms" | "noFee" | "lat" | "lon" | "neighborhood" | "address"
+  >,
+  c: SearchCriteria
+): boolean {
   // Explicit finiteness check first. A NaN price would otherwise pass both
   // comparisons below, since every comparison against NaN is false.
   if (!Number.isFinite(listing.price) || listing.price <= 0) return false;
