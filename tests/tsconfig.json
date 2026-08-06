@@ -1,0 +1,19 @@
+{
+  // The tests import real components (Compare's amenity rows, BedBathPicker's
+  // range maths), so the runner has to compile their JSX.
+  //
+  // The root config says `"jsx": "preserve"` because that is what Next 15
+  // requires — and Next rewrites that field on every build, so overriding it
+  // there would not survive. This config is the tests' own, and it only
+  // changes the one setting: React's automatic runtime, so a component that
+  // never writes `import React` still compiles.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["../src/**/*", "./**/*"]
+}
