@@ -3729,6 +3729,18 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .drawer-photo-wrap { position: relative; }
 
+/* The view-on-site row near the top of the panel. Tight to the facts grid
+   above it — they answer the same "show me more" impulse. */
+.drawer-sites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* Outranks the body's sibling rhythm (.drawer-body > * + *) on specificity,
+   no !important needed. */
+.drawer-body > .drawer-sites { margin-top: var(--s3); }
+.drawer-sites .srcbtn { font-size: var(--t-sm); }
+
 @media (max-width: 700px) {
   /* header.drawer-head, not .drawer-head: globals.css re-declares the class
      after this file is imported, so a bare class tie goes to it. */

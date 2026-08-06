@@ -547,6 +547,31 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             </div>
           </dl>
 
+          {/* The way out to the source, right at the top — checking the full
+              listing is the first thing people do, and these buttons lived at
+              the very bottom of the scroll. */}
+          <div className="drawer-sites">
+            {[...listing.alsoOn]
+              .filter((so) => so.url)
+              .sort((a, b) => {
+                const order = linkPreference(profile.preferredSource);
+                return order.indexOf(a.source) - order.indexOf(b.source);
+              })
+              .map((so) => (
+                <a
+                  key={so.source}
+                  className="btn btn-quiet srcbtn"
+                  href={so.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <SourceMark source={so.source} size={15} />
+                  View on {SOURCE_LABEL[so.source]}
+                  <Icon name="external" size={12} />
+                </a>
+              ))}
+          </div>
+
           {/* A passed place explains itself — to you a week later, and to
               whoever found it. */}
           {(listing.stage === "passed" || listing.stage === "no_go") && listing.passReason && (
@@ -1042,27 +1067,8 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
           </section>
 
           <section className="dsec">
-            <h3 className="dsec-label">Listed on</h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {[...listing.alsoOn]
-                .filter((so) => so.url)
-                .sort((a, b) => {
-                  const order = linkPreference(profile.preferredSource);
-                  return order.indexOf(a.source) - order.indexOf(b.source);
-                })
-                .map((so) => (
-                  <a
-                    key={so.source}
-                    className="btn btn-quiet srcbtn"
-                    href={so.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <SourceMark source={so.source} size={15} />
-                    {SOURCE_LABEL[so.source]}
-                  </a>
-                ))}
-            </div>
+            {/* The site buttons moved to the top of the panel; what stays down
+                here is the provenance fine print, which is end-matter. */}
             <p className="muted drawer-fineprint">
               Details come from the listing sites, not from us. Last confirmed
               live {when(listing.lastSeenAt)}; first seen {when(listing.firstSeenAt)}.
