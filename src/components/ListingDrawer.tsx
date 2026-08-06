@@ -20,6 +20,7 @@ import {
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import PhotoGallery from "@/components/PhotoGallery";
+import TourMedia from "@/components/TourMedia";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
 import { tourQuestions } from "@/lib/tourPrep";
@@ -1014,6 +1015,14 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 </label>
               </div>
             )}
+          </section>
+
+          {/* --- what you saw with your own eyes -------------------------- */}
+          <section className="dsec">
+            <h3 className="dsec-label">Your tour footage</h3>
+            {/* Keyed so the grid resets when the panel moves to another
+                apartment. */}
+            <TourMedia key={listing.id} listingId={listing.id} />
           </section>
 
           {/* --- the application ----------------------------------------- */}

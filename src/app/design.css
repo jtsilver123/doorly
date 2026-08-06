@@ -3750,6 +3750,49 @@ button.fact:hover .fact-label { color: var(--accent); }
 .applink .field { flex: 1; min-width: 0; }
 .applink .btn { flex-shrink: 0; }
 
+/* Footage you took at the viewing: a tight grid, video and stills mixed.
+   Aspect-locked cells so one portrait clip doesn't stretch the row. */
+.tourmedia { display: grid; gap: var(--s3); }
+.tourmedia-head { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.tourmedia-hint { font-size: var(--t-xs); line-height: var(--lh-body); max-width: 34ch; }
+.tourmedia-error { margin: 0; font-size: var(--t-sm); }
+.tourmedia-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s2);
+}
+.tourmedia-item {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.tourmedia-item img,
+.tourmedia-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tourmedia-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--r-full);
+  background: rgba(20, 26, 24, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+.tourmedia-del:hover { background: var(--warn); }
+
 /* Straight line to the person who builds this. Quiet on purpose — it lives
    next to the account menu, not among the primary actions. */
 .feedback-link {
