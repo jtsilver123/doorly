@@ -75,6 +75,8 @@ export interface FeedFilterOptions {
   bedsMax?: number;
   bathsMin?: number;
   noFeeOnly?: boolean;
+  /** Must-have amenities, all-of: a requirement is not a preference. */
+  perks?: string[];
   changedOnly?: boolean;
   followUpOnly?: boolean;
   starredOnly?: boolean;
@@ -155,6 +157,17 @@ export function applyFilters(
   if (filters.bathsMin != null)
     result = result.filter((l) => l.bathrooms >= filters.bathsMin!);
   if (filters.noFeeOnly) result = result.filter((l) => l.noFee);
+  if (filters.perks?.length) {
+    // All-of, unlike sources: "must have laundry AND a dishwasher" is what
+    // requirements mean. In-unit laundry satisfies a building-laundry ask.
+    result = result.filter((l) =>
+      filters.perks!.every(
+        (perk) =>
+          l.perks.includes(perk as (typeof l.perks)[number]) ||
+          (perk === "laundry_building" && l.perks.includes("laundry_unit"))
+      )
+    );
+  }
   if (filters.effectiveMax != null)
     result = result.filter((l) => l.effectiveRent <= filters.effectiveMax!);
   if (filters.starredOnly) result = result.filter((l) => l.starred);
@@ -208,6 +221,7 @@ export function activeFilterCount(filters: FeedFilterOptions): number {
   let n = 0;
   if (filters.search?.trim()) n++;
   if (filters.priceMax != null) n++;
+  if (filters.perks?.length) n += filters.perks.length;
   if (filters.bedsMin != null || filters.bedsMax != null) n++;
   if (filters.bathsMin != null) n++;
   if (filters.sources?.length) n++;

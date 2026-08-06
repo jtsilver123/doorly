@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ALL_SOURCES, SOURCE_LABEL, type Source } from "@/types";
+import { AMENITIES, AMENITY_ORDER, type AmenityKey } from "@/lib/amenities";
 import SourceMark from "@/components/SourceMark";
 import { SORT_OPTIONS } from "@/lib/filters";
 import Icon from "@/components/Icon";
@@ -39,6 +40,8 @@ export interface Filters {
   goodOnly: boolean;
   /** Minutes to the first commute anchor, "any" when off. */
   commuteMax: string;
+  /** Must-have amenities, canonical keys. */
+  perks: AmenityKey[];
 }
 
 const TOGGLES: { key: keyof Filters; label: string; hint: string }[] = [
@@ -117,6 +120,7 @@ export default function FilterBar({
     (filters.beds !== "any" ? 1 : 0) +
     (filters.baths !== "any" ? 1 : 0) +
     (anchorLabel && filters.commuteMax !== "any" ? 1 : 0) +
+    filters.perks.length +
     filters.sources.length +
     TOGGLES.filter((t) => filters[t.key]).length;
 
@@ -220,6 +224,31 @@ export default function FilterBar({
                   </select>
                 </div>
               )}
+
+              <div className="panel-group">
+                <span className="panel-label">Must have</span>
+                <div className="panel-pills">
+                  {AMENITY_ORDER.filter((k) => k !== "light").map((key) => {
+                    const on = filters.perks.includes(key);
+                    return (
+                      <button
+                        key={key}
+                        className={on ? "pill is-on" : "pill"}
+                        aria-pressed={on}
+                        onClick={() =>
+                          onChange({
+                            perks: on
+                              ? filters.perks.filter((p) => p !== key)
+                              : [...filters.perks, key],
+                          })
+                        }
+                      >
+                        {AMENITIES[key].label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="panel-group">
                 <span className="panel-label">Show me</span>

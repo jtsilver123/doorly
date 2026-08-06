@@ -32,6 +32,7 @@ import {
   qualifyCheck,
 } from "@/lib/leverage";
 import { commuteMinutes } from "@/lib/commute";
+import { lastChangeOf } from "@/lib/timeline";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
 import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
@@ -153,6 +154,11 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
   const [detail, setDetail] = useState<Detail | null>(null);
   const [intel, setIntel] = useState<BuildingIntel | null>(null);
   const [negCopied, setNegCopied] = useState(false);
+  /** Which section the quick tabs should light up, from scroll position. */
+  const [activeSec, setActiveSec] = useState("sec-costs");
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const spyTick = useRef(false);
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -482,7 +488,35 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
         {/* Block flow, not grid: inside a height-constrained scroll container
             grid auto rows collapsed to zero and children overlapped. Normal
             flow cannot compress a child below its content. */}
-        <div className="drawer-body">
+        <div
+          className="drawer-body"
+          ref={bodyRef}
+          onScroll={() => {
+            // Scrollspy on a rAF leash: which section owns the reading line.
+            if (spyTick.current) return;
+            spyTick.current = true;
+            requestAnimationFrame(() => {
+              spyTick.current = false;
+              const body = bodyRef.current;
+              if (!body) return;
+              const line = body.getBoundingClientRect().top + 90;
+              let current = "sec-costs";
+              for (const sec of body.querySelectorAll("[data-sec]")) {
+                if (sec.getBoundingClientRect().top <= line) {
+                  current = sec.getAttribute("data-sec") ?? current;
+                }
+              }
+              setActiveSec(current);
+              // Keep the lit chip in view without scrolling anything else.
+              const tabs = tabsRef.current;
+              const chip = tabs?.querySelector<HTMLElement>(`[data-for="${current}"]`);
+              if (tabs && chip) {
+                const want = chip.offsetLeft - tabs.clientWidth / 2 + chip.clientWidth / 2;
+                tabs.scrollTo({ left: want, behavior: "smooth" });
+              }
+            });
+          }}
+        >
           {/* Keyed by listing so the strip snaps back to the first photo when
               the panel moves to another apartment. */}
           <div className="drawer-photo-wrap">
@@ -546,7 +580,47 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             </span>
           </div>
 
-          <dl className="drawer-facts">
+          {/* Quick tabs: pin to the top once the photo scrolls away, jump on
+              tap, light up with the section under the reading line — the
+              long panel's table of contents. */}
+          <div className="drawer-tabs" ref={tabsRef} aria-label="Jump to a section">
+            {(
+              [
+                ["sec-costs", "Costs", true],
+                ["sec-around", "Around", listing.lat != null],
+                ["sec-score", "Score", true],
+                ["sec-record", "Building", Boolean(intel && (intel.violations || intel.bedbugs || intel.noise))],
+                ["sec-viewing", "Viewing", stage === "tour"],
+                ["sec-contact", "Contact", true],
+                ["sec-footage", "Footage", true],
+                ["sec-apply", "Apply", true],
+                ["sec-notes", "Notes", true],
+              ] as [string, string, boolean][]
+            )
+              .filter(([, , show]) => show)
+              .map(([id, label]) => (
+                <button
+                  key={id}
+                  data-for={id}
+                  className={activeSec === id ? "is-on" : undefined}
+                  onClick={() => {
+                    const body = bodyRef.current;
+                    const el = body?.querySelector(`[data-sec="${id}"]`);
+                    if (!body || !el) return;
+                    const top =
+                      el.getBoundingClientRect().top -
+                      body.getBoundingClientRect().top +
+                      body.scrollTop -
+                      60;
+                    body.scrollTo({ top, behavior: "smooth" });
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+          </div>
+
+          <dl className="drawer-facts" data-sec="sec-costs">
             <div>
               <dt>Rent</dt>
               <dd>{money(listing.price)}<span>/mo</span></dd>
@@ -570,6 +644,19 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               </dd>
             </div>
           </dl>
+
+          {/* How stale is this ad — listed when, moved when. */}
+          {(() => {
+            const change = lastChangeOf(listing);
+            return (
+              <p className="muted drawer-changed">
+                Listed {when(listing.firstSeenAt)}
+                {change.kind === "listed"
+                  ? " · no changes since"
+                  : ` · ${change.kind} ${when(change.at)}`}
+              </p>
+            );
+          })()}
 
           {/* The way out to the source, right at the top — checking the full
               listing is the first thing people do, and these buttons lived at
@@ -623,7 +710,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             if (!near) return null;
             const walk = stationsWithin(listing.lat, listing.lon, 12);
             return (
-              <section className="dsec">
+              <section className="dsec" data-sec="sec-around">
                 <h3 className="dsec-label">Getting around</h3>
                 {/* The block, not just the neighborhood's name. */}
                 {listing.lat != null && listing.lon != null && (
@@ -700,7 +787,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
           })()}
 
           {/* --- one judgment: the score, the price, the catches, yours -- */}
-          <section className="dsec">
+          <section className="dsec" data-sec="sec-score">
             <h3 className="dsec-label">Why {listing.rating} out of 100</h3>
 
             <div
@@ -769,7 +856,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               things, has the building filed bedbugs, what do the neighbors
               call 311 about. Public record, cited as such. */}
           {intel && (intel.violations || intel.bedbugs || intel.noise) && (
-            <section className="dsec">
+            <section className="dsec" data-sec="sec-record">
               <h3 className="dsec-label">The building&apos;s record</h3>
               <ul className="intel">
                 {intel.violations && (
@@ -810,7 +897,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
 
           {/* --- the viewing, when one exists to plan -------------------- */}
           {stage === "tour" && (
-            <section className="dsec">
+            <section className="dsec" data-sec="sec-viewing">
               <h3 className="dsec-label">The viewing</h3>
               <div className="tourplan">
                 <div className="tourplan-kind" role="radiogroup" aria-label="Kind of viewing">
@@ -915,7 +1002,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
           )}
 
           {/* --- reaching them: one card, everything in it --------------- */}
-          <section className="dsec">
+          <section className="dsec" data-sec="sec-contact">
             <h3 className="dsec-label">Reaching them</h3>
 
             {/* Broker memory: brokerages carry inventory, and the third
@@ -1180,7 +1267,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
           </section>
 
           {/* --- what you saw with your own eyes -------------------------- */}
-          <section className="dsec">
+          <section className="dsec" data-sec="sec-footage">
             <h3 className="dsec-label">Your tour footage</h3>
             {/* Keyed so the grid resets when the panel moves to another
                 apartment. */}
@@ -1191,7 +1278,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
           {/* Landlords send portal links that die in text threads. Pinned
               here, the link is where you'll look when it's time to apply —
               and one click away once pasted. Saves on blur, like notes. */}
-          <section className="dsec">
+          <section className="dsec" data-sec="sec-apply">
             <h3 className="dsec-label">The application</h3>
             <div className="applink">
               <input
@@ -1233,7 +1320,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
             </section>
           )}
 
-          <section className="dsec">
+          <section className="dsec" data-sec="sec-notes">
             <h3 className="dsec-label">Notes</h3>
             <textarea
               className="field"

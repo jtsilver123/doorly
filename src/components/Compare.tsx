@@ -198,6 +198,10 @@ export default function Compare({
   const [excluded, setExcluded] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
+  /** Tour footage per finalist, signed URLs from the media route. */
+  const [media, setMedia] = useState<
+    Record<string, { id: string; kind: string; url: string }[]>
+  >({});
 
   // localStorage is only readable after mount; reading it in the initialiser
   // would render different markup on the server and hydrate mismatched.
@@ -222,6 +226,29 @@ export default function Compare({
         .sort((a, b) => b.rating - a.rating),
     [listings]
   );
+
+  // Fetch each finalist's footage once per visit — decision night is exactly
+  // when "what did we film there" matters, and the crew's clips come too.
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const entries = await Promise.all(
+        candidates.slice(0, 12).map(async (l) => {
+          try {
+            const res = await fetch(`/api/listings/${encodeURIComponent(l.id)}/media`);
+            const body = await res.json();
+            return [l.id, body.media ?? []] as const;
+          } catch {
+            return [l.id, []] as const;
+          }
+        })
+      );
+      if (live) setMedia(Object.fromEntries(entries));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [candidates]);
 
   const finalists = useMemo(() => {
     const kept = candidates.filter((l) => !excluded.includes(l.id));
@@ -485,6 +512,30 @@ export default function Compare({
               </tr>
             );
           })}
+          {/* What you actually saw — the tour footage, side by side. On
+              decision night "remember the bedroom in the second one" becomes
+              a thing you look at instead of argue about. */}
+          <tr>
+            <td className="muted compare-label">Your footage</td>
+            {finalists.map((l) => (
+              <td key={l.id} className="compare-mediacell">
+                {(media[l.id] ?? []).length === 0 ? (
+                  <span className="muted">—</span>
+                ) : (
+                  <div className="compare-media">
+                    {(media[l.id] ?? []).slice(0, 4).map((m) =>
+                      m.kind === "video" ? (
+                        <video key={m.id} src={m.url} controls playsInline preload="metadata" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={m.id} src={m.url} alt="Tour photo" loading="lazy" onClick={() => onOpen(l)} />
+                      )
+                    )}
+                  </div>
+                )}
+              </td>
+            ))}
+          </tr>
           {/* Written on the night, in the row where you're comparing them —
               not in a panel you'd have to open one place at a time. */}
           <tr>

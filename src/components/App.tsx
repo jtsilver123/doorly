@@ -24,6 +24,7 @@ import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import { formatPhone } from "@/lib/phone";
 import { usePush } from "@/lib/usePush";
 import { commuteMinutes } from "@/lib/commute";
+import type { AmenityKey } from "@/lib/amenities";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
@@ -203,6 +204,8 @@ export default function Home() {
   const [goodOnly, setGoodOnly] = useState(false);
   /** Cap on minutes to the first commute anchor. "any" = off. */
   const [commuteMax, setCommuteMax] = useState("any");
+  /** Must-have amenities: w/d, elevator, dishwasher and friends. */
+  const [perkFilter, setPerkFilter] = useState<AmenityKey[]>([]);
   /** Which panel the profile area opens on, so the menu can deep-link. */
   const [section, setSection] = useState<ProfileSection>("details");
   /**
@@ -234,6 +237,7 @@ export default function Home() {
     setReadyOnly(false);
     setGoodOnly(false);
     setCommuteMax("any");
+    setPerkFilter([]);
   }, []);
 
   /**
@@ -333,6 +337,7 @@ export default function Home() {
       followUpOnly,
       readyByMoveIn: readyOnly,
       minRating: goodOnly ? GOOD_DEAL_RATING : undefined,
+      perks: perkFilter,
       sort: sort as Parameters<typeof applyFilters>[1]["sort"],
     });
     // The commute cap is against the first anchor — "work", for most people.
@@ -358,6 +363,7 @@ export default function Home() {
     sort,
     anchor,
     commuteMax,
+    perkFilter,
   ]);
 
   const loadChanges = useCallback(async () => {
@@ -1160,6 +1166,7 @@ export default function Home() {
                 readyOnly,
                 goodOnly,
                 commuteMax,
+                perks: perkFilter,
               }}
               onChange={(next: Partial<Filters>) => {
                 if (next.query !== undefined) setQuery(next.query);
@@ -1175,6 +1182,7 @@ export default function Home() {
                 if (next.readyOnly !== undefined) setReadyOnly(next.readyOnly);
                 if (next.goodOnly !== undefined) setGoodOnly(next.goodOnly);
                 if (next.commuteMax !== undefined) setCommuteMax(next.commuteMax);
+                if (next.perks !== undefined) setPerkFilter(next.perks);
               }}
               onReset={clearFilters}
               lastCheckedAt={api?.lastCheckedAt}

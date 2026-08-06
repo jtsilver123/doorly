@@ -16,6 +16,23 @@ import type { FeedListing } from "@/types";
  * tell you that. The timeline can.
  */
 
+/**
+ * When this listing last moved: the most recent of listed, price change and
+ * relist. "How stale is this ad" is a question every card gets asked.
+ */
+export function lastChangeOf(l: {
+  firstSeenAt: string;
+  priceChangedAt: string | null;
+  relistedAt: string | null;
+}): { at: string; kind: "listed" | "price change" | "relisted" } {
+  const candidates: { at: string; kind: "listed" | "price change" | "relisted" }[] = [
+    { at: l.firstSeenAt, kind: "listed" },
+  ];
+  if (l.priceChangedAt) candidates.push({ at: l.priceChangedAt, kind: "price change" });
+  if (l.relistedAt) candidates.push({ at: l.relistedAt, kind: "relisted" });
+  return candidates.sort((a, b) => b.at.localeCompare(a.at))[0];
+}
+
 export type Phase = "early" | "prime" | "decide" | "crunch" | "final" | "past";
 
 export interface PhaseInfo {

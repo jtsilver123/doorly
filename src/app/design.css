@@ -3810,6 +3810,114 @@ button.fact:hover .fact-label { color: var(--accent); }
   pointer-events: none;
 }
 
+/* The panel's table of contents: sticky chips that jump and light up. */
+.drawer-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  gap: var(--s1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--surface);
+  margin: 0 calc(-1 * var(--s4));
+  padding: var(--s2) var(--s4);
+  border-bottom: 1px solid var(--border);
+}
+.drawer-tabs::-webkit-scrollbar { display: none; }
+/* Sticky pins at the scroll container's content edge, leaving the body's
+   top padding as a see-through strip above the chips — this paints it. */
+.drawer-tabs::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--s4);
+  background: var(--surface);
+}
+.drawer-tabs button {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: var(--r-full);
+  padding: 4px 12px;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.drawer-tabs button.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Tight to the section above; the body's sibling rhythm resumes after. */
+.drawer-body > .drawer-tabs { margin-top: var(--s3); }
+
+/* When it was listed and when it last moved — the staleness answer. */
+.drawer-changed { margin: var(--s2) 0 0; font-size: var(--t-xs); }
+
+/* Card photo paging: arrows live on the photo, tap targets phone-sized. */
+.card-flip {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  background: rgba(20, 26, 24, 0.5);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  cursor: pointer;
+}
+.card-flip.is-prev { left: 8px; }
+.card-flip.is-next { right: 8px; }
+.card-media:hover .card-flip,
+.card-flip:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .card-flip { opacity: 0.85; }
+}
+.card-shotcount {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: rgba(20, 26, 24, 0.6);
+  color: #fff;
+  font-size: var(--t-2xs);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Compare: the footage row. Small tiles, videos playable in place. */
+.compare-mediacell { vertical-align: top; }
+.compare-media {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(70px, 1fr));
+  gap: 4px;
+  max-width: 190px;
+}
+.compare-media img,
+.compare-media video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--border);
+  display: block;
+  cursor: pointer;
+}
+
 /* --- the renter's edges ---------------------------------------------------- */
 
 /* The building's public record: three verdict lines, colored by severity. */

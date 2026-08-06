@@ -6,6 +6,7 @@ import type { Source } from "@/types";
 import { linkPreference, SOURCE_LABEL, STAGE_LABEL } from "@/types";
 import { CONTACT_ICON, CONTACT_LABEL } from "@/lib/outreach";
 import { nextAction } from "@/lib/nextAction";
+import { lastChangeOf } from "@/lib/timeline";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { RatingDisc, MyScoreDisc, ProsConsLine } from "@/components/Rating";
@@ -72,6 +73,9 @@ export default function ListingCard({
   onReach,
 }: Props) {
   const [imageBroken, setImageBroken] = useState(false);
+  /** Which of the listing's photos the card is showing. */
+  const [shot, setShot] = useState(0);
+  const shots = listing.images.length ? listing.images : listing.imageUrl ? [listing.imageUrl] : [];
 
   const dropped = listing.price < listing.originalPrice;
   const rose = listing.price > listing.originalPrice;
@@ -104,15 +108,63 @@ export default function ListingCard({
         <span className="card-noimg" aria-hidden="true">
           {listing.neighborhood || listing.borough || "No photo"}
         </span>
-        {listing.imageUrl && !imageBroken && (
+        {shots.length > 0 && !imageBroken && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={listing.imageUrl}
+            src={shots[Math.min(shot, shots.length - 1)]}
             alt=""
             loading="lazy"
             decoding="async"
             onError={() => setImageBroken(true)}
           />
+        )}
+
+        {/* Flip through the photos right on the card — opening the panel
+            just to see the second picture was a tax on every listing. */}
+        {shots.length > 1 && !imageBroken && (
+          <>
+            <span
+              role="button"
+              tabIndex={0}
+              className="card-flip is-prev"
+              aria-label="Previous photo"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShot((s) => (s - 1 + shots.length) % shots.length);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShot((s) => (s - 1 + shots.length) % shots.length);
+                }
+              }}
+            >
+              ‹
+            </span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="card-flip is-next"
+              aria-label="Next photo"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShot((s) => (s + 1) % shots.length);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShot((s) => (s + 1) % shots.length);
+                }
+              }}
+            >
+              ›
+            </span>
+            <span className="card-shotcount">
+              {Math.min(shot + 1, shots.length)}/{shots.length}
+            </span>
+          </>
         )}
 
         {/* At most two badges — more than that and none of them get read. */}
@@ -190,6 +242,21 @@ export default function ListingCard({
 
         <div className="card-where">
           {listing.neighborhood || listing.borough || "NYC"} · {relative(listing.firstSeenAt)}
+          {/* When the ad itself last moved — a drop or a relist newer than
+              the listing date is the freshness that matters. */}
+          {(() => {
+            const change = lastChangeOf(listing);
+            if (change.kind === "listed") return null;
+            return (
+              <>
+                {" · "}
+                <span title={new Date(change.at).toLocaleString()}>
+                  {change.kind === "price change" ? "price moved" : "relisted"}{" "}
+                  {relative(change.at)}
+                </span>
+              </>
+            );
+          })()}
           {/* The train, on every card. It's the fact that decides whether a
               cheap place in a far neighborhood is actually cheap. */}
           {(() => {
