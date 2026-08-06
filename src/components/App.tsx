@@ -24,6 +24,7 @@ import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import { formatPhone } from "@/lib/phone";
 import { usePush } from "@/lib/usePush";
 import ApplicationPacket from "@/components/ApplicationPacket";
+import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
 import FilterBar, { type Filters } from "@/components/FilterBar";
@@ -1374,6 +1375,8 @@ export default function Home() {
       )}
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
+      {/* Uploads outlive the panel that started them; this is their heartbeat. */}
+      <UploadStatus />
 
     </div>
   );

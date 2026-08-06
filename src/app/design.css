@@ -3793,6 +3793,54 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 .tourmedia-del:hover { background: var(--warn); }
 
+/* Drag state: the whole section is the target. */
+.tourmedia[data-drag="true"] {
+  outline: 2px dashed var(--accent);
+  outline-offset: 6px;
+  border-radius: var(--r-md);
+}
+.tourmedia-dropnote {
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+  font-size: var(--t-sm);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* The upload heartbeat: alive anywhere in the app while files move. */
+.uploadpill {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  z-index: 75;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  border-radius: var(--r-full);
+  background: var(--ink, #1c2523);
+  color: #fff;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+}
+.uploadpill-spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: uploadspin 0.9s linear infinite;
+}
+@keyframes uploadspin { to { transform: rotate(360deg); } }
+@media (min-width: 861px) {
+  .uploadpill { bottom: 18px; }
+}
+
 /* Straight line to the person who builds this. Quiet on purpose — it lives
    next to the account menu, not among the primary actions. */
 .feedback-link {
