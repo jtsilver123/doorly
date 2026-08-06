@@ -151,6 +151,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
   const [tourAt, setTourAt] = useState(toLocalInput(listing.tourAt));
   const [tourKind, setTourKind] = useState<TourKind>(listing.tourKind);
   const [tourEndsAt, setTourEndsAt] = useState(toLocalInput(listing.tourEndsAt));
+  const [appUrl, setAppUrl] = useState(listing.applicationUrl);
   /**
    * Stage moves paint immediately and reconcile behind the scenes.
    *
@@ -187,8 +188,9 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
     setTourAt(toLocalInput(listing.tourAt));
     setTourKind(listing.tourKind);
     setTourEndsAt(toLocalInput(listing.tourEndsAt));
+    setAppUrl(listing.applicationUrl);
     setEditingContact(false);
-  }, [listing.id, listing.myContactPhone, listing.myContactName, listing.myContactEmail, listing.tourAt, listing.tourKind, listing.tourEndsAt]);
+  }, [listing.id, listing.myContactPhone, listing.myContactName, listing.myContactEmail, listing.tourAt, listing.tourKind, listing.tourEndsAt, listing.applicationUrl]);
 
   useEffect(() => {
     let live = true;
@@ -1003,6 +1005,44 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 </label>
               </div>
             )}
+          </section>
+
+          {/* --- the application ----------------------------------------- */}
+          {/* Landlords send portal links that die in text threads. Pinned
+              here, the link is where you'll look when it's time to apply —
+              and one click away once pasted. Saves on blur, like notes. */}
+          <section className="dsec">
+            <h3 className="dsec-label">The application</h3>
+            <div className="applink">
+              <input
+                className="field"
+                type="url"
+                inputMode="url"
+                value={appUrl}
+                placeholder="Paste the application link — RentSpree, portal, form…"
+                aria-label="Application link"
+                onChange={(e) => setAppUrl(e.target.value)}
+                onBlur={() => {
+                  if (appUrl.trim() !== listing.applicationUrl) {
+                    patch({ action: "applicationUrl", url: appUrl.trim() });
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+              />
+              {listing.applicationUrl && (
+                <a
+                  className="btn btn-primary"
+                  href={listing.applicationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Apply
+                  <Icon name="external" size={13} />
+                </a>
+              )}
+            </div>
           </section>
 
           {/* --- the record ---------------------------------------------- */}

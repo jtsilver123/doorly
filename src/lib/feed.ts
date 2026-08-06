@@ -86,6 +86,7 @@ interface StateRow {
   pass_reason: string | null;
   passed_at: string | null;
   poc_user_id: string | null;
+  application_url: string | null;
 }
 
 function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
@@ -346,6 +347,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       tourKind: state?.tour_kind === "open_house" ? "open_house" : "private",
       tourEndsAt: state?.tour_ends_at ?? null,
       passReason: state?.pass_reason ?? "",
+      applicationUrl: state?.application_url ?? "",
       passedAt: state?.passed_at ?? null,
       addedById: state?.added_by ?? null,
       pocId: state?.poc_user_id ?? null,
@@ -594,6 +596,7 @@ export async function setListingFields(
     tour_kind: string;
     tour_ends_at: string | null;
     poc_user_id: string | null;
+    application_url: string;
   }>
 ): Promise<void> {
   const supabase = await db();

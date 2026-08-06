@@ -199,6 +199,8 @@ export interface FeedListing extends Listing {
    */
   passReason: string;
   passedAt: string | null;
+  /** The landlord's application portal link, pasted by you. "" until then. */
+  applicationUrl: string;
   /** When the viewing actually is. A booked tour without a time is just a label. */
   tourAt: string | null;
   /**

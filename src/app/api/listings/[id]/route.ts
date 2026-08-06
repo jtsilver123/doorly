@@ -75,6 +75,20 @@ export async function PATCH(request: Request, { params }: Params) {
         });
         break;
 
+      case "applicationUrl": {
+        // Pasted from a text thread, so be forgiving: bare domains get a
+        // scheme, anything else non-empty that can't parse is dropped.
+        let url = String(body.url ?? "").trim().slice(0, 500);
+        if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
+        try {
+          if (url) new URL(url);
+        } catch {
+          url = "";
+        }
+        await setListingFields(id, { application_url: url });
+        break;
+      }
+
       case "tourAt":
         await setListingFields(id, {
           tour_at: body.tourAt ? String(body.tourAt) : null,

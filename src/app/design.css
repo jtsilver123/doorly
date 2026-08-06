@@ -3739,6 +3739,12 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* Outranks the body's sibling rhythm (.drawer-body > * + *) on specificity,
    no !important needed. */
 .drawer-body > .drawer-sites { margin-top: var(--s3); }
+
+/* The application link row: the field takes the room, the button appears
+   once there's somewhere to go. */
+.applink { display: flex; gap: var(--s2); align-items: stretch; }
+.applink .field { flex: 1; min-width: 0; }
+.applink .btn { flex-shrink: 0; }
 .drawer-sites .srcbtn { font-size: var(--t-sm); }
 
 @media (max-width: 700px) {

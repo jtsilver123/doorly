@@ -333,6 +333,7 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     myContactName: "",
     passReason: "",
     passedAt: null,
+    applicationUrl: "",
     tourAt: null,
     tourKind: "private" as const,
     tourEndsAt: null,
