@@ -12,7 +12,7 @@ import type {
 import { PIPELINE_STAGES } from "@/types";
 import { db, adminDb, currentUserId } from "@/lib/supabase";
 import { pipelineOwnerId, crewOf } from "@/lib/crew";
-import { DEFAULT_CRITERIA, searchKey, normalizeCriteria } from "@/lib/criteria";
+import { DEFAULT_CRITERIA, searchKey, normalizeCriteria, inBounds } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
 import { fingerprint, extractUnit } from "@/lib/dedupe";
 import { boroughFor } from "@/lib/areas";
@@ -295,12 +295,37 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     price: r.price,
   }));
 
+  /*
+   * Your feed is your searches.
+   *
+   * The corpus is communal — every user's pulls land in one pool, which is
+   * what keeps it fresh and the comps honest — but the cards and the map
+   * should show what *you* asked for, not the East Williamsburg 2-beds
+   * somebody else is hunting. So each listing must fit one of your active
+   * searches to render, with two exceptions: anything you track (starred or
+   * in the pipeline) rides along wherever it is, and the comps above were
+   * built from the whole pool on purpose.
+   */
+  const activeCriteria = saved.filter((s) => s.active).map((s) => s.criteria);
+
   // --- assemble ----------------------------------------------------------
   const out: FeedListing[] = [];
   for (const row of listings) {
     const state = stateBy.get(row.id);
     const alsoOn = sourcesBy.get(row.id) ?? [];
     const listing = toListing(row, alsoOn[0]?.source ?? "streeteasy");
+
+    const trackedHere =
+      Boolean(state?.starred) ||
+      !["inbox", "passed"].includes((state?.stage as string) ?? "inbox");
+    if (
+      activeCriteria.length > 0 &&
+      !trackedHere &&
+      !activeCriteria.some((c) => inBounds(listing, c))
+    ) {
+      continue;
+    }
+
     const { score: value, reasons } = score(listing, model, criteria);
 
     const rowEvents = eventsBy.get(row.id) ?? [];

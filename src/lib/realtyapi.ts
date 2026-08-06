@@ -1,4 +1,4 @@
-import { loadConfig, keyHint, recordCall, getUsage } from "@/lib/apikey";
+import { loadConfig, keyHint, recordCall, getUsage, NO_CREDITS_PATH } from "@/lib/apikey";
 
 /**
  * Shared client for realtyapi.io.
@@ -71,7 +71,15 @@ export async function realtyGet<T>(
 
   const hint = keyHint(apiKey);
   const usage = await getUsage();
-  if (usage.remaining <= 0) {
+  // Two ways to be out: the local count reaching the limit, or upstream
+  // having already refused this key. A known-dead key shouldn't burn a whole
+  // poll re-learning it every few hours — but a key someone topped up must
+  // be able to come back, so after six quiet hours one probe gets through.
+  const RETRY_AFTER_MS = 6 * 3_600_000;
+  const refusalFresh =
+    usage.refusedAt != null &&
+    Date.now() - new Date(usage.refusedAt).getTime() < RETRY_AFTER_MS;
+  if (usage.remaining <= 0 || (usage.exhausted && refusalFresh)) {
     throw new BudgetExhaustedError(usage.used, usage.limit, host, path);
   }
 
@@ -103,7 +111,10 @@ export async function realtyGet<T>(
   // 402 is the upstream's own "you're out of credits". Trust it over our local
   // counter, which only sees requests made through this app — probing, other
   // tools, or a key that arrived already part-spent all go unseen by us.
+  // Logged under the sentinel so the usage meter can say "key is dead"
+  // instead of showing a healthy count that upstream disagrees with.
   if (response.status === 402) {
+    void recordCall(hint, host, NO_CREDITS_PATH, false);
     throw new BudgetExhaustedError(usage.limit, usage.limit, host, path);
   }
   if (!response.ok) {
@@ -115,6 +126,7 @@ export async function realtyGet<T>(
   // Some hosts answer 200 with the credit error in the body instead.
   const creditText = `${body.error ?? ""} ${body.message ?? ""}`;
   if (/not enough credits|quota|402/i.test(creditText)) {
+    void recordCall(hint, host, NO_CREDITS_PATH, false);
     throw new BudgetExhaustedError(usage.limit, usage.limit, host, path);
   }
 

@@ -56,7 +56,13 @@ type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
 const TABS: Tab[] = ["today", "feed", "changes", "pipeline", "compare", "profile"];
 
 interface ApiStatus {
-  usage: { used: number; limit: number; remaining: number; keyHint: string };
+  usage: {
+    used: number;
+    limit: number;
+    remaining: number;
+    keyHint: string;
+    exhausted?: boolean;
+  };
   hasKey: boolean;
   keyHint: string;
   monthlyLimit: number;
@@ -980,34 +986,73 @@ export default function Home() {
                 <span className="meter">
                   <span
                     style={{
-                      width: `${Math.min(100, (api.usage.used / api.usage.limit) * 100)}%`,
+                      width: api.usage.exhausted
+                        ? "100%"
+                        : `${Math.min(100, (api.usage.used / api.usage.limit) * 100)}%`,
                       background:
-                        api.usage.remaining <= 25 ? "var(--warn)" : "var(--accent)",
+                        api.usage.exhausted || api.usage.remaining <= 25
+                          ? "var(--warn)"
+                          : "var(--accent)",
                     }}
                   />
                 </span>
-                <span className="usage-foot">
-                  <span className={api.usage.remaining <= 25 ? "warn-text" : undefined}>
-                    {api.usage.remaining} of {api.usage.limit} requests left
+                {/* Upstream's word beats our arithmetic: the local count only
+                    sees requests made through this app, so a key drained
+                    elsewhere looks healthy here while every call bounces. */}
+                {api.usage.exhausted ? (
+                  <span className="usage-foot">
+                    <span className="warn-text">
+                      Key out of credits — paste a new one
+                    </span>
                   </span>
-                  <span>
-                    {(() => {
-                      const d = runwayDays(
-                        api.usage.remaining,
-                        api.checksPerDay,
-                        Math.max(api.perPollEstimate ?? 5, 1)
-                      );
-                      return d == null
-                        ? "manual only"
-                        : d <= 3
-                          ? `new key in ${d}d`
-                          : `~${d}d left`;
-                    })()}
+                ) : (
+                  <span className="usage-foot">
+                    <span className={api.usage.remaining <= 25 ? "warn-text" : undefined}>
+                      {api.usage.remaining} of {api.usage.limit} requests left
+                    </span>
+                    <span>
+                      {(() => {
+                        const d = runwayDays(
+                          api.usage.remaining,
+                          api.checksPerDay,
+                          Math.max(api.perPollEstimate ?? 5, 1)
+                        );
+                        return d == null
+                          ? "manual only"
+                          : d <= 3
+                            ? `new key in ${d}d`
+                            : `~${d}d left`;
+                      })()}
+                    </span>
                   </span>
-                </span>
+                )}
               </button>
             )}
           </div>
+
+          {/* Straight to the person who builds this — a pre-filled email
+              beats a feedback form nobody maintains. */}
+          <a
+            className="feedback-link"
+            href={`mailto:jtsilver123@gmail.com?subject=${encodeURIComponent(
+              "Doorly feedback"
+            )}&body=${encodeURIComponent(
+              [
+                "Hey Jake —",
+                "",
+                "What I was doing:",
+                "",
+                "What happened (or what's missing):",
+                "",
+                "What I expected instead:",
+                "",
+                "— sent from Doorly",
+              ].join("\n")
+            )}`}
+          >
+            <Icon name="mail" size={14} />
+            Send feedback
+          </a>
 
           <AccountMenu
             email={email}
@@ -1513,15 +1558,28 @@ function ApiSettings({
           <div className="meter">
             <span
               style={{
-                width: `${Math.min(100, (status.usage.used / status.usage.limit) * 100)}%`,
-                background: status.usage.remaining <= 25 ? "var(--warn)" : "var(--accent)",
+                width: status.usage.exhausted
+                  ? "100%"
+                  : `${Math.min(100, (status.usage.used / status.usage.limit) * 100)}%`,
+                background:
+                  status.usage.exhausted || status.usage.remaining <= 25
+                    ? "var(--warn)"
+                    : "var(--accent)",
               }}
             />
           </div>
-          <div className="muted" style={{ fontSize: 12 }}>
-            {status.usage.remaining} left — about {polls} more checks at {perPoll}{" "}
-            requests each. Usage resets when you paste a new key.
-          </div>
+          {status.usage.exhausted ? (
+            <div className="warn-text" style={{ fontSize: 12 }}>
+              The API itself says this key is out of credits — the count above
+              only sees requests made through Doorly, so a key spent elsewhere
+              can look healthy here. Paste a new key below to keep checking.
+            </div>
+          ) : (
+            <div className="muted" style={{ fontSize: 12 }}>
+              {status.usage.remaining} left — about {polls} more checks at {perPoll}{" "}
+              requests each. Usage resets when you paste a new key.
+            </div>
+          )}
         </div>
       )}
 

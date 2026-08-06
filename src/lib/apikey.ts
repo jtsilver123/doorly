@@ -162,21 +162,61 @@ export interface Usage {
   remaining: number;
   keyHint: string;
   since: string;
+  /**
+   * Upstream said "no credits" more recently than it served a request. The
+   * local count can look healthy while this is true — the key was spent
+   * somewhere we can't see — and the refusal is the truth worth showing.
+   */
+  exhausted: boolean;
+  /** When upstream last refused, so the gate can re-probe occasionally. */
+  refusedAt: string | null;
 }
 
 export async function getUsage(): Promise<Usage> {
   const config = await loadConfig();
   const hint = keyHint(config.realtyApiKey);
   let used = 0;
+  let exhausted = false;
+  let refusedAtOut: string | null = null;
   for (const getClient of [async () => await db(), async () => adminDb()]) {
     try {
-      const { count, error } = await (await getClient())
+      const client = await getClient();
+      const { count, error } = await client
         .from("api_usage")
         .select("id", { count: "exact", head: true })
         .eq("key_hint", hint)
+        .neq("path", NO_CREDITS_PATH)
         .gte("called_at", monthStart());
       if (error) continue;
       used = count ?? 0;
+
+      // Dead until a call succeeds again: the latest refusal outranking the
+      // latest served request means every real call is bouncing right now.
+      // Scoped to this month so an upstream credit reset clears the flag on
+      // its own instead of poisoning a refilled key forever.
+      const [{ data: refusal }, { data: served }] = await Promise.all([
+        client
+          .from("api_usage")
+          .select("called_at")
+          .eq("key_hint", hint)
+          .eq("path", NO_CREDITS_PATH)
+          .gte("called_at", monthStart())
+          .order("called_at", { ascending: false })
+          .limit(1),
+        client
+          .from("api_usage")
+          .select("called_at")
+          .eq("key_hint", hint)
+          .eq("ok", true)
+          .neq("path", NO_CREDITS_PATH)
+          .gte("called_at", monthStart())
+          .order("called_at", { ascending: false })
+          .limit(1),
+      ]);
+      const refusedAt = refusal?.[0]?.called_at as string | undefined;
+      const servedAt = served?.[0]?.called_at as string | undefined;
+      exhausted = Boolean(refusedAt && (!servedAt || refusedAt > servedAt));
+      refusedAtOut = exhausted ? (refusedAt ?? null) : null;
       break;
     } catch {
       // Try the service role; a poll has no session to read with.
@@ -188,6 +228,8 @@ export async function getUsage(): Promise<Usage> {
     remaining: Math.max(0, config.monthlyLimit - used),
     keyHint: hint,
     since: monthStart(),
+    exhausted,
+    refusedAt: refusedAtOut,
   };
 }
 
@@ -249,6 +291,18 @@ export async function nextCheckDue(userId?: string): Promise<{
   // Small tolerance so an hourly tick isn't skipped by a few seconds of drift.
   return { due: elapsedHours >= intervalHours - 0.1, lastAt, intervalHours };
 }
+
+/**
+ * The marker row for "upstream refused this key for lack of credits".
+ *
+ * The local counter only sees requests made through this app, so a key spent
+ * elsewhere — or one that arrived already drained — reads as healthy here
+ * while every real call bounces. The refusal itself is the truth, so it gets
+ * logged under this sentinel path and the usage meter believes it over its
+ * own arithmetic. Excluded from the "used" count: a refusal isn't a request
+ * the quota served.
+ */
+export const NO_CREDITS_PATH = "__no_credits__";
 
 /** Fire-and-forget: metering must never be able to fail a real request. */
 export async function recordCall(

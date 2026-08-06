@@ -3745,6 +3745,21 @@ button.fact:hover .fact-label { color: var(--accent); }
 .applink { display: flex; gap: var(--s2); align-items: stretch; }
 .applink .field { flex: 1; min-width: 0; }
 .applink .btn { flex-shrink: 0; }
+
+/* Straight line to the person who builds this. Quiet on purpose — it lives
+   next to the account menu, not among the primary actions. */
+.feedback-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s2);
+  font-size: var(--t-sm);
+  font-weight: 550;
+  color: var(--text-muted);
+  border-radius: var(--r-md);
+  text-decoration: none;
+}
+.feedback-link:hover { color: var(--accent); background: var(--accent-soft); }
 .drawer-sites .srcbtn { font-size: var(--t-sm); }
 
 @media (max-width: 700px) {
