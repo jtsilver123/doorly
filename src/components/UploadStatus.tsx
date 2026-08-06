@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { pendingUploads, subscribeUploads, uploadProgress } from "@/lib/uploadQueue";
+import { pendingUploads, subscribeUploads, uploadBatch, uploadProgress } from "@/lib/uploadQueue";
 
 /**
  * The one visible trace of the upload queue once its panel is gone.
@@ -13,10 +13,22 @@ import { pendingUploads, subscribeUploads, uploadProgress } from "@/lib/uploadQu
  * above the tab bar so a phone never hides it.
  */
 export default function UploadStatus() {
-  const [state, setState] = useState({ pending: 0, ratio: 0, done: 0, total: 0 });
+  const [state, setState] = useState({
+    pending: 0,
+    ratio: 0,
+    done: 0,
+    total: 0,
+    at: 0,
+    batch: 0,
+  });
 
   useEffect(() => {
-    const read = () => setState({ pending: pendingUploads(), ...uploadProgress() });
+    const read = () =>
+      setState({
+        pending: pendingUploads(),
+        ...uploadProgress(),
+        ...(({ at, total }) => ({ at, batch: total }))(uploadBatch()),
+      });
     read();
     return subscribeUploads(read);
   }, []);
@@ -29,8 +41,10 @@ export default function UploadStatus() {
     <div className="uploadpill" role="status" aria-live="polite">
       <div className="uploadpill-top">
         <span>
-          Uploading {state.pending} file{state.pending === 1 ? "" : "s"} — safe to keep
-          browsing
+          {state.batch > 1
+            ? `Uploading file ${state.at} of ${state.batch}`
+            : "Uploading 1 file"}{" "}
+          — safe to keep browsing
         </span>
         <b>{pct}%</b>
       </div>

@@ -16,10 +16,17 @@
  * (see wrangler.jsonc) is what stops a Worker calling its own zone from
  * getting Cloudflare error 1042 instead of a response.
  *
+ * One route is answered here rather than passed through: tour-footage uploads
+ * stream into R2 straight off the socket, which is only possible while the
+ * request is still the runtime's native one. See upload-handler.js for why
+ * that matters — in short, going through Next forced the whole file into a
+ * Worker's 128MB of memory and took the isolate down with it.
+ *
  * The durable-object classes are re-exported because Wrangler resolves them
  * from the entry point, and OpenNext's caching machinery declares them.
  */
 import worker from "./.open-next/worker.js";
+import { handleUpload } from "./upload-handler.js";
 
 export {
   DOQueueHandler,
@@ -28,7 +35,10 @@ export {
 } from "./.open-next/worker.js";
 
 export default {
-  fetch: worker.fetch,
+  async fetch(request, env, ctx) {
+    const handled = await handleUpload(request, env);
+    return handled ?? worker.fetch(request, env, ctx);
+  },
 
   async scheduled(event, env, ctx) {
     const base = env.NEXT_PUBLIC_SITE_URL || "https://damnlease.com";

@@ -223,8 +223,37 @@ export function placeByName(name: string): Place | undefined {
  *
  * This is what makes one borough-wide request able to replace four
  * neighborhood ones: the narrowing happens here instead of upstream.
+ *
+ * It asks the boundary, not a radius. A circle drawn 1.2km around a
+ * neighborhood's centroid reaches well into the next two neighborhoods — a
+ * search for the East Village was returning Kips Bay and Murray Hill, which is
+ * both wrong and, worse, visibly wrong: the card said "Murray Hill" on it,
+ * because the *label* has always come from the real polygon.
+ *
+ * Filtering through the same function that assigns the label is what makes
+ * that impossible. The two can't disagree now, so a card can never name a
+ * neighborhood the search excluded. Point-in-polygon is also strictly cheaper
+ * than it looks — every area is bounding-boxed first.
  */
 export function withinAreas(
+  lat: number | null | undefined,
+  lon: number | null | undefined,
+  areaNames: string[]
+): boolean {
+  if (lat == null || lon == null || !areaNames.length) return false;
+  const here = neighborhoodByPolygon(lat, lon);
+  if (!here) return false; // water, a park, outside the city
+  const label = here.neighborhood.toLowerCase();
+  return areaNames.some((name) => name.toLowerCase() === label);
+}
+
+/**
+ * The old centroid-and-radius test, kept for the one job it's still right for:
+ * "roughly near here" questions like the map's initial framing, where a
+ * boundary would be a false precision. It is no longer what decides whether a
+ * listing belongs to a search.
+ */
+export function nearAreas(
   lat: number | null | undefined,
   lon: number | null | undefined,
   areaNames: string[],

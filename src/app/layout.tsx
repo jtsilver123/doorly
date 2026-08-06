@@ -36,20 +36,20 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://damnlease.com"),
   title: "DamnLease",
   description:
-    "Every NYC listing site, the building's violation record and the comps on the block — then the number to argue with and the message to send.",
+    "A good NYC apartment is gone in a day, and it goes to whoever replied first. Every listing site checked hourly, priced against real comps, with your message already written.",
   openGraph: {
-    title: "DamnLease — Rent like you know someone.",
+    title: "DamnLease — Be first, not lucky.",
     description:
-      "Every listing site in one list, each place priced against its own comps, the building's record pulled from city data, and the message already written. The other applicants have the listing photos.",
+      "A good NYC apartment is gone in a day, and it goes to whoever replied first. Every listing site checked hourly, each place priced against its own comps, the building's record from city data, and your message already written.",
     url: "https://damnlease.com",
     siteName: "DamnLease",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "DamnLease — Rent like you know someone.",
+    title: "DamnLease — Be first, not lucky.",
     description:
-      "Every listing site in one list, priced against real comps, with the building's record and the message already written.",
+      "Gone in a day, to whoever replied first. Every listing site checked hourly, priced against real comps, message already written.",
   },
 };
 

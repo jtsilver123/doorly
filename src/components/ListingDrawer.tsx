@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type {
   ContactLog,
@@ -150,7 +150,31 @@ function PriceChart({ points }: { points: PricePoint[] }) {
   );
 }
 
-export default function ListingDrawer({ listing, profile, onClose, onChanged, crew, all }: Props) {
+export default function ListingDrawer({
+  listing,
+  profile,
+  onClose: requestClose,
+  onChanged,
+  crew,
+  all,
+}: Props) {
+  /*
+   * Closing is animated, which means the panel has to outlive the decision to
+   * close it. Every close path sets this flag, the exit animation plays, and
+   * only then does the parent unmount us — otherwise the drawer vanishes on
+   * the frame the button is pressed, which is jarring next to an entrance
+   * that slides.
+   *
+   * The timeout matches the CSS duration. If it drifts, the panel either
+   * disappears mid-slide or lingers after it — both worse than no animation,
+   * so the two are commented on each other.
+   */
+  const [closing, setClosing] = useState(false);
+  const onClose = useCallback(() => {
+    setClosing(true);
+    setTimeout(requestClose, 180);
+  }, [requestClose]);
+
   const [detail, setDetail] = useState<Detail | null>(null);
   const [intel, setIntel] = useState<BuildingIntel | null>(null);
   const [negCopied, setNegCopied] = useState(false);
@@ -418,10 +442,11 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
 
   return (
     <>
-      <div className="scrim" onClick={onClose} />
+      <div className="scrim" data-closing={closing ? "true" : undefined} onClick={onClose} />
       <aside
         ref={panelRef}
         className="drawer"
+        data-closing={closing ? "true" : undefined}
         role="dialog"
         aria-modal="true"
         aria-label={listing.address}

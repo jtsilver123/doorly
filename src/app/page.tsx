@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/supabase";
 import { appUrl } from "@/lib/site";
 import SiteChrome from "@/components/SiteChrome";
 import Reveal from "@/components/Reveal";
+import HuntEstimator from "@/components/HuntEstimator";
 import CountUp from "@/components/CountUp";
 
 /**
@@ -29,32 +30,32 @@ const EDGE: { label: string; title: string; body: string }[] = [
   {
     label: "The price",
     title: "What the line actually rents for",
-    body: "Every listing measured against its own comps — same building, same line, same bedroom count. You get the number that's over, by how much, and the script that says so politely.",
+    body: "Every listing is measured against its own comps: same building, same line, same bedroom count. You get the number it's over by, and a script that says so without being rude.",
   },
   {
     label: "The building",
     title: "The record nobody puts in the listing",
-    body: "Open HPD violations, bedbug filings and the block's 311 noise complaints, pulled from city data. The photos won't tell you the boiler's been out twice this year.",
+    body: "Open HPD violations, bedbug filings, and the block's 311 noise complaints, straight from city data. The photos won't mention that the boiler has been out twice this year.",
   },
   {
     label: "The clock",
     title: "How long it's really been sitting",
-    body: "First seen, every price change since, and the day it quietly relisted under a new ID. A place that's been up three weeks negotiates very differently from one posted this morning.",
+    body: "First seen, every price change since, and the day it quietly relisted under a new ID. A place that has sat for three weeks negotiates very differently from one posted this morning.",
   },
   {
     label: "The cost",
     title: "What you'll actually hand over",
-    body: "Concession spread across the lease, broker fee amortized, cash due at signing — and whether your income clears the 40× rule before you fall for it.",
+    body: "Concession spread across the lease, broker fee amortized, cash due at signing, and whether your income clears the 40x rule before you fall for the place.",
   },
   {
     label: "The move",
     title: "The message, already written",
-    body: "Named, specific, human, and sent from your own phone. First reply usually gets the viewing, and most people take four hours to write theirs.",
+    body: "Named, specific, human, and sent from your own phone. The first reply usually gets the viewing, and most people take four hours to write theirs.",
   },
   {
     label: "The crew",
     title: "One board, not a group chat",
-    body: "Your roommate sees the same pipeline, the same tour videos, the same notes — and who's on point for which agent. Nothing gets asked twice.",
+    body: "Your roommate sees the same pipeline, the same tour videos, the same notes, and who is on point for which agent. Nothing gets asked twice.",
   },
 ];
 
@@ -113,7 +114,7 @@ export default async function Home({
   // Signed in, the product is a hostname away — link straight there rather
   // than bouncing through a redirect the app would only issue anyway.
   const go = user ? appUrl("/app") : "/signup";
-  const goLabel = user ? "Open the board" : "Start hunting";
+  const goLabel = user ? "Back to the hunt" : "Start the hunt";
 
   return (
     <SiteChrome
@@ -132,19 +133,20 @@ export default async function Home({
       />
 
       <section className="landing-hero">
+        <div className="landing-hero-grid">
         <div className="landing-hero-inner">
           <p className="overline landing-eyebrow">
             New York City rentals · free, forever
           </p>
           <h1 className="display">
-            Rent like you <span className="mark">know someone.</span>
+            Be <span className="mark">first</span>, not lucky.
           </h1>
           <p className="landing-sub">
-            Five people are going to see that apartment today. Four of them
-            know what the listing told them. DamnLease reads every listing
-            site, the building&apos;s violation record and the comps on the
-            block, then hands you the number to argue with and the message to
-            send.
+            A good New York apartment is gone in a day, and it goes to
+            whoever replied first. DamnLease checks every listing site every
+            hour, tells you what a place is really worth the minute it shows
+            up, and has your message to the agent already written. You reply
+            while everyone else is still opening tabs.
           </p>
           <div className="landing-cta">
             <Link className="landing-go" href={go}>
@@ -156,6 +158,10 @@ export default async function Home({
                 : "Completely free · two minutes to set up · bring your roommate"}
             </span>
           </div>
+        </div>
+
+        {/* The claim, performed. See HuntEstimator. */}
+        <HuntEstimator cta={go} ctaLabel={user ? "Back to the hunt" : "Secure a place"} />
         </div>
 
         {counts ? (
@@ -209,58 +215,94 @@ export default async function Home({
         </ul>
       </section>
 
-      {/* Who made this, and why it costs nothing — the two questions a
-          stranger has after the pitch lands. */}
-      <section className="landing-maker">
+      {/* Who made this, why it costs nothing, and what it can't do — the
+          three questions a stranger has after the pitch lands, answered in
+          that order because the third one is what makes the first two
+          believable. */}
+      <section className="landing-maker" id="about">
         <Reveal>
-          <p className="overline">Why it&apos;s free</p>
+          <p className="overline">About</p>
+          <h2 className="display">Made by a frustrated renter.</h2>
           <p className="landing-maker-body">
-            I built DamnLease because I lost an apartment I wanted by four
-            hours, to someone who saw the listing first. Then I did it again.
-            The tools renters get are catalogs built for the people selling;
-            everything that decides the outcome — the real price, the
-            building&apos;s record, who replied first — you&apos;re expected to
-            work out alone, in twelve tabs, at midnight.
+            I lost an apartment I wanted by four hours, to someone who saw
+            the listing first. Then I did it again. The tools renters get are
+            catalogs built for the people selling. Everything that actually
+            decides it, like the real price, the building&apos;s record, and
+            who replied first, you are left to work out alone, in twelve tabs,
+            at midnight.
           </p>
           <p className="landing-maker-body">
-            So this is the thing I wanted. It&apos;s{" "}
-            <span className="mark">completely free</span>, there&apos;s no paid
-            tier waiting behind a feature, and nothing about you is sold to
-            anyone — there&apos;s no business model here to make that
-            tempting. Use it, bring your roommate, and go take a place off
-            somebody.
+            So I built the thing I wanted. It is{" "}
+            <span className="mark">completely free</span>. There is no paid
+            tier hiding behind a feature, and nothing about you is sold to
+            anyone, because there is no business model here to make that
+            tempting. One person builds it, in New York, mostly at night.
           </p>
-          <p className="landing-maker-sign">— a frustrated renter, New York</p>
+        </Reveal>
+
+        <Reveal delay={80}>
+          <h3 className="landing-honest-h">What it can&apos;t do, so you hear it from me</h3>
+          <ul className="landing-honest">
+            <li>
+              <b>New York only.</b> The building records, the comps, and the
+              commute times are all specific to this city. Anywhere else it
+              would just be a worse spreadsheet.
+            </li>
+            <li>
+              <b>It doesn&apos;t see every apartment.</b> Five listing sites,
+              refreshed hourly. Buildings that only post on their own website,
+              and the ones that never get listed at all, are invisible to it.
+              They are invisible to Zillow too.
+            </li>
+            <li>
+              <b>The numbers are estimates.</b> Comps, true monthly cost, and
+              scores come from third-party data that can be stale or wrong.
+              Use them to ask sharper questions at the viewing, not to sign
+              anything.
+            </li>
+            <li>
+              <b>It won&apos;t message anyone for you.</b> It writes the
+              text, you send it from your own phone. That is deliberate. An
+              agent can tell, and a bot gets ignored.
+            </li>
+            <li>
+              <b>It&apos;s young.</b> A handful of people use it. If
+              something breaks, email me and I will actually fix it.
+            </li>
+          </ul>
+          <p className="landing-maker-sign">
+            Jake, New York ·{" "}
+            <a href="mailto:jtsilver123@gmail.com?subject=DamnLease">
+              jtsilver123@gmail.com
+            </a>
+          </p>
         </Reveal>
       </section>
 
-      {/* The objection everyone raises, answered head-on rather than dodged.
-          A browsing site and a hunting tool are different machines. */}
       <section className="landing-vs" id="why">
         <h2 className="display">&ldquo;Why not just use Zillow?&rdquo;</h2>
         <p className="landing-vs-lede">
-          Because a listing site is a catalog, and the hunt isn&apos;t
-          browsing. It&apos;s texting agents, booking tours, comparing
-          finalists and beating four other applications to the same
-          apartment. That part currently lives in twelve tabs, a group chat
-          and a spreadsheet.
+          Because a listing site is a catalog, and hunting is not browsing.
+          It is texting agents, booking tours, comparing finalists, and
+          beating four other applications to the same apartment. Right now
+          that part lives in twelve tabs, a group chat, and a spreadsheet.
         </p>
         <ul className="landing-vs-rows">
           {(
             [
               [
                 "Every site at once",
-                "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, deduplicated — in NYC no single site has the inventory.",
+                "StreetEasy, Zillow, Apartments.com, HotPads, and Craigslist, deduplicated. No single site has all of New York's inventory.",
                 "One site's slice of the market",
               ],
               [
                 "What it really costs",
-                "Concessions spread over the lease, fees amortized, cash to move in — and whether your income clears the 40× rule.",
+                "Concessions spread over the lease, fees amortized, cash to move in, and whether your income clears the 40x rule.",
                 "The asking rent",
               ],
               [
                 "A price check with teeth",
-                "Every listing measured against its own comps, with a ready-to-send negotiation script — or a warning to move fast instead.",
+                "Every listing measured against its own comps, with a negotiation script ready to send, or a warning to move fast instead.",
                 "“Contact agent”",
               ],
               [
@@ -270,12 +312,12 @@ export default async function Home({
               ],
               [
                 "A pipeline that chases",
-                "Every place you pursue tracked from first text to signed lease; silence gets flagged and follow-ups draft themselves.",
+                "Every place you chase, tracked from first text to signed lease. Silence gets flagged and follow-ups write themselves.",
                 "Browser tabs and memory",
               ],
               [
                 "A crew, not a group chat",
-                "One shared board with your roommate or family — tours, videos from viewings, and who's on point for which agent.",
+                "One shared board with your roommate or family: tours, videos from viewings, and who is on point for which agent.",
                 "Forwarded links",
               ],
             ] as [string, string, string][]
@@ -297,8 +339,8 @@ export default async function Home({
           <h2 className="display">Hunt as a crew.</h2>
           <p>
             Moving in with someone? Share one pipeline and split who talks to
-            which agent. Living alone? Let your friends and family scout —
-            every find carries their name, and the final say stays yours.
+            which agent. Living alone? Let friends and family scout for you.
+            Every find carries their name, and the final say stays yours.
           </p>
         </div>
         <Link className="landing-go landing-go-sm" href={go}>

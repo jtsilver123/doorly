@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { db, currentUserId } from "@/lib/supabase";
-import { mediaBucket, mediaKey, SINGLE_SHOT_BYTES } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
 
@@ -41,79 +40,14 @@ export async function GET(
   }
 }
 
-/**
- * Taking an upload.
+/*
+ * There is no POST here any more.
  *
- * The file streams from the phone through this Worker into R2 — no
- * intermediate copy, no third-party credential in the browser. The metadata
- * row is written only after the object lands, so a failed upload can't leave
- * a card pointing at nothing.
+ * Uploads are answered by the Worker itself, at `/api/upload`, before Next
+ * sees the request — see upload-handler.js. That's not a refactor for
+ * neatness: R2 needs a body's length, Next's request wrapper loses it, and
+ * the only way to satisfy R2 from inside a route handler was to read the
+ * whole file into a Worker's 128MB of memory. A 44MB video killed the
+ * isolate, which took unrelated requests down with it. Handled at the front
+ * door the body is still a stream, and nothing is ever assembled.
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const userId = await currentUserId();
-    const { id } = await params;
-    const url = new URL(request.url);
-    const filename = url.searchParams.get("name") ?? "upload";
-    const contentType = request.headers.get("content-type") ?? "application/octet-stream";
-    const kind = contentType.startsWith("video/") ? "video" : "photo";
-
-    if (!contentType.startsWith("video/") && !contentType.startsWith("image/")) {
-      return NextResponse.json({ error: "only photos and video" }, { status: 415 });
-    }
-    const declared = Number(request.headers.get("content-length") ?? 0);
-    if (declared > SINGLE_SHOT_BYTES) {
-      return NextResponse.json(
-        { error: "too big for one request — send it in parts" },
-        { status: 413 }
-      );
-    }
-    if (!request.body) {
-      return NextResponse.json({ error: "no file" }, { status: 400 });
-    }
-
-    /*
-     * R2 refuses a stream whose length it doesn't know, and the body Next
-     * hands a route handler is exactly that — piping it through a
-     * FixedLengthStream doesn't help, because by then it isn't the runtime's
-     * own stream any more. Reading it into a buffer gives R2 the known length
-     * it wants, and that buffer is why this path is capped at
-     * SINGLE_SHOT_BYTES rather than at the product limit: a Worker gets 128MB
-     * of memory. Anything larger goes to the multipart route next door, which
-     * never holds more than one part at a time.
-     */
-    const key = mediaKey(userId, id, filename);
-    const bytes = await request.arrayBuffer();
-    // Re-checked against the real body: content-length is a client claim.
-    if (bytes.byteLength > SINGLE_SHOT_BYTES) {
-      return NextResponse.json(
-        { error: "too big for one request — send it in parts" },
-        { status: 413 }
-      );
-    }
-    await mediaBucket().put(key, bytes, { httpMetadata: { contentType } });
-
-    const supabase = await db();
-    const { error } = await supabase.from("user_listing_media").insert({
-      user_id: userId,
-      listing_id: id,
-      path: key,
-      kind,
-    });
-    if (error) {
-      // Don't leave an orphan object paying rent for a row that never existed.
-      await mediaBucket().delete(key).catch(() => {});
-      throw new Error(error.message);
-    }
-
-    return NextResponse.json({ path: key, kind });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "upload failed" },
-      { status: 500 }
-    );
-  }
-}

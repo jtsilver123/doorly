@@ -16,7 +16,7 @@ const INK = "#14141a";
 const BONE = "#f4f2ea";
 const ACID = "#d6f84b";
 
-export const alt = "DamnLease — rent like you know someone";
+export const alt = "DamnLease — be first, not lucky";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -73,40 +73,48 @@ export default async function OpengraphImage() {
           <div style={{ fontSize: 52, fontWeight: 700, letterSpacing: -1 }}>DamnLease</div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/*
-           * Two rows rather than one wrapped line: the highlight has to sit
-           * tight around "know someone" alone, and Satori won't inline-wrap a
-           * background the way a browser does.
-           */}
-          <div style={{ display: "flex", fontSize: 92, fontWeight: 700, letterSpacing: -4 }}>
-            Rent like you
-          </div>
-          {/*
-            * The period lives inside the highlight. Left outside as its own
-            * flex item it sat off the baseline and read as a stray dot — and
-            * a highlighter that stops one character short of the end of the
-            * phrase looks like a mistake rather than a mark.
+            * One row, three items — "Be", the highlight, and the rest — rather
+            * than a single string. Satori won't wrap a background around part
+            * of an inline run the way a browser does, so the mark has to be
+            * its own box, and the words either side have to be theirs.
             */}
-          <div style={{ display: "flex" }}>
+          {/* No gap: the comma has to touch the highlight, or the sentence
+              reads as three fragments. The word-space before it is a margin. */}
+          <div style={{ display: "flex", alignItems: "center" }}>
             <div
               style={{
                 display: "flex",
-                padding: "2px 16px 12px",
+                marginRight: 18,
+                fontSize: 104,
+                fontWeight: 700,
+                letterSpacing: -5,
+              }}
+            >
+              Be
+            </div>
+            <div
+              style={{
+                display: "flex",
+                padding: "2px 18px 14px",
                 backgroundColor: ACID,
                 color: INK,
-                fontSize: 92,
+                fontSize: 104,
                 fontWeight: 700,
-                letterSpacing: -4,
+                letterSpacing: -5,
                 borderRadius: 5,
               }}
             >
-              know someone.
+              first
+            </div>
+            <div style={{ display: "flex", fontSize: 104, fontWeight: 700, letterSpacing: -5 }}>
+              , not lucky.
             </div>
           </div>
           <div style={{ display: "flex", fontSize: 27, color: "rgba(244,242,234,0.68)" }}>
-            Every listing site · priced against real comps · the building&apos;s record ·
-            the message already written
+            Every listing site, checked hourly &middot; priced against real comps &middot;
+            the building&apos;s record &middot; your message already written
           </div>
         </div>
       </div>

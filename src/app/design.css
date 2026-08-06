@@ -3920,22 +3920,20 @@ button.fact:hover .fact-label { color: var(--accent); }
   overflow-x: auto;
   scrollbar-width: none;
   background: var(--surface);
-  margin: 0 calc(-1 * var(--s4));
-  padding: var(--s2) var(--s4);
+  /*
+   * Pulled flush with the panel's top edge on all three sides.
+   *
+   * Sticky pins at the scroll container's *content* box, so the body's own
+   * padding was left as a gap above the chips — and the content underneath
+   * showed through it as the panel scrolled, which read as a rendering bug.
+   * Cancelling the padding with a negative margin puts the bar against the
+   * edge, where a frozen toolbar belongs.
+   */
+  margin: calc(-1 * var(--s4)) calc(-1 * var(--s4)) 0;
+  padding: var(--s3) var(--s4);
   border-bottom: 1px solid var(--border);
 }
 .drawer-tabs::-webkit-scrollbar { display: none; }
-/* Sticky pins at the scroll container's content edge, leaving the body's
-   top padding as a see-through strip above the chips — this paints it. */
-.drawer-tabs::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: var(--s4);
-  background: var(--surface);
-}
 .drawer-tabs button {
   flex-shrink: 0;
   border: 1px solid var(--border);
@@ -4408,5 +4406,41 @@ button.fact:hover .fact-label { color: var(--accent); }
     overflow-y: auto;
     border-radius: var(--r-lg) var(--r-lg) 0 0;
     box-shadow: 0 -12px 32px rgba(30, 26, 16, 0.2);
+  }
+}
+
+
+/* --- touch targets -------------------------------------------------------- */
+
+/*
+ * Hit areas, widened without moving anything.
+ *
+ * An audit across three viewports found a handful of controls under 30px tall:
+ * the address and headline buttons on a card, the plan button on the board,
+ * the brand lockup on the marketing bar. Each is a line of text, so growing
+ * the box would push the layout around it. Padding paired with an equal
+ * negative margin grows only the part a thumb has to hit, which is the part
+ * that was actually too small.
+ *
+ * Pointer devices keep the tight boxes: a mouse doesn't need 44px, and the
+ * expanded areas would overlap into neighbouring hover targets.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .card-headline,
+  .card-address,
+  .board-plan,
+  .site-brand,
+  .linkish {
+    padding-block: 9px;
+    margin-block: -9px;
+  }
+
+  /* The board's drop affordance is genuinely small, and it is a target rather
+     than a label, so this one grows for real. */
+  .board-drop {
+    min-width: 34px;
+    min-height: 34px;
+    display: inline-grid;
+    place-items: center;
   }
 }

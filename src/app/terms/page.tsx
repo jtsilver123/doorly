@@ -15,7 +15,7 @@ import SiteChrome from "@/components/SiteChrome";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Terms — DamnLease",
+  title: "Terms · DamnLease",
   description: "The short version of what DamnLease is and isn't.",
 };
 
@@ -24,7 +24,7 @@ const UPDATED = "August 2026";
 export default async function Terms() {
   const user = await currentUser();
   return (
-    <SiteChrome cta={user ? appUrl("/app") : "/signup"} ctaLabel={user ? "Open the board" : "Start hunting"}>
+    <SiteChrome cta={user ? appUrl("/app") : "/signup"} ctaLabel={user ? "Back to the hunt" : "Start the hunt"}>
       <article className="legal">
         <p className="overline">Terms of use</p>
         <h1 className="display">The short version.</h1>
@@ -37,8 +37,8 @@ export default async function Terms() {
         <h2>It&apos;s free</h2>
         <p>
           No fee, no trial, no card, no paid tier waiting behind a feature. If
-          that ever changes, existing accounts get told before it does — not
-          after.
+          that ever changes, existing accounts hear about it before it
+          happens, not after.
         </p>
 
         <h2>What DamnLease is not</h2>
@@ -73,8 +73,8 @@ export default async function Terms() {
         <p>
           Keep your password to yourself; you&apos;re responsible for what
           happens under your account. Inviting someone to your crew gives them
-          access to that search — its listings, notes and footage — until you
-          remove them.
+          access to that search, including its listings, notes, and footage,
+          until you remove them.
         </p>
 
         <h2>What you upload</h2>
@@ -97,7 +97,7 @@ export default async function Terms() {
           The app is provided as it is, with no guarantee that it will be
           available, accurate, or that you&apos;ll get the apartment. To the
           extent the law allows, the author isn&apos;t liable for losses
-          arising from using it — including an apartment you missed, a lease
+          arising from using it, including an apartment you missed, a lease
           you signed, or data that turned out to be wrong. This is a free tool
           built by one renter, not a service with a support contract.
         </p>

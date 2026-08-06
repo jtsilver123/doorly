@@ -16,7 +16,7 @@ import SiteChrome from "@/components/SiteChrome";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Privacy — DamnLease",
+  title: "Privacy · DamnLease",
   description: "What DamnLease stores, why, and how to get rid of it.",
 };
 
@@ -25,7 +25,7 @@ const UPDATED = "August 2026";
 export default async function Privacy() {
   const user = await currentUser();
   return (
-    <SiteChrome cta={user ? appUrl("/app") : "/signup"} ctaLabel={user ? "Open the board" : "Start hunting"}>
+    <SiteChrome cta={user ? appUrl("/app") : "/signup"} ctaLabel={user ? "Back to the hunt" : "Start the hunt"}>
       <article className="legal">
         <p className="overline">Privacy</p>
         <h1 className="display">What we keep, and why.</h1>
@@ -39,9 +39,9 @@ export default async function Privacy() {
         <h2>What&apos;s stored</h2>
         <ul>
           <li>
-            <b>Your account.</b> Email address, and a password hash — or, if you
-            sign in with Google, the email and name Google returns. Passwords
-            are never stored in a form anyone can read.
+            <b>Your account.</b> Your email address and a password hash. If
+            you sign in with Google, the email and name Google hands back.
+            Passwords are never stored in a form anyone can read.
           </li>
           <li>
             <b>Your search.</b> Neighborhoods, budget, bedroom count, move-in
@@ -55,8 +55,8 @@ export default async function Privacy() {
           </li>
           <li>
             <b>Your footage.</b> Photos and video you upload after a viewing.
-            These are stored in Cloudflare R2 and served only to you and the
-            crew you invited — the app checks who you are on every request.
+            These live in Cloudflare R2 and are served only to you and the
+            crew you invited. The app checks who you are on every request.
           </li>
           <li>
             <b>Listing data.</b> Apartments pulled from public listing sites and
@@ -64,8 +64,9 @@ export default async function Privacy() {
             about you.
           </li>
           <li>
-            <b>Push subscriptions</b>, if you turn on notifications — a token
-            from your browser that lets us send you an alert, and nothing else.
+            <b>Push subscriptions</b>, if you turn notifications on. That is
+            a token from your browser which lets us send you an alert, and
+            nothing else.
           </li>
         </ul>
 
@@ -105,14 +106,14 @@ export default async function Privacy() {
           Inviting someone to your crew is what shares your pipeline with them:
           they can see the places you&apos;re tracking, your notes and your tour
           footage for that search. That&apos;s the point of the feature, but
-          it&apos;s worth saying plainly — only invite people you&apos;d show
-          the spreadsheet to. Removing someone cuts off their access.
+          it is worth saying plainly: only invite people you would show the
+          spreadsheet to. Removing someone cuts off their access.
         </p>
 
         <h2>Getting rid of it</h2>
         <p>
-          Delete any listing, note or file from inside the app and it&apos;s
-          gone — the file is removed from storage, not just hidden. To delete
+          Delete any listing, note, or file from inside the app and it is
+          gone. The file is removed from storage, not just hidden. To delete
           your whole account and everything attached to it, email{" "}
           <a href="mailto:jtsilver123@gmail.com?subject=Delete%20my%20DamnLease%20account">
             jtsilver123@gmail.com

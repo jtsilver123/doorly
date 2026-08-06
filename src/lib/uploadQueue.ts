@@ -28,6 +28,13 @@ export interface UploadJob {
 let jobs: UploadJob[] = [];
 let seq = 0;
 let running = false;
+/*
+ * How many files this run started with, so the pill can say "2 of 3" rather
+ * than counting down from a number nobody saw. Reset when the queue goes idle
+ * and added to when more files are dropped mid-run, which is exactly what
+ * happens when someone remembers the kitchen video.
+ */
+let batchTotal = 0;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
@@ -61,6 +68,15 @@ function activeJobs(listingId?: string): UploadJob[] {
  * snapshots would otherwise show 75% while the only part anyone is waiting
  * for hasn't started. The bar has to track the wait, not the file count.
  */
+/**
+ * Which file of how many. `done` counts finished files, so the display reads
+ * "2 of 3" while the second is in flight rather than after it lands.
+ */
+export function uploadBatch(): { at: number; total: number } {
+  const left = activeJobs().length;
+  return { at: Math.min(batchTotal, batchTotal - left + 1), total: batchTotal };
+}
+
 export function uploadProgress(listingId?: string): { done: number; total: number; ratio: number } {
   const active = activeJobs(listingId);
   const total = active.reduce((sum, j) => sum + j.bytes, 0);
@@ -94,8 +110,23 @@ function guard(e: BeforeUnloadEvent) {
  * reaches for the Cloudflare context, which does not exist in a browser.
  */
 const MAX_BYTES = 200 * 1024 * 1024;
-const PART_BYTES = 12 * 1024 * 1024;
-const SINGLE_SHOT_BYTES = 12 * 1024 * 1024;
+
+/**
+ * How many times one chunk gets to fail before the file does.
+ *
+ * A phone on the move loses its radio, and an edge node recycles under load.
+ * Losing an entire walkthrough to one of those is the worst possible outcome
+ * for the thing someone drove across Brooklyn to film — and re-sending is
+ * safe, because a repeat upload simply writes a new object.
+ */
+const TRIES = 3;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** 5xx and dropped connections are worth another go; 4xx never is. */
+function worthRetrying(res: { status: number } | null): boolean {
+  return res === null || res.status >= 500 || res.status === 429;
+}
 
 /** One request with a raw body, reporting progress as it drains. */
 function send(
@@ -138,90 +169,48 @@ async function doUpload(job: UploadJob): Promise<void> {
       `too big (${Math.round(job.file.size / 1048576)}MB) — 200MB is the ceiling`
     );
   }
-  const type = job.file.type || "application/octet-stream";
-  const base = `/api/listings/${encodeURIComponent(job.listingId)}/media`;
-  const track = (fraction: number) => {
-    /*
-     * Held just shy of 1. The last bytes leaving the browser is not the same
-     * event as the server having stored them — the R2 write and the metadata
-     * row still have to happen — and a bar that sits at 100% for four seconds
-     * reads as stuck.
-     */
-    job.progress = Math.min(0.98, fraction);
-    notify();
-  };
-
-  if (job.file.size <= SINGLE_SHOT_BYTES) {
-    const res = await send(
-      `${base}?name=${encodeURIComponent(job.file.name)}`,
-      job.file,
-      type,
-      track
-    );
-    if (res.status < 200 || res.status >= 300) fail(res);
-    job.progress = 1;
-    notify();
-    return;
-  }
 
   /*
-   * Big file: cut it up here and let R2 reassemble it.
+   * One request, straight through to R2.
    *
-   * A 200MB walkthrough can't cross a Worker whole — Cloudflare bounds the
-   * request body, the Worker has 128MB of memory, and R2 needs a known length
-   * so the body gets buffered on the way through. Parts sidestep all three,
-   * and they make a dropped connection cost one 12MB chunk instead of the
-   * whole upload.
+   * This used to cut the file into parts and push each one through a Next
+   * route, because R2 needs a known body length and Next's request wrapper
+   * loses it — so the app had to buffer, and buffering a video inside a
+   * Worker's 128MB is what was producing 503s and taking the whole isolate
+   * down with it. `/api/upload` is answered by the Worker itself, before Next
+   * sees it, where the body is still the runtime's own stream and goes to the
+   * bucket without ever being assembled. No chunking, no reassembly, one hop
+   * instead of several — which is most of why it was slow, too.
+   *
+   * Retried anyway: a phone losing its radio mid-upload is not a bug, and
+   * re-sending is cheaper than making someone re-shoot a walkthrough.
    */
-  const createRes = await fetch(`${base}/multipart?action=create`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      action: "create",
-      filename: job.file.name,
-      contentType: type,
-      size: job.file.size,
-    }),
-  });
-  if (!createRes.ok) fail({ status: createRes.status, text: await createRes.text() });
-  const { key, uploadId } = (await createRes.json()) as { key: string; uploadId: string };
+  const type = job.file.type || "application/octet-stream";
+  const url = `/api/upload?listing=${encodeURIComponent(job.listingId)}&name=${encodeURIComponent(job.file.name)}`;
 
-  const total = Math.ceil(job.file.size / PART_BYTES);
-  const parts: { partNumber: number; etag: string }[] = [];
-  try {
-    for (let i = 0; i < total; i++) {
-      const chunk = job.file.slice(i * PART_BYTES, (i + 1) * PART_BYTES);
-      const res = await send(
-        `${base}/multipart?action=part&key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${i + 1}`,
-        chunk,
-        "application/octet-stream",
-        // Whole-file progress, not per-part: the bar tracks the wait, and the
-        // wait is the file.
-        (fraction) => track((i * PART_BYTES + fraction * chunk.size) / job.file.size)
-      );
-      if (res.status < 200 || res.status >= 300) fail(res);
-      parts.push(JSON.parse(res.text));
+  let res: { status: number; text: string } | null = null;
+  for (let attempt = 1; attempt <= TRIES; attempt++) {
+    try {
+      res = await send(url, job.file, type, (fraction) => {
+        /*
+         * Held just shy of 1. The last bytes leaving the browser is not the
+         * same event as R2 having stored them and the metadata row landing,
+         * and a bar that sits at 100% for four seconds reads as stuck.
+         */
+        job.progress = Math.min(0.98, fraction);
+        notify();
+      });
+    } catch (err) {
+      if (err instanceof Error && /cancelled/i.test(err.message)) throw err;
+      res = null;
     }
-
-    const done = await fetch(`${base}/multipart?action=complete`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "complete", key, uploadId, contentType: type, parts }),
-    });
-    if (!done.ok) fail({ status: done.status, text: await done.text() });
-  } catch (err) {
-    /*
-     * Tell R2 to throw the parts away. Left dangling they'd sit in the bucket
-     * indefinitely, invisible — an abandoned multipart upload is billed like
-     * any other stored object but appears in no listing.
-     */
-    void fetch(`${base}/multipart?action=abort`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "abort", key, uploadId }),
-      keepalive: true,
-    }).catch(() => {});
-    throw err;
+    if (res && res.status >= 200 && res.status < 300) break;
+    if (attempt === TRIES || !worthRetrying(res)) fail(res ?? { status: 0, text: "" });
+    // Backing off rather than hammering: whatever went wrong upstream needs a
+    // moment more than it needs the same 40MB again immediately.
+    await wait(800 * attempt);
+    job.progress = 0;
+    notify();
   }
 
   job.progress = 1;
@@ -269,6 +258,8 @@ async function pump(): Promise<void> {
 }
 
 export function enqueueUploads(listingId: string, files: File[] | FileList): void {
+  // A fresh run restarts the count; files added to a run in progress extend it.
+  if (!running) batchTotal = 0;
   for (const file of [...files]) {
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue;
     jobs.push({
@@ -281,6 +272,7 @@ export function enqueueUploads(listingId: string, files: File[] | FileList): voi
       bytes: file.size,
       file,
     });
+    batchTotal++;
   }
   notify();
   void pump();

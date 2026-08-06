@@ -112,10 +112,32 @@
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.7);
   }
+
+  /*
+   * At night the frame has to go the other way. Ink on ink is one flat black
+   * rectangle, so the window lifts slightly off the sheet instead of sinking
+   * below it — the relationship survives, the direction inverts.
+   */
+  .shell { background: #1c1c22; }
 }
 
 * {
   box-sizing: border-box;
+}
+
+/*
+ * Anchor links glide rather than jump, and land clear of the sticky bar.
+ *
+ * `scroll-margin-top` is the half nobody remembers: without it the browser
+ * scrolls the heading to y=0, which is underneath the header, and the section
+ * you clicked appears to have no title. Both are switched off for anyone who
+ * asked for less motion — a 900px teleport is exactly what they opted out of.
+ */
+html { scroll-behavior: smooth; }
+:target, [id] { scroll-margin-top: 5.5rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 html,
@@ -332,6 +354,20 @@ textarea {
   animation: slide-in 0.18s ease-out;
 }
 
+/*
+ * Leaving, on the way it came. A panel that slides in and then vanishes on
+ * the frame you press close reads as a crash rather than a dismissal — the
+ * exit is what tells you where the thing went.
+ *
+ * `forwards` holds the final frame, so there's no flicker back to opaque in
+ * the gap before React unmounts. The 0.18s here is duplicated in
+ * ListingDrawer's close timeout; the two have to stay in step.
+ */
+.drawer[data-closing="true"] {
+  animation: slide-out 0.18s ease-in forwards;
+  pointer-events: none;
+}
+
 @keyframes slide-in {
   from {
     transform: translateX(24px);
@@ -343,12 +379,30 @@ textarea {
   }
 }
 
+@keyframes slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
 .scrim {
   position: fixed;
   inset: 0;
   background: rgba(12, 12, 16, 0.4);
   z-index: 40;
   animation: fade-in 0.18s ease-out;
+}
+
+.scrim[data-closing="true"] { animation: fade-out 0.18s ease-in forwards; }
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 @keyframes fade-in {
@@ -394,36 +448,113 @@ textarea {
 
 /* --- app shell ---------------------------------------------------------- */
 
+/*
+ * The shell: a white window, with the work inset into it.
+ *
+ * The rail and the frame are the window — white, no chrome of their own — and
+ * the content sits inside as a recessed bone panel. The gap on all four sides
+ * is what does the work: navigation belongs to the window, listings belong to
+ * the sheet, and the eye stops having to be told which is which.
+ *
+ * The frame is also fixed. The window is exactly one viewport tall and never
+ * scrolls; the panel inside it does. Before this the whole page scrolled, so
+ * the inset border slid up out of view and the "frame" turned out to have no
+ * bottom — the illusion only holds if the edges are always on screen.
+ */
 .shell {
   display: flex;
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--ink);
+  gap: var(--s3);
+  padding: var(--s3);
+  padding-left: 0;
+}
+
+/*
+ * The rail is ink, and re-themes itself by redefining the tokens rather than
+ * restyling its children.
+ *
+ * Every control in here — nav rows, counts, the refresh meter, the account
+ * menu — already draws from `--text`, `--border`, `--surface`. Overriding
+ * those on the subtree flips the whole rail in one place and, more usefully,
+ * means anything added to the sidebar later is correct by default instead of
+ * arriving white-on-white.
+ *
+ * A pure-white frame was tried first and read as absence — two flat planes
+ * with a line between them. Ink is what the brand already uses for the hero
+ * and the sign-in panel, so the app now opens looking like the site that sold
+ * it: chrome is the brand, content is paper.
+ */
+.sidebar {
+  color: #f4f2ea;
+  --text: #f4f2ea;
+  --text-muted: rgba(244, 242, 234, 0.6);
+  --border: rgba(244, 242, 234, 0.16);
+  --border-strong: rgba(244, 242, 234, 0.3);
+  --surface: rgba(244, 242, 234, 0.06);
+  --surface-2: rgba(244, 242, 234, 0.12);
+  --accent: #f4f2ea;
+  --accent-soft: rgba(244, 242, 234, 0.14);
+  --on-accent: #14141a;
+  --shadow: none;
+  /* The mark's unlit lines, against ink. */
+  --logo-dim: #f4f2ea;
 }
 
 .sidebar {
   width: 236px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  padding: 16px;
+  background: transparent;
+  padding: var(--s4) var(--s3) var(--s4) var(--s4);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  position: sticky;
-  top: 0;
-  height: 100dvh;
+  height: 100%;
   overflow-y: auto;
 }
 
-.brand {
-  font-size: var(--t-xl);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+/*
+ * The panel. This is the scroll container, not the page — which is what keeps
+ * the frame's four edges on screen no matter how long the list gets. Sticky
+ * headers inside it stick to its top rather than the viewport's, which is the
+ * behaviour they always wanted anyway.
+ */
+.main {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 20px 40px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
 }
 
-.main {
-  flex: 1;
-  padding: 18px 20px 40px;
-  min-width: 0;
+/*
+ * On a phone there is no rail to wrap around, and an inset frame would spend
+ * 12px of a 390px screen on decoration. The sheet becomes the page, and the
+ * page scrolls normally — a nested scroller on touch fights the browser's own
+ * address-bar collapse and rubber-banding.
+ */
+@media (max-width: 860px) {
+  .shell {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    gap: 0;
+    padding: 0;
+    background: var(--bg);
+  }
+  .main {
+    height: auto;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    padding: var(--s3) var(--s4) calc(80px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .toolbar {
@@ -1040,8 +1171,17 @@ kbd {
   flex-wrap: wrap;
   color: var(--text);
 }
-.site-foot-top nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
-.site-foot-top a { color: var(--text-muted); text-decoration: none; }
+.site-foot-top nav { display: flex; gap: var(--s2); flex-wrap: wrap; margin: -8px; }
+/* Standalone links, so they get a real target rather than the text's own
+   height. Inline links inside a paragraph deliberately do not: expanding
+   those would overlap the words either side of them. */
+.site-foot-top a {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+}
+.site-foot-top a:hover { background: var(--surface); }
 .site-foot-top a:hover { color: var(--text); text-decoration: underline; }
 .site-foot p { margin: 0; max-width: 62ch; line-height: 1.6; }
 
@@ -1116,6 +1256,38 @@ kbd {
   font-weight: 650;
   color: var(--text);
 }
+.landing-maker-sign a { color: var(--text-muted); text-underline-offset: 3px; }
+
+/*
+ * The limits, stated plainly.
+ *
+ * This is the most persuasive block on the page precisely because it argues
+ * against the product. A pitch that names what it can't do is the only kind
+ * a renter who has been lied to by five listing sites has any reason to
+ * believe — so it gets the same weight as the features, not a footnote.
+ */
+.landing-honest-h {
+  margin: var(--s7) 0 var(--s4);
+  font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+.landing-honest {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--s3);
+  max-width: 62ch;
+}
+.landing-honest li {
+  padding-left: var(--s4);
+  border-left: 2px solid var(--border-strong);
+  font-size: var(--t-md);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.landing-honest b { color: var(--text); font-weight: 650; }
 
 /* --- the landing page ---------------------------------------------------- */
 
@@ -1175,13 +1347,159 @@ kbd {
   border-color: rgba(244, 242, 234, 0.5);
 }
 
-.landing-hero-inner {
+/*
+ * Two columns on a desktop: the argument on the left, the same argument being
+ * run as a calculation on the right. On a phone they stack, pitch first —
+ * nobody picks neighborhoods before they know what the thing is.
+ */
+.landing-hero-grid {
   align-self: center;
-  max-width: 54rem;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(var(--s5), 4vw, var(--s7));
+  align-items: center;
+  padding: var(--s6) 0;
+}
+
+.landing-hero-inner {
+  max-width: 40rem;
   display: grid;
   gap: var(--s5);
-  padding: var(--s7) 0;
 }
+
+@media (max-width: 940px) {
+  .landing-hero-grid { grid-template-columns: 1fr; gap: var(--s6); }
+  .landing-hero-inner { max-width: none; }
+}
+
+/* --- the estimator ------------------------------------------------------- */
+
+.estimator {
+  display: grid;
+  gap: var(--s4);
+  padding: clamp(var(--s4), 2.4vw, var(--s5));
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(244, 242, 234, 0.16);
+  background: rgba(244, 242, 234, 0.05);
+  color: #f4f2ea;
+  backdrop-filter: blur(6px);
+}
+.estimator .overline { color: rgba(244, 242, 234, 0.55); }
+
+.estimator-field { display: grid; gap: var(--s2); min-width: 0; }
+.estimator-field label {
+  font-size: var(--t-xs);
+  font-weight: 650;
+  color: rgba(244, 242, 234, 0.6);
+}
+.estimator-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s3); align-items: end; }
+@media (max-width: 420px) {
+  .estimator-row { grid-template-columns: 1fr; align-items: stretch; }
+}
+
+.estimator-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* The pills live on ink here, so they restate rather than inherit the app's
+   light-surface version. */
+.estimator .pill {
+  border-color: rgba(244, 242, 234, 0.22);
+  background: transparent;
+  color: rgba(244, 242, 234, 0.78);
+  font-size: var(--t-xs);
+  padding: 5px 10px;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.estimator .pill:hover { border-color: rgba(244, 242, 234, 0.5); color: #f4f2ea; }
+.estimator .pill:active { transform: scale(0.96); }
+.estimator .pill[data-on="true"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-action);
+  font-weight: 650;
+}
+
+.estimator-date {
+  background: rgba(244, 242, 234, 0.08);
+  border-color: rgba(244, 242, 234, 0.22);
+  color: #f4f2ea;
+  color-scheme: dark;
+  width: auto;
+}
+
+.estimator-out {
+  display: grid;
+  gap: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid rgba(244, 242, 234, 0.16);
+  transition: opacity var(--t-slow) var(--ease);
+}
+/* Dimmed rather than blanked while recomputing: the numbers stay readable, so
+   changing an input reads as a refinement instead of a reload. */
+.estimator-out[data-loading="true"] { opacity: 0.45; }
+
+.estimator-nums {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3) var(--s4);
+}
+.estimator-nums div { display: grid; gap: 1px; min-width: 0; }
+/* The sublabel is what makes each figure legible on its own — "28" means
+   nothing; "28, to book 7 viewings" is the whole argument in four words. */
+.estimator-nums span {
+  font-size: var(--t-2xs);
+  line-height: 1.35;
+  color: rgba(244, 242, 234, 0.42);
+}
+.estimator-nums dt {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(244, 242, 234, 0.5);
+}
+.estimator-nums dd {
+  margin: 0;
+  font-size: var(--t-3xl);
+  font-weight: 700;
+  font-stretch: 118%;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+/* A range doesn't get the headline size — it would wrap and out-shout the
+   counts, which are the part that's actually surprising. */
+.estimator-cash { font-size: var(--t-xl) !important; }
+
+.estimator-basis {
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: rgba(244, 242, 234, 0.55);
+}
+
+.estimator-verdict {
+  margin: 0;
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  background: rgba(244, 242, 234, 0.06);
+  font-size: var(--t-md);
+  line-height: 1.55;
+}
+.estimator-verdict b { font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Behind schedule gets a warm left edge — the one moment this panel is
+   allowed to look like a warning. */
+.estimator-verdict[data-tight="true"] {
+  border-left: 3px solid var(--urgent);
+}
+.estimator-fine {
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: rgba(244, 242, 234, 0.5);
+}
+.estimator-go { padding: 14px 26px; font-size: var(--t-lg); justify-self: stretch; }
 
 .landing-eyebrow { color: rgba(244, 242, 234, 0.5); }
 

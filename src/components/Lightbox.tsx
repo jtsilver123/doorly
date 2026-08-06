@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 
 /**
@@ -14,6 +15,14 @@ import Icon from "@/components/Icon";
  * It reads like the photo apps people already have: arrow keys and on-screen
  * arrows on a pointer, swipe on touch, Escape or a tap on the backdrop to
  * leave. Video keeps native controls, because nobody wants a bespoke scrubber.
+ *
+ * Rendered through a portal to `document.body`, which is not a detail. Its
+ * callers live inside the listing drawer, and the drawer is a positioned,
+ * animated element — so a `position: fixed` child was being laid out against
+ * the drawer instead of the viewport, and its z-index was trapped in the
+ * drawer's stacking context. The photo came up half off-screen with the
+ * drawer's own tab bar and close button painted on top of it. Escaping to the
+ * body is the only reliable fix; no z-index is large enough otherwise.
  */
 
 export interface LightboxItem {
@@ -77,10 +86,14 @@ export default function Lightbox({
     };
   }, []);
 
-  const item = items[at];
-  if (!item) return null;
+  // Portals need a DOM, and this renders on the server first.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
+  const item = items[at];
+  if (!item || !mounted) return null;
+
+  return createPortal(
     <div
       className="lightbox"
       role="dialog"
@@ -150,6 +163,7 @@ export default function Lightbox({
         )}
         {item.caption ? <figcaption>{item.caption}</figcaption> : null}
       </figure>
-    </div>
+    </div>,
+    document.body
   );
 }

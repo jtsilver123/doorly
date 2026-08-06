@@ -48,6 +48,7 @@ import {
 } from "../src/lib/subway.ts";
 import { applyFilters } from "@/lib/filters";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
+import { withinAreas, nearAreas } from "@/lib/geo";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
 import { hpdAddress } from "@/lib/nycdata";
 import {
@@ -1788,4 +1789,22 @@ test("local development gets no split and no cookie domain", () => {
     assert.equal(originsFor(host), null);
     assert.equal(cookieDomainFor(host), undefined);
   }
+});
+
+// --- neighborhood scoping --------------------------------------------------
+
+test("a search is scoped by real boundaries, not a radius", () => {
+  const search = ["east village", "west village", "chelsea", "gramercy"];
+  // 232 East 26th Street sits in Kips Bay, ~1km from the Gramercy centroid —
+  // close enough for the old circle, and plainly not in the search.
+  assert.equal(withinAreas(40.7398, -73.9807, search), false);
+  assert.equal(nearAreas(40.7398, -73.9807, search), true, "the old test let it through");
+
+  // 91 East Third Street is genuinely in the East Village and must survive.
+  assert.equal(withinAreas(40.7256, -73.9873, search), true);
+});
+
+test("coordinates in no neighborhood at all are excluded", () => {
+  // The middle of the East River: a centroid radius would happily claim it.
+  assert.equal(withinAreas(40.7461, -73.9645, ["east village", "williamsburg"]), false);
 });

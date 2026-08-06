@@ -32,6 +32,7 @@ export default function SiteChrome({
         <nav className="site-nav">
           <Link href="/#what-you-know">What you get</Link>
           <Link href="/#why">Why not Zillow</Link>
+          <Link href="/#about">About</Link>
           <span className="site-free">Free</span>
         </nav>
         <Link className="btn site-cta" href={cta}>
@@ -54,9 +55,9 @@ export default function SiteChrome({
           </nav>
         </div>
         <p>
-          Built by a frustrated renter, in New York, after one too many
-          bidding wars. Free to use. Listing data belongs to the sites it comes
-          from, and every message is one you send yourself.
+          Built by a frustrated renter in New York, after one too many
+          bidding wars. Free to use. Listing data belongs to the sites it
+          comes from, and every message is one you send yourself.
         </p>
       </footer>
     </div>
