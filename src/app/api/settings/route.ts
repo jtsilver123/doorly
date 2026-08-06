@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { loadConfig, saveConfig, getUsage, keyHint, nextCheckDue } from "@/lib/apikey";
-import { db } from "@/lib/supabase";
+import { db, currentUserId } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 /** Never returns the key itself — only enough to recognise which one is set. */
 export async function GET() {
+  // The schedule readout is personal: your cadence, clocked from your own
+  // last pull — not whoever in the userbase pulled most recently.
+  const uid = await currentUserId().catch(() => undefined);
   const [config, usage, schedule] = await Promise.all([
     loadConfig(),
     getUsage(),
-    nextCheckDue().catch(() => ({ due: false, lastAt: null, intervalHours: 0 })),
+    nextCheckDue(uid).catch(() => ({ due: false, lastAt: null, intervalHours: 0 })),
   ]);
 
   // Measure what a poll actually costs rather than assuming it. Total spend on

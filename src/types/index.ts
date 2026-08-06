@@ -359,6 +359,8 @@ export interface SavedSearch {
   criteria: SearchCriteria;
   searchKey: string;
   active: boolean;
+  /** Whose search this is. Set on the cron path, where the spender matters. */
+  userId?: string;
 }
 
 // --- StreetEasy upstream shape (via realtyapi.io) -------------------------

@@ -153,9 +153,14 @@ function dedupeBy<T>(rows: T[], key: (row: T) => string): T[] {
   return [...byKey.values()];
 }
 
-export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
+export async function ingest(
+  searches: SavedSearch[],
+  opts: { userId?: string } = {}
+): Promise<IngestResult> {
   // Shared market data is written once for everyone, so it needs the service
-  // role: RLS deliberately gives users read-only access to it.
+  // role: RLS deliberately gives users read-only access to it. That is also
+  // the point of the model: whoever pulls spends their own request budget,
+  // and the rows they fetch refresh the corpus every account reads.
   const supabase = adminDb();
   const startedAt = new Date();
   const nowIso = startedAt.toISOString();
@@ -164,7 +169,7 @@ export async function ingest(searches: SavedSearch[]): Promise<IngestResult> {
 
   const { data: runRow } = await supabase
     .from("poll_runs")
-    .insert({ started_at: nowIso })
+    .insert({ started_at: nowIso, user_id: opts.userId ?? null })
     .select("id")
     .single();
   const runId = runRow?.id as number | undefined;

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { db, adminDb, currentUserId } from "@/lib/supabase";
 
 /**
@@ -44,75 +45,105 @@ export const DEFAULT_CONFIG: AppConfig = {
   checksPerDay: 2,
 };
 
-let cache: { value: AppConfig; at: number } | null = null;
+/**
+ * Whose key pays for a request is decided per user, never globally.
+ *
+ * The first multi-account bug this file shipped: with no session, the poll
+ * read "the most recently updated config row" — which meant the scheduled
+ * check billed every account's searches to whichever user pasted a key last.
+ * Keys are personal budgets. Two rules now, and everything here serves them:
+ *
+ *   1  A key someone saves is spent only on that person's own pulls.
+ *   2  What a pull fetches lands in the shared corpus for everyone — the
+ *      spender pays requests, everybody gets the freshness.
+ *
+ * The poll runs outside any session, so the acting user's config travels via
+ * AsyncLocalStorage: the cron resolves each user's config explicitly and runs
+ * their ingest inside `withConfig`, and every nested `loadConfig()` — the
+ * source fetchers, the budget gate — sees that user and no one else.
+ */
+const actingConfig = new AsyncLocalStorage<AppConfig>();
+
+export function withConfig<T>(config: AppConfig, fn: () => Promise<T>): Promise<T> {
+  return actingConfig.run(config, fn);
+}
+
+/** Per-user, not global: a shared cache slot was a 15-second key leak. */
+const cache = new Map<string, { value: AppConfig; at: number }>();
 const CACHE_MS = 15_000;
 
-/**
- * The stored settings, read whether or not there's a signed-in session.
- *
- * This is the bug that made a freshly pasted key look like it hadn't saved.
- * `currentUserId()` throws when there is no session, and the scheduled poll
- * has no session — so every automatic check fell into the catch, read no
- * stored config at all, and ran on `process.env.REALTYAPI_KEY`. That env var
- * still held the previous, exhausted key, so the cron kept calling a dead key
- * while the app showed the new one saved and working. The chosen page depth
- * and check frequency were silently ignored the same way.
- *
- * With no session we fall back to the service role and take the most recently
- * updated row. That is exactly right while this is one person's tool, and it
- * is the wrong answer the moment two accounts keep different keys — at which
- * point the poll needs to load config per search owner rather than globally.
- */
-async function readStored(): Promise<Partial<AppConfig>> {
-  try {
-    const { data } = await (await db())
-      .from("app_config")
-      .select("config")
-      .eq("user_id", await currentUserId())
-      .maybeSingle();
-    if (data?.config) return data.config as Partial<AppConfig>;
-  } catch {
-    // No session, or no database. Try the service role below.
-  }
+function withDefaults(stored: Partial<AppConfig>): AppConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...stored,
+    // A key saved in the app wins; the env var is the house fallback.
+    realtyApiKey: stored.realtyApiKey || process.env.REALTYAPI_KEY || "",
+  };
+}
 
+/** A specific user's settings, service-role read — the cron's path. */
+export async function loadConfigFor(userId: string): Promise<AppConfig> {
+  const hit = cache.get(userId);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+  let stored: Partial<AppConfig> = {};
   try {
     const { data } = await adminDb()
       .from("app_config")
       .select("config")
-      .order("updated_at", { ascending: false })
-      .limit(1);
-    return ((data?.[0]?.config as Partial<AppConfig>) ?? {}) as Partial<AppConfig>;
+      .eq("user_id", userId)
+      .maybeSingle();
+    stored = (data?.config as Partial<AppConfig>) ?? {};
   } catch {
-    // A missing table or offline database must not stop a poll that could
-    // still run from the environment variable.
-    return {};
+    // Missing table or offline database — defaults plus the env fallback.
+  }
+  const value = withDefaults(stored);
+  cache.set(userId, { value, at: Date.now() });
+  return value;
+}
+
+/**
+ * The key this user saved themselves — no env fallback. The cron uses this to
+ * decide whether a user participates in scheduled pulls at all: spending is
+ * strictly opt-in by pasting your own key.
+ */
+export async function storedKeyFor(userId: string): Promise<string> {
+  try {
+    const { data } = await adminDb()
+      .from("app_config")
+      .select("config")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return ((data?.config as Partial<AppConfig>)?.realtyApiKey ?? "").trim();
+  } catch {
+    return "";
   }
 }
 
 export async function loadConfig(): Promise<AppConfig> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
+  // Inside a poll, the acting user's config was resolved up front.
+  const acting = actingConfig.getStore();
+  if (acting) return acting;
 
-  const stored = await readStored();
-  const value: AppConfig = {
-    ...DEFAULT_CONFIG,
-    ...stored,
-    // A key saved in the app wins; the env var is the fallback.
-    realtyApiKey: stored.realtyApiKey || process.env.REALTYAPI_KEY || "",
-  };
-  cache = { value, at: Date.now() };
-  return value;
+  try {
+    return await loadConfigFor(await currentUserId());
+  } catch {
+    // No session and no acting context: environment defaults only. Never
+    // another user's stored row — that's someone else's budget.
+    return withDefaults({});
+  }
 }
 
 export async function saveConfig(patch: Partial<AppConfig>): Promise<void> {
   const current = await loadConfig();
   const next = { ...current, ...patch };
+  const uid = await currentUserId();
   await (await db())
     .from("app_config")
     .upsert(
-      { user_id: await currentUserId(), config: next, updated_at: new Date().toISOString() },
+      { user_id: uid, config: next, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
-  cache = null;
+  cache.delete(uid);
 }
 
 /** Last 6 characters only — enough to tell two keys apart, useless if leaked. */
@@ -161,17 +192,20 @@ export async function getUsage(): Promise<Usage> {
 }
 
 /**
- * Is another automatic check due?
+ * Is another automatic check due — for this user, on this user's cadence?
  *
  * Guards the request budget as much as the schedule: at ~5 requests a poll and
  * 250 a month, hourly checking would exhaust a free key in under two days.
+ * The clock is per user: your 2×/day counts your own successful pulls, not
+ * whoever pulled most recently — otherwise one eager account's polls would
+ * silence everyone else's schedule forever.
  */
-export async function nextCheckDue(): Promise<{
+export async function nextCheckDue(userId?: string): Promise<{
   due: boolean;
   lastAt: string | null;
   intervalHours: number;
 }> {
-  const config = await loadConfig();
+  const config = userId ? await loadConfigFor(userId) : await loadConfig();
   if (config.checksPerDay <= 0) {
     return { due: false, lastAt: null, intervalHours: 0 };
   }
@@ -188,10 +222,12 @@ export async function nextCheckDue(): Promise<{
   ]) {
     try {
       const client = await getClient();
-      const { data, error } = await client
+      let query = client
         .from("poll_runs")
         .select("started_at")
-        .eq("ok", true)
+        .eq("ok", true);
+      if (userId) query = query.eq("user_id", userId);
+      const { data, error } = await query
         .order("started_at", { ascending: false })
         .limit(1);
       if (error) continue;

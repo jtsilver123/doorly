@@ -782,6 +782,7 @@ export async function loadAllActiveSearches(): Promise<SavedSearch[]> {
     criteria: normalizeCriteria(row.criteria as Record<string, never>),
     searchKey: row.search_key as string,
     active: true,
+    userId: (row.user_id as string) ?? undefined,
   }));
 }
 

@@ -30,7 +30,7 @@ import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
-import { DEFAULT_CONFIG, keyHint } from "@/lib/apikey";
+import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
 import { amenitiesOf, qualityScore } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
 import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar.ts";
@@ -1106,6 +1106,24 @@ test("the environment key is used only when nothing is stored", () => {
     realtyApiKey: stored.realtyApiKey || "rt_env",
   };
   assert.equal(merged.realtyApiKey, "rt_env");
+});
+
+test("inside withConfig, every nested loadConfig sees the acting user's key", async () => {
+  // The cron polls one user at a time; the fetchers deep inside each poll call
+  // loadConfig themselves. The acting context must reach them — the bug this
+  // pins was the scheduled poll billing everyone's searches to whichever user
+  // saved a key most recently.
+  const acting = { ...DEFAULT_CONFIG, realtyApiKey: "rt_actingUserKey000000" };
+  const seen = await withConfig(acting, async () => {
+    const inner = await loadConfig();
+    return inner.realtyApiKey;
+  });
+  assert.equal(seen, "rt_actingUserKey000000");
+
+  // Outside the context there is no session in a test, and the answer must
+  // never be some other user's stored key — env default or nothing.
+  const outside = await loadConfig();
+  assert.notEqual(outside.realtyApiKey, "rt_actingUserKey000000");
 });
 
 test("keyHint identifies a key without exposing it", () => {

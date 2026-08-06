@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ingest } from "@/lib/ingest";
 import { ensureDefaultSearch } from "@/lib/feed";
+import { loadConfig, withConfig } from "@/lib/apikey";
+import { currentUserId } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -10,6 +12,10 @@ export const maxDuration = 300;
  * cron. When CRON_SECRET is set, unattended callers must present it; requests
  * from the app itself (no secret configured) are allowed through so local use
  * needs no setup.
+ *
+ * The caller's own searches, on the caller's own key, attributed to the
+ * caller in the run log — pressing the button spends your budget, and what
+ * it fetches refreshes the shared corpus for everyone.
  */
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -21,7 +27,9 @@ export async function POST(request: Request) {
 
   try {
     const searches = await ensureDefaultSearch();
-    const result = await ingest(searches);
+    const config = await loadConfig();
+    const userId = await currentUserId().catch(() => undefined);
+    const result = await withConfig(config, () => ingest(searches, { userId }));
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "refresh failed";
