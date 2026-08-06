@@ -47,6 +47,11 @@ export interface Profile {
    * enough to be worth asking rather than assuming.
    */
   preferredSource: Source;
+  /**
+   * Commute anchors: work, the partner's office, the gym. Geocoded once when
+   * saved; every listing then wears a door-to-door estimate per anchor.
+   */
+  anchors?: { label: string; address: string; lat: number; lon: number }[];
 }
 
 /** The documents a NYC landlord actually asks for. */

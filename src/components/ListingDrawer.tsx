@@ -24,6 +24,14 @@ import TourMedia from "@/components/TourMedia";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
 import { tourQuestions } from "@/lib/tourPrep";
+import type { BuildingIntel } from "@/lib/nycdata";
+import {
+  brokerHistory,
+  incomeToAnnual,
+  negotiationScript,
+  qualifyCheck,
+} from "@/lib/leverage";
+import { commuteMinutes } from "@/lib/commute";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
 import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
@@ -60,6 +68,8 @@ interface Props {
   crew?: {
     members: { userId: string; name: string; isYou: boolean; role: string }[];
   } | null;
+  /** Everything loaded, for cross-listing reads like broker memory. */
+  all?: FeedListing[];
 }
 
 /**
@@ -139,8 +149,10 @@ function PriceChart({ points }: { points: PricePoint[] }) {
   );
 }
 
-export default function ListingDrawer({ listing, profile, onClose, onChanged, crew }: Props) {
+export default function ListingDrawer({ listing, profile, onClose, onChanged, crew, all }: Props) {
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [intel, setIntel] = useState<BuildingIntel | null>(null);
+  const [negCopied, setNegCopied] = useState(false);
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -199,6 +211,15 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
       .then((r) => r.json())
       .then((d) => {
         if (live) setDetail(d);
+      })
+      .catch(() => {});
+    // The building's public record rides in behind the details — cached a
+    // week server-side, so this is usually instant.
+    setIntel(null);
+    fetch(`/api/listings/${encodeURIComponent(listing.id)}/intel`)
+      .then((r) => r.json())
+      .then((b) => {
+        if (live && b.intel) setIntel(b.intel as BuildingIntel);
       })
       .catch(() => {});
     // Opening the drawer counts as reading its updates.
@@ -645,9 +666,34 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                     ))}
                   </ul>
                 )}
+                {/* Door-to-door to the places your week actually goes. */}
+                {(profile.anchors ?? []).length > 0 && (
+                  <ul className="commutes">
+                    {(profile.anchors ?? []).map((anchor) => {
+                      const est = commuteMinutes(listing, anchor);
+                      return (
+                        <li key={anchor.label}>
+                          <b>{anchor.label}</b>
+                          {est ? (
+                            <span>
+                              ~{est.minutes} min <i>({est.breakdown})</i>
+                            </span>
+                          ) : (
+                            <span className="muted">no estimate</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
                 <p className="muted drawer-fineprint">
                   Straight-line distance at walking pace, from the MTA&apos;s own
-                  station list — a couple of blocks either way.
+                  station list — a couple of blocks either way
+                  {(profile.anchors ?? []).length > 0
+                    ? "; commute estimates assume average subway pace, not a route plan"
+                    : ""}
+                  .
                 </p>
               </section>
             );
@@ -687,6 +733,26 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
 
             <Perks keys={listing.perks} limit={10} showLabels />
 
+            {/* The 40× rule, before you fall for it. Only speaks when the
+                profile has an income to check against. */}
+            {(() => {
+              const annual = incomeToAnnual(profile.income);
+              if (!annual) return null;
+              const q = qualifyCheck(listing.price, annual);
+              return q.ok ? (
+                <p className="qualify is-ok">
+                  ✓ Your income clears the 40× rule for this rent (needs{" "}
+                  {money(q.needed)}/yr).
+                </p>
+              ) : (
+                <p className="qualify is-short">
+                  The 40× rule wants {money(q.needed)}/yr — you&apos;re{" "}
+                  {money(q.gap)} short, so plan on a guarantor. A guarantor
+                  service runs about one month&apos;s rent.
+                </p>
+              );
+            })()}
+
             {/* The rating knows what the listing published; it doesn't know
                 the block was loud at 8pm. After a viewing, yours wins. */}
             <div className="dsec-sub">
@@ -697,6 +763,50 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
               />
             </div>
           </section>
+
+          {/* --- the building's rap sheet -------------------------------- */}
+          {/* What the listing will never tell you: does the landlord fix
+              things, has the building filed bedbugs, what do the neighbors
+              call 311 about. Public record, cited as such. */}
+          {intel && (intel.violations || intel.bedbugs || intel.noise) && (
+            <section className="dsec">
+              <h3 className="dsec-label">The building&apos;s record</h3>
+              <ul className="intel">
+                {intel.violations && (
+                  <li className={intel.violations.openC > 0 ? "is-bad" : intel.violations.open > 0 ? "is-warn" : "is-ok"}>
+                    {intel.violations.open > 0 ? (
+                      <>
+                        <b>{intel.violations.open} open HPD violation{intel.violations.open === 1 ? "" : "s"}</b>
+                        {intel.violations.openC > 0 &&
+                          ` — ${intel.violations.openC} class C (immediately hazardous)`}
+                        . Ask what&apos;s being done about them.
+                      </>
+                    ) : (
+                      <>No open HPD violations{intel.violations.total > 0 ? ` (${intel.violations.total} on record, all closed)` : ""}.</>
+                    )}
+                  </li>
+                )}
+                {intel.bedbugs && (
+                  <li className={intel.bedbugs.infested > 0 ? "is-warn" : "is-ok"}>
+                    {intel.bedbugs.infested > 0
+                      ? `Bedbug filing: ${intel.bedbugs.infested} infested unit${intel.bedbugs.infested === 1 ? "" : "s"} reported (${intel.bedbugs.lastFilingYear}). Ask about treatment and re-inspection.`
+                      : `Bedbug registry: clean on the latest filing (${intel.bedbugs.lastFilingYear}).`}
+                  </li>
+                )}
+                {intel.noise && (
+                  <li className={intel.noise.count >= 20 ? "is-warn" : undefined}>
+                    {intel.noise.count === 0
+                      ? "No 311 noise complaints on this block in six months."
+                      : `${intel.noise.count} noise complaint${intel.noise.count === 1 ? "" : "s"} to 311 on this block in six months${intel.noise.top.length ? ` — mostly ${intel.noise.top.join(" and ").toLowerCase()}` : ""}.`}
+                  </li>
+                )}
+              </ul>
+              <p className="muted drawer-fineprint">
+                NYC Open Data: HPD violations, the bedbug registry and 311, matched
+                to this address. Public record, not a judgment.
+              </p>
+            </section>
+          )}
 
           {/* --- the viewing, when one exists to plan -------------------- */}
           {stage === "tour" && (
@@ -807,6 +917,26 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
           {/* --- reaching them: one card, everything in it --------------- */}
           <section className="dsec">
             <h3 className="dsec-label">Reaching them</h3>
+
+            {/* Broker memory: brokerages carry inventory, and the third
+                message to the same agent shouldn't read like a stranger's
+                form letter. */}
+            {(() => {
+              const known = brokerHistory(all ?? [], listing);
+              if (!known) return null;
+              return (
+                <p className="brokerknown">
+                  You&apos;ve dealt with <b>{known.name}</b> before —{" "}
+                  {known.others.length === 1
+                    ? `${known.others[0].address}${known.others[0].unit ? ` #${known.others[0].unit}` : ""} (${STAGE_LABEL[known.others[0].stage]})`
+                    : `${known.others.length} other places: ${known.others
+                        .slice(0, 3)
+                        .map((o) => `${o.address} (${STAGE_LABEL[o.stage]})`)
+                        .join(", ")}`}
+                  . Mention it — repeat interest gets faster replies.
+                </p>
+              );
+            })()}
 
             {editingContact ? (
               <div className="contactedit">
@@ -980,6 +1110,38 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
                 </details>
               </div>
             )}
+
+            {/* Talk them down — or don't. The comps decide which. */}
+            {(() => {
+              const neg = negotiationScript(listing);
+              return (
+                <div className={`negotiate is-${neg.stance}`}>
+                  <b>
+                    {neg.stance === "push"
+                      ? "Talk them down"
+                      : neg.stance === "move-fast"
+                        ? "Don't negotiate this one"
+                        : "Worth one ask"}
+                  </b>
+                  <span>{neg.note}</span>
+                  {neg.message && (
+                    <>
+                      <pre>{neg.message}</pre>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(neg.message ?? "");
+                          setNegCopied(true);
+                          setTimeout(() => setNegCopied(false), 2000);
+                        }}
+                      >
+                        {negCopied ? "Copied" : "Copy the script"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Tag-team: whose find, who owns the thread. */}
             {crew && crew.members.length > 1 && (

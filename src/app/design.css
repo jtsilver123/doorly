@@ -3810,6 +3810,78 @@ button.fact:hover .fact-label { color: var(--accent); }
   pointer-events: none;
 }
 
+/* --- the renter's edges ---------------------------------------------------- */
+
+/* The building's public record: three verdict lines, colored by severity. */
+.intel { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s2); }
+.intel li {
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  border-left: 3px solid var(--border);
+}
+.intel li.is-ok { border-left-color: var(--good); }
+.intel li.is-warn { border-left-color: var(--warn); }
+.intel li.is-bad { border-left-color: var(--warn); background: var(--warn-soft); }
+
+/* The 40× verdict. */
+.qualify { margin: 0; font-size: var(--t-sm); line-height: var(--lh-body); }
+.qualify.is-ok { color: var(--good); }
+.qualify.is-short { color: var(--warn); }
+
+/* Negotiation stance + script. */
+.negotiate {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--t-sm);
+}
+.negotiate b { font-size: var(--t-md); }
+.negotiate.is-push b { color: var(--accent); }
+.negotiate.is-move-fast b { color: var(--good); }
+.negotiate pre {
+  margin: 0;
+  padding: var(--s3);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+.negotiate .btn { justify-self: start; }
+
+/* Broker memory. */
+.brokerknown {
+  margin: 0;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+/* Commute lines under Getting around. */
+.commutes { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s1); }
+.commutes li {
+  display: flex;
+  gap: var(--s2);
+  align-items: baseline;
+  font-size: var(--t-sm);
+}
+.commutes li i { font-style: normal; color: var(--text-muted); font-size: var(--t-xs); }
+
+/* Anchor editor rows in the profile. */
+.anchorrow { display: flex; gap: var(--s2); align-items: baseline; font-size: var(--t-sm); }
+.anchoradd { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.anchoradd .field { flex: 1; min-width: 110px; }
+
 /* The upload heartbeat: alive anywhere in the app while files move. */
 .uploadpill {
   position: fixed;

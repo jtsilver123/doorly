@@ -37,6 +37,8 @@ export interface Filters {
   followUpOnly: boolean;
   readyOnly: boolean;
   goodOnly: boolean;
+  /** Minutes to the first commute anchor, "any" when off. */
+  commuteMax: string;
 }
 
 const TOGGLES: { key: keyof Filters; label: string; hint: string }[] = [
@@ -64,6 +66,7 @@ export default function FilterBar({
   onReset,
   lastCheckedAt,
   sourceCount,
+  anchorLabel,
 }: {
   filters: Filters;
   onChange: (next: Partial<Filters>) => void;
@@ -71,6 +74,8 @@ export default function FilterBar({
   onReset: () => void;
   lastCheckedAt?: string | null;
   sourceCount?: number;
+  /** First commute anchor's name — the control only exists when one does. */
+  anchorLabel?: string | null;
 }) {
   const [openPanel, setOpenPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -111,6 +116,7 @@ export default function FilterBar({
     (filters.priceMax ? 1 : 0) +
     (filters.beds !== "any" ? 1 : 0) +
     (filters.baths !== "any" ? 1 : 0) +
+    (anchorLabel && filters.commuteMax !== "any" ? 1 : 0) +
     filters.sources.length +
     TOGGLES.filter((t) => filters[t.key]).length;
 
@@ -197,6 +203,23 @@ export default function FilterBar({
                   </select>
                 </div>
               </div>
+
+              {anchorLabel && (
+                <div className="panel-group">
+                  <span className="panel-label">Commute</span>
+                  <select
+                    className="control control-sm"
+                    value={filters.commuteMax}
+                    onChange={(e) => onChange({ commuteMax: e.target.value })}
+                    aria-label={`Maximum commute to ${anchorLabel}`}
+                  >
+                    <option value="any">Any commute to {anchorLabel}</option>
+                    <option value="20">≤ 20 min to {anchorLabel}</option>
+                    <option value="30">≤ 30 min to {anchorLabel}</option>
+                    <option value="45">≤ 45 min to {anchorLabel}</option>
+                  </select>
+                </div>
+              )}
 
               <div className="panel-group">
                 <span className="panel-label">Show me</span>

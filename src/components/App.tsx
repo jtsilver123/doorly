@@ -23,6 +23,7 @@ import { runwayDays } from "@/lib/runway";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import { formatPhone } from "@/lib/phone";
 import { usePush } from "@/lib/usePush";
+import { commuteMinutes } from "@/lib/commute";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
@@ -200,6 +201,8 @@ export default function Home() {
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [readyOnly, setReadyOnly] = useState(false);
   const [goodOnly, setGoodOnly] = useState(false);
+  /** Cap on minutes to the first commute anchor. "any" = off. */
+  const [commuteMax, setCommuteMax] = useState("any");
   /** Which panel the profile area opens on, so the menu can deep-link. */
   const [section, setSection] = useState<ProfileSection>("details");
   /**
@@ -230,6 +233,7 @@ export default function Home() {
     setFollowUpOnly(false);
     setReadyOnly(false);
     setGoodOnly(false);
+    setCommuteMax("any");
   }, []);
 
   /**
@@ -313,40 +317,48 @@ export default function Home() {
   }, [listings, toast]);
 
 
-  const visible = useMemo(
-    () =>
-      applyFilters(listings, {
-        stage: "all",
-        search: query,
-        priceMax: priceMax ? Number(priceMax) : undefined,
-        bedsMin: beds === "any" ? undefined : Number(beds),
-        bedsMax: beds === "any" ? undefined : Number(beds),
-        bathsMin: baths === "any" ? undefined : Number(baths),
-        sources: sourceFilter,
-        changedOnly,
-        starredOnly,
-        noFeeOnly,
-        followUpOnly,
-        readyByMoveIn: readyOnly,
-        minRating: goodOnly ? GOOD_DEAL_RATING : undefined,
-        sort: sort as Parameters<typeof applyFilters>[1]["sort"],
-      }),
-    [
-      listings,
-      query,
-      priceMax,
-      beds,
-      baths,
-      sourceFilter,
+  const anchor = (profile.anchors ?? [])[0];
+  const visible = useMemo(() => {
+    const filtered = applyFilters(listings, {
+      stage: "all",
+      search: query,
+      priceMax: priceMax ? Number(priceMax) : undefined,
+      bedsMin: beds === "any" ? undefined : Number(beds),
+      bedsMax: beds === "any" ? undefined : Number(beds),
+      bathsMin: baths === "any" ? undefined : Number(baths),
+      sources: sourceFilter,
       changedOnly,
       starredOnly,
       noFeeOnly,
       followUpOnly,
-      readyOnly,
-      goodOnly,
-      sort,
-    ]
-  );
+      readyByMoveIn: readyOnly,
+      minRating: goodOnly ? GOOD_DEAL_RATING : undefined,
+      sort: sort as Parameters<typeof applyFilters>[1]["sort"],
+    });
+    // The commute cap is against the first anchor — "work", for most people.
+    if (!anchor || commuteMax === "any") return filtered;
+    const cap = Number(commuteMax);
+    return filtered.filter((l) => {
+      const est = commuteMinutes(l, anchor);
+      return est != null && est.minutes <= cap;
+    });
+  }, [
+    listings,
+    query,
+    priceMax,
+    beds,
+    baths,
+    sourceFilter,
+    changedOnly,
+    starredOnly,
+    noFeeOnly,
+    followUpOnly,
+    readyOnly,
+    goodOnly,
+    sort,
+    anchor,
+    commuteMax,
+  ]);
 
   const loadChanges = useCallback(async () => {
     const body = await fetch("/api/changes").then((r) => r.json());
@@ -1147,6 +1159,7 @@ export default function Home() {
                 followUpOnly,
                 readyOnly,
                 goodOnly,
+                commuteMax,
               }}
               onChange={(next: Partial<Filters>) => {
                 if (next.query !== undefined) setQuery(next.query);
@@ -1161,10 +1174,12 @@ export default function Home() {
                 if (next.followUpOnly !== undefined) setFollowUpOnly(next.followUpOnly);
                 if (next.readyOnly !== undefined) setReadyOnly(next.readyOnly);
                 if (next.goodOnly !== undefined) setGoodOnly(next.goodOnly);
+                if (next.commuteMax !== undefined) setCommuteMax(next.commuteMax);
               }}
               onReset={clearFilters}
               lastCheckedAt={api?.lastCheckedAt}
               sourceCount={ALL_SOURCES.length}
+              anchorLabel={anchor?.label ?? null}
               />
             )}
           </div>
@@ -1355,6 +1370,7 @@ export default function Home() {
           onClose={() => setOpen(null)}
           onChanged={loadFeed}
           crew={crew}
+          all={listings}
         />
       )}
 
@@ -1740,6 +1756,93 @@ function PushToggle() {
  * The details every outreach message is built from. Filling this in once is
  * what makes reaching out a single keystroke afterwards.
  */
+/**
+ * Commute anchors: the two or three places your week actually goes. Geocoded
+ * once on save (Nominatim), then every listing wears a door-to-door estimate
+ * and the feed can filter on it.
+ */
+function AnchorsEditor({
+  anchors,
+  onChange,
+}: {
+  anchors: NonNullable<Profile["anchors"]>;
+  onChange: (next: NonNullable<Profile["anchors"]>) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [address, setAddress] = useState("");
+  const [state, setState] = useState<"idle" | "looking" | "error">("idle");
+
+  async function add() {
+    if (!label.trim() || address.trim().length < 3) return;
+    setState("looking");
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(address.trim())}`);
+      const body = await res.json();
+      if (!res.ok || body.lat == null) throw new Error(body.error ?? "not found");
+      onChange([
+        ...anchors,
+        { label: label.trim(), address: address.trim(), lat: body.lat, lon: body.lon },
+      ]);
+      setLabel("");
+      setAddress("");
+      setState("idle");
+    } catch {
+      setState("error");
+    }
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      <span className="muted" style={{ fontSize: 12 }}>
+        Commute anchors — work, the gym, wherever your week goes
+      </span>
+      {anchors.map((anchor) => (
+        <div key={anchor.label} className="anchorrow">
+          <b>{anchor.label}</b>
+          <span className="muted">{anchor.address}</span>
+          <button
+            className="linkish"
+            onClick={() => onChange(anchors.filter((a) => a.label !== anchor.label))}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      {anchors.length < 3 && (
+        <div className="anchoradd">
+          <input
+            className="field"
+            value={label}
+            placeholder="Work"
+            aria-label="Anchor name"
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <input
+            className="field"
+            value={address}
+            placeholder="1 Madison Ave"
+            aria-label="Anchor address"
+            onChange={(e) => setAddress(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+          />
+          <button className="btn" onClick={add} disabled={state === "looking"}>
+            {state === "looking" ? "Finding…" : "Add"}
+          </button>
+        </div>
+      )}
+      {state === "error" && (
+        <span className="warn-text" style={{ fontSize: 12 }}>
+          Couldn&apos;t place that address — try adding the borough.
+        </span>
+      )}
+      <span className="muted" style={{ fontSize: 11 }}>
+        Every listing then shows a rough door-to-door subway time to each
+        anchor, and the feed can filter on the first one.
+      </span>
+    </div>
+  );
+}
+
 function ProfileForm({
   profile,
   onSave,
@@ -1840,6 +1943,11 @@ function ProfileForm({
           </label>
         ))}
       </div>
+
+      <AnchorsEditor
+        anchors={draft.anchors ?? []}
+        onChange={(anchors) => setDraft({ ...draft, anchors })}
+      />
 
       <div style={{ display: "grid", gap: 6 }}>
         <span className="muted" style={{ fontSize: 12 }}>

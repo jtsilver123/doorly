@@ -48,6 +48,14 @@ import {
 } from "../src/lib/subway.ts";
 import { applyFilters } from "@/lib/filters";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
+import { hpdAddress } from "@/lib/nycdata";
+import {
+  negotiationScript,
+  incomeToAnnual,
+  qualifyCheck,
+  brokerHistory,
+} from "@/lib/leverage";
+import { commuteMinutes } from "@/lib/commute";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
@@ -1283,6 +1291,84 @@ test("tour questions come from this listing's gaps, not a generic checklist", ()
 
   // The list stays short enough to read at a door.
   assert.ok(tourQuestions(feed({ unit: "1B", description: "x".repeat(100) })).length <= 6);
+});
+
+// --- the renter's edges -----------------------------------------------------
+
+test("addresses convert to the city's own HPD spelling", () => {
+  // Probed against the live dataset: HPD writes "EAST 35 STREET".
+  assert.deepEqual(hpdAddress("330 East 35th Street"), {
+    houseNumber: "330",
+    street: "EAST 35 STREET",
+  });
+  assert.deepEqual(hpdAddress("91 E 3rd St"), {
+    houseNumber: "91",
+    street: "EAST 3 STREET",
+  });
+  assert.deepEqual(hpdAddress("955 Metropolitan Ave"), {
+    houseNumber: "955",
+    street: "METROPOLITAN AVENUE",
+  });
+  // "St" mid-name is a saint, not a street suffix.
+  assert.deepEqual(hpdAddress("120 St Marks Pl"), {
+    houseNumber: "120",
+    street: "ST MARKS PLACE",
+  });
+  assert.equal(hpdAddress("no number here"), null);
+});
+
+test("negotiation stance follows the comps", () => {
+  const base = { address: "5 Test St", price: 4000, bedrooms: 1 };
+  const over = negotiationScript({ ...base, dealDelta: 10, dealVerdict: "high" });
+  assert.equal(over.stance, "push");
+  assert.ok(over.message?.includes("$3,636") || over.message?.includes("3,6"));
+
+  const steal = negotiationScript({ ...base, dealDelta: -15, dealVerdict: "steal" });
+  assert.equal(steal.stance, "move-fast");
+  assert.equal(steal.message, undefined); // no script for a place you should grab
+
+  const market = negotiationScript({ ...base, dealDelta: 0, dealVerdict: "market" });
+  assert.equal(market.stance, "nudge");
+  assert.ok(market.message?.includes("free month"));
+});
+
+test("the 40× rule math is exact and income parsing is forgiving", () => {
+  assert.equal(incomeToAnnual("$140,000"), 140000);
+  assert.equal(incomeToAnnual("95k"), 95000);
+  assert.equal(incomeToAnnual(""), null);
+  assert.equal(incomeToAnnual("call me"), null);
+
+  const short = qualifyCheck(3500, 120000);
+  assert.equal(short.ok, false);
+  assert.equal(short.needed, 140000);
+  assert.equal(short.gap, 20000);
+  assert.equal(qualifyCheck(2500, 120000).ok, true);
+});
+
+test("broker memory matches on the phone, however it's formatted", () => {
+  const a = feed({ id: "a", contactPhone: "(212) 555-0134", contactName: "Josh" });
+  const b = feed({ id: "b", address: "9 Other St", myContactPhone: "1-212-555-0134", stage: "contacted" });
+  const c = feed({ id: "c", contactPhone: "(917) 555-9999" });
+  const known = brokerHistory([a, b, c], a);
+  assert.equal(known?.others.length, 1);
+  assert.equal(known?.others[0].id, "b");
+  // No number, no memory — names are too overloaded to match on.
+  assert.equal(brokerHistory([a, b], feed({ id: "d", contactPhone: "" })), null);
+});
+
+test("commute estimates walk short hops and ride long ones", () => {
+  // East Village to Midtown East: a real train ride, not a walk.
+  const ride = commuteMinutes({ lat: 40.7265, lon: -73.9815 }, { lat: 40.7527, lon: -73.9772 });
+  assert.ok(ride && ride.minutes >= 15 && ride.minutes <= 45, `got ${ride?.minutes}`);
+  assert.ok(ride?.breakdown.includes("train"));
+
+  // Two blocks apart: say "walk", never route a subway.
+  const walk = commuteMinutes({ lat: 40.7265, lon: -73.9815 }, { lat: 40.728, lon: -73.983 });
+  assert.ok(walk && walk.minutes <= 18);
+  assert.ok(walk?.breakdown.includes("walk"));
+
+  const nowhere = commuteMinutes({ lat: null, lon: null }, { lat: 40.75, lon: -73.98 });
+  assert.equal(nowhere, null);
 });
 
 test("a declined place never proposes re-courting the agent", () => {
