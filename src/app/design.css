@@ -3427,6 +3427,11 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* The address, drawn. An illustration of one place, not a map to navigate. */
 .spotmap {
   position: relative;
+  /* `position: relative` alone doesn't contain a child's z-index; this does.
+     Leaflet's panes then can't out-stack anything outside the map, whatever
+     numbers it uses internally. */
+  isolation: isolate;
+  z-index: 0;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
@@ -3814,7 +3819,9 @@ button.fact:hover .fact-label { color: var(--accent); }
 .drawer-tabs {
   position: sticky;
   top: 0;
-  z-index: 6;
+  /* Above Leaflet, which paints its panes at 400 and its controls at 800 —
+     the map scrolled straight over the pinned chips without this. */
+  z-index: 900;
   display: flex;
   gap: var(--s1);
   overflow-x: auto;

@@ -1,0 +1,20 @@
+name = "doorly-cron"
+main = "index.js"
+compatibility_date = "2026-01-01"
+
+# Hourly. The app decides who's actually due — /api/cron/poll walks users and
+# skips anyone whose own cadence hasn't elapsed — so a frequent tick is cheap
+# and everyone gets the schedule they chose.
+#
+# This exists because Vercel's Hobby plan caps cron at once per day, which
+# quietly capped the whole product at once-a-day freshness in a market where
+# listings go in hours. Cloudflare's cron triggers are free at any interval.
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+# Points at whatever the app's canonical host is. Kept as a var so moving to
+# damnlease.com is a config change, not a code change.
+POLL_URL = "https://doorlynyc.vercel.app/api/cron/poll"
+# CRON_SECRET is a secret, not a var:
+#   wrangler secret put CRON_SECRET
