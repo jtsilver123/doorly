@@ -89,6 +89,12 @@ export default function PhotoGallery({
           </span>
         </>
       )}
+
+      {/* One photo is data, not breakage — say so, or the missing arrows read
+          as the gallery being broken. The site link has the rest. */}
+      {urls.length === 1 && (
+        <span className="gallery-count">1 photo — more on the listing site</span>
+      )}
     </div>
   );
 }
