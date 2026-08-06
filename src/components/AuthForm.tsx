@@ -76,15 +76,15 @@ export default function AuthForm({
         <div className="auth-pitch-inner">
           <div className="auth-mark">DamnLease</div>
           <h1>
-            Find the one before
+            Be <span className="mark">first</span>,
             <br />
-            everybody else does.
+            not lucky.
           </h1>
           <p className="auth-lede">
-            New York apartments go in a day. This watches every listing site at
-            once, tells you which places are genuinely a good deal, and keeps
-            track of who you&apos;ve contacted — so the search stops living in
-            twelve browser tabs.
+            A good New York apartment goes to whoever replied first. This
+            checks every listing site every hour, tells you which places are
+            genuinely a good deal, and keeps track of who you&apos;ve
+            contacted. The search stops living in twelve browser tabs.
           </p>
 
           <ul className="auth-claims">
@@ -244,7 +244,7 @@ export default function AuthForm({
 
           <p className="auth-fineprint">
             Listing data comes from the sites above, not from us. We don&apos;t
-            contact anyone on your behalf — every message is one you send.
+            contact anyone on your behalf. Every message is one you send.
           </p>
         </form>
       </section>

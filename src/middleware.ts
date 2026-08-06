@@ -113,6 +113,13 @@ export async function middleware(request: NextRequest) {
   const origins = originsFor(host);
   const onApp = Boolean(origins) && isAppHost(host);
 
+  // One spelling of the marketing host. www serves the same Worker, and two
+  // URLs for one page is how link previews, analytics and search results end
+  // up split between them.
+  if (host.split(":")[0].startsWith("www.") && origins) {
+    return NextResponse.redirect(new URL(path + search, origins.marketing), 308);
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return response;
@@ -183,6 +190,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!user && !isAuthRoute && !isCron && !isPublicApi && !isLanding) {
+    /*
+     * APIs answer 401, pages redirect. A fetch() that gets a 307 to /login
+     * follows it silently and hands the caller a login page with a 200 on it,
+     * which the client then tries to parse as JSON. The error belongs at the
+     * status code, where the client is actually looking.
+     */
+    if (isApi) {
+      return finish(
+        NextResponse.json({ error: "not signed in" }, { status: 401 })
+      );
+    }
     const to = origins ? new URL(`/login${search}`, origins.marketing) : request.nextUrl.clone();
     if (!origins) to.pathname = "/login";
     const redirectResponse = NextResponse.redirect(to);

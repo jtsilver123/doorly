@@ -686,11 +686,11 @@ export default function Home() {
         try {
           await navigator.clipboard.writeText(message);
           toast({
-            message: "Message copied — paste it into their contact form",
+            message: "Message copied. Paste it into their contact form",
             tone: "good",
           });
         } catch {
-          toast({ message: "Opened listing — copy the message from the detail panel" });
+          toast({ message: "Opened the listing. Copy the message from the detail panel" });
         }
         const target = orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
         if (target) window.open(target, "_blank", "noopener");
@@ -989,7 +989,7 @@ export default function Home() {
             }}
           >
             <strong>{counts.followUp} waiting on a reply</strong>
-            <span className="muted">Contacted 2+ days ago — chase them</span>
+            <span className="muted">Contacted 2+ days ago. Chase them</span>
           </button>
         )}
 
@@ -1548,7 +1548,7 @@ function ApiSettings({
     });
     setKey("");
     setBusy(false);
-    setNote("Key saved — the next check uses it");
+    setNote("Key saved. The next check uses it");
     setTimeout(() => setNote(""), 4000);
     onSaved();
   }
@@ -1638,7 +1638,7 @@ function ApiSettings({
             </>
           )}
           {days == null
-            ? "Nothing runs on its own — the key only spends when you press the button, so it never expires on a schedule."
+            ? "Nothing runs on its own. The key only spends when you press the button, so it never expires on a schedule."
             : days <= 3
               ? `⚠ At this pace you'd need a fresh key by ${replaceBy} — ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}. Consider checking less often.`
               : `At ${Number(checks) * perPoll} requests a day you'll need a fresh key around ${replaceBy} (${days} days).`}
@@ -1683,7 +1683,7 @@ function ApiSettings({
 
       <div className="fieldgrid">
       <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-        <span className="muted">New API key — saves when you click away</span>
+        <span className="muted">New API key, saves when you click away</span>
         <input
           ref={keyInputRef}
           className="field"
@@ -1707,9 +1707,9 @@ function ApiSettings({
         <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>
           <span className="muted">Pages per source</span>
           <select className="field" value={pages} onChange={(e) => setPages(e.target.value)}>
-            <option value="1">1 — lightest (~10/check)</option>
-            <option value="2">2 — deeper (~20/check)</option>
-            <option value="3">3 — thorough (~30/check)</option>
+            <option value="1">1 · lightest (~10/check)</option>
+            <option value="2">2 · deeper (~20/check)</option>
+            <option value="3">3 · thorough (~30/check)</option>
           </select>
         </label>
         <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>

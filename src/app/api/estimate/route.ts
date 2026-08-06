@@ -19,12 +19,16 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    // Bounded hard: this is a public endpoint, and the values go into a
+    // database filter. Nothing legitimate is longer than a neighborhood name.
     const areas = (url.searchParams.get("areas") ?? "")
       .split(",")
-      .map((a) => a.trim())
+      .map((a) => a.trim().slice(0, 40))
       .filter(Boolean)
       .slice(0, 8);
-    const beds = Math.max(0, Math.min(4, Number(url.searchParams.get("beds") ?? 1)));
+    const rawBeds = Number(url.searchParams.get("beds") ?? 1);
+    // NaN survives min/max untouched and would end up in the query filter.
+    const beds = Number.isFinite(rawBeds) ? Math.max(0, Math.min(4, Math.round(rawBeds))) : 1;
     const moveIn = url.searchParams.get("moveIn");
 
     const supabase = adminDb();
@@ -50,10 +54,10 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ ...estimate, sample: prices.length });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "estimate failed" },
-      { status: 500 }
-    );
+  } catch {
+    // Never echo the upstream error: a database hiccup here once returned a
+    // whole HTML error page inside this JSON, on an endpoint strangers can
+    // hit. There is nothing a landing-page visitor can do with details anyway.
+    return NextResponse.json({ error: "estimate failed" }, { status: 500 });
   }
 }
