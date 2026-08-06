@@ -11,6 +11,28 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  /*
+   * One address. Vercel serves every deployment on its own generated
+   * hostname too, and people bookmark whatever's in the bar — which strands
+   * them on a frozen build with yesterday's UI against today's data. Any
+   * .vercel.app host that isn't the canonical one bounces there, path and
+   * query intact. APIs are exempt: the cron invokes by deployment URL, and
+   * a redirect mid-cron is a silently skipped poll.
+   */
+  const canonical = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const host = request.headers.get("host") ?? "";
+  if (
+    canonical &&
+    host.endsWith(".vercel.app") &&
+    !canonical.includes(host) &&
+    !request.nextUrl.pathname.startsWith("/api")
+  ) {
+    return NextResponse.redirect(
+      new URL(request.nextUrl.pathname + request.nextUrl.search, canonical),
+      308
+    );
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return response;

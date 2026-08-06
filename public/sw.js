@@ -28,7 +28,10 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+  let url = event.notification.data?.url || "/app";
+  // Notifications delivered before the app moved to /app carry root URLs;
+  // clicking one should still land in the app, not on the pitch.
+  url = url.replace(/^(https?:\/\/[^/]+)?\/(\?|#|$)/, "$1/app$2");
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
       // Re-use an open tab if there is one — a stack of identical tabs is

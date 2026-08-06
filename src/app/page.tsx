@@ -44,7 +44,7 @@ const STEPS: { title: string; body: string }[] = [
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; place?: string }>;
 }) {
   /*
    * A `?code=` on the root is a misrouted OAuth callback.
@@ -54,8 +54,15 @@ export default async function Home({
    * dashboard setting is the real fix, but the app shouldn't strand a valid
    * sign-in code on the landing page while a setting is wrong somewhere else.
    */
-  const { code } = await searchParams;
+  const { code, place } = await searchParams;
   if (code) redirect(`/auth/callback?code=${encodeURIComponent(code)}`);
+
+  /*
+   * `?place=` on the root is an app link from before the app moved to /app —
+   * a share sent last week, a push delivered yesterday. Links people already
+   * have must keep opening the listing they point at.
+   */
+  if (place) redirect(`/app?place=${encodeURIComponent(place)}`);
 
   const user = await currentUser();
   const go = user ? "/app" : "/signup";
@@ -63,6 +70,14 @@ export default async function Home({
 
   return (
     <main className="landing">
+      {/* Old bookmarks look like /#pipeline — the app lived on the root
+          before it moved to /app, and hashes never reach the server. Anyone
+          arriving with an app-shaped hash meant the app, not the pitch. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){var h=location.hash.replace("#","");if(["today","feed","changes","pipeline","compare","profile"].indexOf(h)>=0){location.replace("/app"+location.search+location.hash)}})()`,
+        }}
+      />
       <section className="landing-hero">
         <AuthArt />
         <header className="landing-nav">
