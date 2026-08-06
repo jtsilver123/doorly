@@ -72,7 +72,7 @@ export function eventDescription(listing: FeedListing): string {
   ].filter(Boolean);
   if (size.length) lines.push(size.join(" · "));
 
-  lines.push(`Doorly score: ${listing.rating}/100${listing.myScore != null ? ` · yours: ${listing.myScore}/100` : ""}`);
+  lines.push(`DamnLease score: ${listing.rating}/100${listing.myScore != null ? ` · yours: ${listing.myScore}/100` : ""}`);
   if (listing.dealLabel) lines.push(listing.dealLabel);
 
   if (phone || email || who) {
@@ -147,13 +147,13 @@ export function icsFor(listing: FeedListing): string | null {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Doorly//NYC apartment hunt//EN",
+    "PRODID:-//DamnLease//NYC apartment hunt//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     // Stable per listing, so re-adding updates the event rather than
     // creating a second one next to it.
-    `UID:doorly-tour-${listing.id}@doorlynyc.vercel.app`,
+    `UID:damnlease-tour-${listing.id}@damnlease.com`,
     `DTSTAMP:${stamp(new Date())}`,
     `DTSTART:${stamp(span.start)}`,
     `DTEND:${stamp(span.end)}`,

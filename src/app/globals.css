@@ -5,7 +5,7 @@
 @import "./design.css";
 
 /*
- * Doorly's visual language.
+ * DamnLease's visual language.
  *
  * A dense, calm surface: apartment hunting means scanning a lot of near-identical
  * cards quickly, so the design leans on generous whitespace between rows, one
@@ -23,7 +23,7 @@
 
 :root {
   /*
-   * Doorly's palette.
+   * DamnLease's palette.
    *
    * Navy is the brand: identity, links, active states, the logo. Green is
    * the *action* — every button that moves the hunt forward. They're split
@@ -1112,7 +1112,7 @@ kbd {
   align-items: center;
   padding: 6vh 5vw;
   color: #f4f6f8;
-  /* Doorly navy, deepening to night. */
+  /* DamnLease navy, deepening to night. */
   background: linear-gradient(150deg, #1e415f 0%, #16324f 46%, #0a1929 100%);
 }
 

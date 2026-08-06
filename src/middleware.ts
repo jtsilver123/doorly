@@ -2,13 +2,20 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Session refresh + auth gate. (Next 16 renamed `middleware` to `proxy`.)
+ * Session refresh + auth gate.
+ *
+ * Runs on the edge runtime, which is what makes this app deployable to a
+ * Cloudflare Worker: Next 16 moved middleware to `proxy.ts` and pinned it to
+ * the Node runtime, and OpenNext can only compile edge middleware — the two
+ * are mutually exclusive, so the app stays on Next 15 where middleware is
+ * edge-native. Nothing here needs Node anyway: it reads cookies, asks
+ * Supabase over HTTPS who the user is, and redirects.
  *
  * Supabase access tokens are short-lived, so every request refreshes the
  * session and writes the rotated cookies back — without this, users get signed
  * out mid-session. It also keeps signed-out visitors out of the app itself.
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   /*

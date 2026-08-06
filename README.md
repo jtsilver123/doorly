@@ -1,4 +1,4 @@
-# Doorly
+# DamnLease
 
 A personal Zillow for one apartment search. It watches StreetEasy, Zillow,
 HotPads and Craigslist, merges the same apartment across all of them, records
@@ -18,7 +18,7 @@ listings; Craigslist catches small landlords who post nowhere else.
 
 **Deduplicates** — the same flat is typically on three sites at three slightly
 different prices with three different addresses (`55 Morton Street #5J` /
-`55 Morton St APT 5j` / `55 Morton St`). Doorly collapses those into one
+`55 Morton St APT 5j` / `55 Morton St`). DamnLease collapses those into one
 card that links out to each site, defaulting to Zillow because its listing
 pages are the nicest to use.
 
@@ -237,7 +237,7 @@ the logic changes.
   puts the draft on your clipboard and opens the site's own enquiry form. Every
   one of those logs the contact and advances the pipeline.
 - **StreetEasy only searches by borough.** Neighborhood slugs and its own
-  numeric area ids both return zero, so Doorly queries the borough and
+  numeric area ids both return zero, so DamnLease queries the borough and
   narrows using the `areaName` on each listing.
 - **Craigslist has no address field.** Its listing title is used instead, so
   Craigslist rows only dedupe against other sites when the title contains a real

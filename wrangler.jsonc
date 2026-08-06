@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "damnlease",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-01-01",
+  // nodejs_compat is not optional here: the app uses AsyncLocalStorage to
+  // carry the acting user's API key through a poll, and web-push signs VAPID
+  // with node crypto. Both come from this flag.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // One address. The account's workers.dev subdomain would otherwise serve a
+  // second, public copy of the whole app at damnlease.<account>.workers.dev —
+  // duplicate content, and a URL that leaks the account name.
+  "workers_dev": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

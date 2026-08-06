@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       "&viewbox=-74.30,40.95,-73.65,40.48&bounded=1&q=" +
       encodeURIComponent(q);
     const res = await fetch(url, {
-      headers: { "user-agent": "doorly-nyc/1.0 (apartment hunt tool)" },
+      headers: { "user-agent": "damnlease-nyc/1.0 (apartment hunt tool)" },
       cache: "no-store",
     });
     const body = (await res.json()) as { lat: string; lon: string; display_name: string }[];

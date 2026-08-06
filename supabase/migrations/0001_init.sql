@@ -1,4 +1,4 @@
--- Doorly schema. (Named Homefinder at the time this migration first ran.)
+-- DamnLease schema. (Named Homefinder at the time this migration first ran.)
 --
 -- Split in two halves:
 --

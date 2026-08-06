@@ -2,7 +2,7 @@
  * Where this app actually lives.
  *
  * Every Vercel deployment answers on several hostnames: the production alias
- * (doorlynyc.vercel.app), a project-scoped one, and a unique per-deployment
+ * (damnlease.com), a project-scoped one, and a unique per-deployment
  * URL. All but the alias sit behind Vercel's deployment protection, so a
  * visitor who lands there is bounced to a Vercel login page.
  *
@@ -22,7 +22,7 @@ const CONFIGURED = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
 export function siteOrigin(): string {
   if (CONFIGURED) return CONFIGURED;
   if (typeof window !== "undefined") return window.location.origin;
-  return "https://doorlynyc.vercel.app";
+  return "https://damnlease.com";
 }
 
 /** An absolute URL on the canonical host. `path` should start with "/". */

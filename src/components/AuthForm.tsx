@@ -74,7 +74,7 @@ export default function AuthForm({
       <section className="auth-pitch">
         {children}
         <div className="auth-pitch-inner">
-          <div className="auth-mark">Doorly</div>
+          <div className="auth-mark">DamnLease</div>
           <h1>
             Find the one before
             <br />

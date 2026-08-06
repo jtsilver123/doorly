@@ -11,3 +11,6 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 data/
+
+# Cloudflare Workers build output
+.open-next/

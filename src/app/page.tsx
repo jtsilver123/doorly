@@ -66,7 +66,7 @@ export default async function Home({
 
   const user = await currentUser();
   const go = user ? "/app" : "/signup";
-  const goLabel = user ? "Open Doorly" : "Secure a place";
+  const goLabel = user ? "Open DamnLease" : "Secure a place";
 
   return (
     <main className="landing">
@@ -83,7 +83,7 @@ export default async function Home({
         <header className="landing-nav">
           <span className="landing-brand">
             <Logo size={26} />
-            Doorly
+            DamnLease
           </span>
           <Link className="btn landing-signin" href={user ? "/app" : "/login"}>
             {user ? "Open the app" : "Sign in"}
@@ -95,7 +95,7 @@ export default async function Home({
             NYC apartments go in a day. <b>So&nbsp;will&nbsp;you.</b>
           </h1>
           <p>
-            Doorly watches every listing site at once, scores each place
+            DamnLease watches every listing site at once, scores each place
             against what you actually want, and drafts the message that gets
             you the viewing — so the search stops living in twelve browser
             tabs.
@@ -131,7 +131,7 @@ export default async function Home({
           Because Zillow is a catalog, and the hunt isn&apos;t browsing — it&apos;s
           texting agents, booking tours, comparing finalists and racing other
           applicants. That part currently lives in twelve tabs, a group chat
-          and a spreadsheet. That part is Doorly.
+          and a spreadsheet. That part is DamnLease.
         </p>
         <ul className="landing-vs-rows">
           {(
@@ -176,7 +176,7 @@ export default async function Home({
           ))}
         </ul>
         <p className="landing-vs-close">
-          Zillow shows you apartments. <b>Doorly wins you one.</b>
+          Zillow shows you apartments. <b>DamnLease wins you one.</b>
         </p>
       </section>
 
@@ -196,7 +196,7 @@ export default async function Home({
 
       <footer className="landing-foot">
         <span>
-          <Logo size={18} /> Doorly
+          <Logo size={18} /> DamnLease
         </span>
         <span>
           Listing data belongs to the sites it comes from. Every message is one

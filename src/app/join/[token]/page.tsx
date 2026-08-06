@@ -57,7 +57,7 @@ export default async function JoinPage({
               it for a fresh one.
             </p>
             <Link className="btn btn-primary" href="/">
-              Go to Doorly
+              Go to DamnLease
             </Link>
           </>
         ) : (

@@ -36,21 +36,21 @@ const sans = Instrument_Sans({
 export const metadata: Metadata = {
   // Absolute base for the social card URL — link unfurlers won't chase a
   // relative path.
-  metadataBase: new URL("https://doorlynyc.vercel.app"),
-  title: "Doorly",
+  metadataBase: new URL("https://damnlease.com"),
+  title: "DamnLease",
   description:
-    "Doorly watches every NYC listing site at once, scores each apartment 1–100 for you, and drafts the message that gets the viewing.",
+    "DamnLease watches every NYC listing site at once, scores each apartment 1–100 for you, and drafts the message that gets the viewing.",
   openGraph: {
-    title: "Doorly — NYC apartments go in a day. So will you.",
+    title: "DamnLease — NYC apartments go in a day. So will you.",
     description:
       "Every listing site in one list, each place scored against what you actually want, and one-tap outreach. Hunt solo or as a team.",
-    url: "https://doorlynyc.vercel.app",
-    siteName: "Doorly",
+    url: "https://damnlease.com",
+    siteName: "DamnLease",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Doorly — NYC apartments go in a day. So will you.",
+    title: "DamnLease — NYC apartments go in a day. So will you.",
     description:
       "Every listing site in one list, each place scored against what you actually want, and one-tap outreach.",
   },

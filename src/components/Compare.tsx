@@ -32,8 +32,8 @@ import { useAutosave, saveLabel } from "@/lib/useAutosave";
  * matters and never again. The notes are real content and go to the server.
  */
 
-const ORDER_KEY = "doorly.compare.order";
-const OUT_KEY = "doorly.compare.excluded";
+const ORDER_KEY = "damnlease.compare.order";
+const OUT_KEY = "damnlease.compare.excluded";
 
 /** Reads a string array out of localStorage without trusting what it finds. */
 function readList(key: string): string[] {

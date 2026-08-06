@@ -10,7 +10,7 @@ import { ImageResponse } from "next/og";
  * navy, same facade mark with its one lit window, same voice.
  */
 
-export const alt = "Doorly — find your NYC apartment before everybody else does";
+export const alt = "DamnLease — find your NYC apartment before everybody else does";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -39,7 +39,7 @@ export default function OpengraphImage() {
             <rect x="6.5" y="12" width="4" height="4" rx="0.8" fill="#16324f" opacity="0.55" />
             <rect x="13.5" y="12" width="4" height="4" rx="0.8" fill="#ffd66b" />
           </svg>
-          <div style={{ fontSize: 64, fontWeight: 700, letterSpacing: -2 }}>Doorly</div>
+          <div style={{ fontSize: 64, fontWeight: 700, letterSpacing: -2 }}>DamnLease</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

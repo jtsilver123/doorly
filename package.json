@@ -1,5 +1,5 @@
 {
-  "name": "doorly",
+  "name": "damnlease",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -17,12 +17,13 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
     "leaflet": "^1.9.4",
-    "next": "16.2.3",
+    "next": "^15.5.22",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.2",
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^20",
@@ -33,6 +34,7 @@
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
     "tsx": "^4.23.5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.119.0"
   }
 }

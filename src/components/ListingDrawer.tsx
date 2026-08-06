@@ -388,7 +388,7 @@ export default function ListingDrawer({ listing, profile, onClose, onChanged, cr
   async function share() {
     const url = siteUrl(`/app?place=${encodeURIComponent(listing.id)}`);
     const title = `${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`;
-    const text = `${money(listing.price)}/mo · ${listing.neighborhood} · ${listing.rating}/100 on Doorly`;
+    const text = `${money(listing.price)}/mo · ${listing.neighborhood} · ${listing.rating}/100 on DamnLease`;
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url });

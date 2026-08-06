@@ -905,7 +905,7 @@ export default function Home() {
         <div className="brandblock">
           <div className="brandrow">
             <Logo />
-            <span className="brand brandmark">Doorly</span>
+            <span className="brand brandmark">DamnLease</span>
           </div>
           <div className="brandmeta">
             {/* The countdown leads — it's the premise of the product — and
@@ -1069,7 +1069,7 @@ export default function Home() {
           <a
             className="feedback-link"
             href={`mailto:jtsilver123@gmail.com?subject=${encodeURIComponent(
-              "Doorly feedback"
+              "DamnLease feedback"
             )}&body=${encodeURIComponent(
               [
                 "Hey Jake —",
@@ -1080,7 +1080,7 @@ export default function Home() {
                 "",
                 "What I expected instead:",
                 "",
-                "— sent from Doorly",
+                "— sent from DamnLease",
               ].join("\n")
             )}`}
           >
@@ -1598,7 +1598,7 @@ function ApiSettings({
           {status.usage.exhausted ? (
             <div className="warn-text" style={{ fontSize: 12 }}>
               The API itself says this key is out of credits — the count above
-              only sees requests made through Doorly, so a key spent elsewhere
+              only sees requests made through DamnLease, so a key spent elsewhere
               can look healthy here. Paste a new key below to keep checking.
             </div>
           ) : (
@@ -1732,7 +1732,7 @@ function PushToggle() {
   if (state === "unsupported") {
     return (
       <span className="muted" style={{ fontSize: 11 }}>
-        This browser can&apos;t do device notifications. On iPhone, add Doorly
+        This browser can&apos;t do device notifications. On iPhone, add DamnLease
         to your Home Screen first — Safari only allows push for installed apps.
       </span>
     );

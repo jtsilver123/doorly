@@ -55,7 +55,7 @@ function vapid(): boolean {
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) return false;
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:hello@doorlynyc.vercel.app",
+    process.env.VAPID_SUBJECT ?? "mailto:hello@damnlease.com",
     pub,
     priv
   );
