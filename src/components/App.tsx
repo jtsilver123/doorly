@@ -50,10 +50,21 @@ const CityMap = dynamic(() => import("@/components/CityMap"), {
 // Same constraint, same cure: the planner is Leaflet too.
 const TourPlanner = dynamic(() => import("@/components/TourPlanner"), { ssr: false });
 
-type Tab = "today" | "feed" | "changes" | "pipeline" | "compare" | "profile";
+/**
+ * Three places, not five. Usage was blunt about it: the hunt happens in
+ * Listings and Pipeline, with Activity as the news ticker. "Today" was a
+ * landing page restating what the other tabs already knew — its action strip
+ * now tops Listings and its move-in timeline heads Pipeline — and Compare is
+ * the pipeline's own finalists in a different lens, so it's a view there
+ * rather than a destination.
+ */
+type Tab = "feed" | "changes" | "pipeline" | "profile";
 
 /** Every valid tab, so a hand-edited hash can't put the app in a dead state. */
-const TABS: Tab[] = ["today", "feed", "changes", "pipeline", "compare", "profile"];
+const TABS: Tab[] = ["feed", "changes", "pipeline", "profile"];
+
+/** Old bookmarks and muscle memory keep working. */
+const LEGACY_TABS: Record<string, Tab> = { today: "feed", compare: "pipeline" };
 
 interface ApiStatus {
   usage: {
@@ -75,11 +86,9 @@ interface ApiStatus {
 
 /** Drawn marks, one per section. Shown at every width. */
 const NAV_ICON: Record<string, IconName> = {
-  today: "today",
   feed: "listings",
   changes: "bell",
   pipeline: "pipeline",
-  compare: "compare",
   profile: "profile",
 };
 
@@ -109,7 +118,9 @@ function sinceText(iso: string): string {
 export default function Home() {
   // Today is the default: the hunt is a four-week sprint, and the first
   // question each morning is what to do, not what exists.
-  const [tab, setTab] = useState<Tab>("today");
+  const [tab, setTab] = useState<Tab>("feed");
+  /** Board or Compare — two lenses on the same finalists. */
+  const [pipelineView, setPipelineView] = useState<"board" | "compare">("board");
 
   /**
    * The tab lives in the URL.
@@ -126,7 +137,8 @@ export default function Home() {
    */
   useLayoutEffect(() => {
     const fromHash = () => {
-      const key = window.location.hash.replace(/^#/, "") as Tab;
+      const raw = window.location.hash.replace(/^#/, "");
+      const key = (LEGACY_TABS[raw] ?? raw) as Tab;
       return TABS.includes(key) ? key : null;
     };
     const initial = fromHash();
@@ -906,13 +918,11 @@ export default function Home() {
         <div className="mobile-nav" style={{ display: "grid", gap: 2 }}>
           {(
             [
-              ["today", "Today", actions.length],
-              ["feed", "Listings", counts.active],
-              // The badge is the unread count — a permanent "200" is noise,
-              // an occasional "3" is news.
+              // The badge is what needs doing, not the corpus size — a
+              // permanent "489" is noise, an occasional "3" is news.
+              ["feed", "Listings", actions.length],
               ["changes", "Activity", unread],
               ["pipeline", "Pipeline", counts.pipeline],
-              ["compare", "Compare", finalistCount],
               // Phones only: the desktop rail reaches this through the account
               // button, which the bottom bar has no room for.
               ["profile", "You", 0],
@@ -1066,7 +1076,7 @@ export default function Home() {
       </nav>
 
       <main className="main" id="results">
-        {(tab === "today" || tab === "feed") && (
+        {tab === "feed" && (
           <div className="stickytop">
             {budget > 0 && (
           <SearchHeader
@@ -1082,41 +1092,24 @@ export default function Home() {
           />
             )}
 
-        {loading && (tab === "today" || tab === "feed") && <SkeletonGrid />}
+        {loading && <SkeletonGrid />}
 
-        {!loading && tab === "today" && (
-          <div className="page-today">
-            <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
-
-            <div className="actions-block">
-              <div className="muted section-label">DO THIS TODAY</div>
-              <div className="actions">
-              {actions.length === 0 ? (
-                <div className="surface" style={{ padding: 20 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                    Nothing urgent
-                  </div>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    No silent leads, no viewings booked, nothing new since
-                    yesterday. Pull fresh listings or work through the feed.
-                  </div>
-                </div>
-              ) : (
-                actions.map((action) => (
+            {/* What used to be the Today tab, boiled down to its one useful
+                part: the things that need doing, as a strip above the browse.
+                Nothing urgent means no strip — the feed speaks for itself. */}
+            {!loading && actions.length > 0 && (
+              <div className="actions actions-strip">
+                {actions.map((action) => (
                   <button
                     key={action.key}
                     className={`surface action action-${action.tone}`}
                     onClick={() => {
                       if (action.filter === "followUp") {
                         setFollowUpOnly(true);
-                        setTab("feed");
                       } else if (action.filter === "new") {
                         setSort("newest");
-                        setTab("feed");
                       } else if (action.filter === "tour") {
                         setTab("pipeline");
-                      } else {
-                        setTab("feed");
                       }
                     }}
                   >
@@ -1128,32 +1121,9 @@ export default function Home() {
                     </div>
                     <span className="action-arrow">→</span>
                   </button>
-                ))
-              )}
-              </div>
-            </div>
-
-            {/* The best of what's live, so Today can stand alone. */}
-            {visible.length > 0 && (
-              <div style={{ display: "grid", gap: 10 }}>
-                <div className="muted section-label">BEST MATCHES RIGHT NOW</div>
-                <div className="grid">
-                  {visible.slice(0, 4).map((listing) => (
-                    <ListingCard
-                      key={listing.id}
-                      listing={listing}
-                      via={via(listing)}
-                      onOpen={setOpen}
-                      onStar={star}
-                      onPass={pass}
-                      onReach={reachOut}
-                    />
-                  ))}
-                </div>
+                ))}
               </div>
             )}
-          </div>
-        )}
 
             {tab === "feed" && (
               <FilterBar
@@ -1242,7 +1212,7 @@ export default function Home() {
           </>
         )}
 
-        {loading && tab !== "today" && tab !== "feed" && (
+        {loading && tab !== "feed" && (
           <div className="surface" style={{ padding: 24 }} aria-busy="true">
             <div className="skeleton skeleton-line" style={{ width: "40%", height: 16 }} />
             <div className="skeleton skeleton-line" style={{ width: "70%", marginTop: 10 }} />
@@ -1262,34 +1232,59 @@ export default function Home() {
         )}
 
         {!loading && tab === "pipeline" && (
-          <PipelineBoard
-            listings={listings}
-            onOpen={setOpen}
-            onMove={moveStage}
-            onQuickAdd={quickAdd}
-            onPlanTours={() => setPlanning(true)}
-            onPass={(l) => setPassing(l)}
-            onAddToCalendar={downloadIcs}
-            crewTag={(l) => {
-              if (!crew) return null;
-              // Point person first — on a working board, "who's on this" beats
-              // "who found it".
-              const poc = crewName(l.pocId);
-              if (poc) return `${poc} has point`;
-              return via(l);
-            }}
-          />
-        )}
+          <div className="page-pipeline">
+            {/* The move-in clock lives with the funnel it measures. */}
+            <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
 
-        {!loading && tab === "compare" && (
-          <Compare
-            listings={listings}
-            onOpen={setOpen}
-            onNotes={async (id, notes) => {
-              await patch(id, { action: "notes", notes });
-              loadFeed();
-            }}
-          />
+            {/* Two lenses on the same finalists: work the board, or put them
+                side by side for decision night. A view toggle, not a tab —
+                Compare's candidates were always just the pipeline. */}
+            <div className="seg pipeline-view" role="group" aria-label="Pipeline view">
+              <button
+                className={pipelineView === "board" ? "is-on" : undefined}
+                aria-pressed={pipelineView === "board"}
+                onClick={() => setPipelineView("board")}
+              >
+                Board
+              </button>
+              <button
+                className={pipelineView === "compare" ? "is-on" : undefined}
+                aria-pressed={pipelineView === "compare"}
+                onClick={() => setPipelineView("compare")}
+              >
+                Compare{finalistCount > 0 ? ` (${finalistCount})` : ""}
+              </button>
+            </div>
+
+            {pipelineView === "board" ? (
+              <PipelineBoard
+                listings={listings}
+                onOpen={setOpen}
+                onMove={moveStage}
+                onQuickAdd={quickAdd}
+                onPlanTours={() => setPlanning(true)}
+                onPass={(l) => setPassing(l)}
+                onAddToCalendar={downloadIcs}
+                crewTag={(l) => {
+                  if (!crew) return null;
+                  // Point person first — on a working board, "who's on this"
+                  // beats "who found it".
+                  const poc = crewName(l.pocId);
+                  if (poc) return `${poc} has point`;
+                  return via(l);
+                }}
+              />
+            ) : (
+              <Compare
+                listings={listings}
+                onOpen={setOpen}
+                onNotes={async (id, notes) => {
+                  await patch(id, { action: "notes", notes });
+                  loadFeed();
+                }}
+              />
+            )}
+          </div>
         )}
 
         {!loading && tab === "profile" && (

@@ -1208,24 +1208,23 @@ button.fact:hover .fact-label { color: var(--accent); }
  * cap belongs on the text, not on the page.
  */
 
-.page-today {
-  display: grid;
-  gap: var(--s5);
-  align-content: start;
-}
-
-/* Reading matter inside Today keeps a sane measure without boxing the grid
-   of listings underneath it. */
-.page-today .timeline-note,
-.page-today p { max-width: 78ch; }
-
-/* The action list is a column of one-line decisions; three across on a wide
-   screen beats one column of stretched rows. */
-.page-today .actions {
+/* What was the Today tab, distributed: the do-this strip tops Listings and
+   the timeline heads Pipeline. Both keep the old three-across rhythm. */
+.actions-strip {
   display: grid;
   gap: var(--s3);
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  margin-bottom: var(--s3);
 }
+
+.page-pipeline {
+  display: grid;
+  gap: var(--s4);
+  align-content: start;
+}
+.page-pipeline .timeline-note,
+.page-pipeline p { max-width: 78ch; }
+.pipeline-view { justify-self: start; }
 
 /*
  * Settings panels.
@@ -1340,7 +1339,6 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /* The action cards on Today are parallel one-line decisions, so they can run
    several across rather than stretching one per row. */
-.actions-block { display: grid; gap: var(--s3); }
 
 /* Marks where the next page of cards will appear, and says where you are in
    the set — an infinite list with no count leaves you unable to judge whether
