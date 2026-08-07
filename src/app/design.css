@@ -1370,11 +1370,9 @@ button.fact:hover .fact-label { color: var(--accent); }
   margin-bottom: var(--s3);
 }
 
-.page-pipeline {
-  display: grid;
-  gap: var(--s4);
-  align-content: start;
-}
+/* Layout lives with the kanban block further down (flex column filling the
+   viewport); this early rule only spaces the children. */
+.page-pipeline { gap: var(--s4); }
 .page-pipeline .timeline-note,
 .page-pipeline p { max-width: 78ch; }
 .pipeline-view { justify-self: start; }
@@ -1571,41 +1569,70 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 
 /*
- * Desktop is a real kanban: the page holds still and each column scrolls
- * its own cards under its own header. This is the third attempt at "freeze
- * the headers" and the first one that can't glitch, because nothing is
- * sticky — the paste bar and the headers are frozen by being outside the
- * thing that scrolls. Phones keep the flowing layout; a nested scroller
- * under a thumb fights the browser's own chrome.
+ * The kanban, everywhere: the page holds still and each column scrolls its
+ * own cards under its own header. This is the third attempt at "freeze the
+ * headers" and the first one that can't glitch, because nothing is sticky —
+ * the paste bar and the headers are frozen by being outside the thing that
+ * scrolls. Desktop fills the panel; phones size the page to exactly one
+ * viewport (below in the phone block), so the board is the only thing a
+ * thumb can scroll and the headers never move.
  */
-@media (min-width: 861px) {
+.page-pipeline {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page-pipeline .board {
+  flex: 1 1 0;
+  min-height: 0;
+  align-items: stretch;
+  padding-bottom: 0;
+}
+
+.page-pipeline .board-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-pipeline .board-stack {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  /* Breathing room so the last card's shadow isn't clipped. */
+  padding-bottom: var(--s2);
+}
+
+/* Phones: the page has no fixed-height panel to fill, so the pipeline sizes
+   itself to the viewport minus the page's own top padding and the tab bar.
+   No page scroll left on this tab means the column headers, the paste bar
+   and the pace strip simply cannot leave the screen. */
+@media (max-width: 860px) {
   .page-pipeline {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+    height: calc(100dvh - var(--s3) - 80px - env(safe-area-inset-bottom, 0px));
   }
 
-  .page-pipeline .board {
-    flex: 1 1 0;
-    min-height: 0;
-    align-items: stretch;
-    padding-bottom: 0;
+  /* The strip now competes with the board for one fixed viewport, so it
+     slims to what a phone needs: the phase, the countdown, and the pace.
+     The funnel numbers and the band bar are desktop-rail furniture, and
+     their fixed-width rows were what ran off the screen edge. */
+  .page-pipeline .timeline { flex-shrink: 0; }
+  .page-pipeline .timeline-funnel,
+  .page-pipeline .timeline-bar { display: none; }
+  .page-pipeline .timeline-advice {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
   }
-
-  .page-pipeline .board-col {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .page-pipeline .board-stack {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow-y: auto;
-    /* Breathing room so the last card's shadow isn't clipped. */
-    padding-bottom: var(--s2);
+  .page-pipeline .timeline-pace { flex-wrap: wrap; }
+  .page-pipeline .timeline-pace > div:last-child {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
+    min-width: 0;
   }
 }
 

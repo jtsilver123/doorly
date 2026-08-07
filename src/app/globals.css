@@ -274,6 +274,23 @@ textarea {
   outline: none;
 }
 
+/*
+ * iOS Safari zooms the whole page when a focused field's text is under
+ * 16px, and the zoom outlives the keyboard — the "everything hangs off the
+ * right edge of my phone" screenshots are this, not a layout bug. Sixteen
+ * pixels at the source is the one real cure (viewport maximum-scale would
+ * also block the user's own pinch, which is hostile). !important on
+ * purpose: this is a device guard that has to beat every classed size,
+ * including ones added later.
+ */
+@media (max-width: 860px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Focus is acid, in both themes. It's the one place the brand colour is
    allowed to appear unbidden, and it makes keyboard use feel deliberate
    rather than tolerated. */
