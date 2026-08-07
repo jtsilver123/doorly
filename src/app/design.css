@@ -1372,12 +1372,16 @@ button.fact:hover .fact-label { color: var(--accent); }
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--surface-2);
+  /* The column tint over the page ground, layered so the pinned header is
+     opaque — the tint alone is translucent and let card prices ghost
+     through the column names while scrolling. */
+  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
   padding: var(--s2) 0;
 }
 
 @media (min-width: 861px) {
-  .board-head { top: 46px; }
+  /* One pixel under the paste bar's 41px bottom edge — see .quickadd above. */
+  .board-head { top: 62px; }
 }
 
 /* Your own amenity verdicts, tappable in place. The ring marks cells where
@@ -2108,19 +2112,31 @@ button.fact:hover .fact-label { color: var(--accent); }
  * over it while it's stuck. The max-width lives on the inner form so the
  * frozen bar itself can span and paint the full panel width.
  */
+/*
+ * The frozen stack, sized to the pixel. The paste bar's pinned box is
+ * 10 + 38 + 10 + 1 = 59px tall with its top 18px above the scrollport (the
+ * padding-cancel trick), so its visible bottom edge lands at 41px — and the
+ * column headers pin at 40px, one pixel tucked underneath so no seam ever
+ * shows. Change one number here and the other must follow; eyeballed
+ * offsets are how the headers ended up guillotined mid-letter under the bar.
+ */
 @media (min-width: 861px) {
   .page-pipeline .quickadd {
     position: sticky;
     top: -18px;
     z-index: 25;
     margin: -18px -20px var(--s4);
-    padding: 14px 20px;
+    padding: 10px 20px;
     max-width: none;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
   }
 
-  .page-pipeline .quickadd .field { max-width: 30rem; }
+  .page-pipeline .quickadd .field,
+  .page-pipeline .quickadd .btn {
+    height: 38px;
+    max-width: 30rem;
+  }
 }
 
 .quickadd .field { flex: 1; }
