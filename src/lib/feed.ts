@@ -368,6 +368,9 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       priceChangedAt: row.price_changed_at,
       relistedAt: row.relisted_at,
       alsoOn,
+      // The ball's court: an inbound reply anywhere in the thread means the
+      // conversation is live and the next move is booking, not chasing.
+      hasReply: contact?.inbound ?? false,
       stage: state?.stage ?? "inbox",
       stageChangedAt: state?.stage_changed_at ?? null,
       starred: state?.starred ?? false,

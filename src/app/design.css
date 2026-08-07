@@ -5378,3 +5378,63 @@ button.fact:hover .fact-label { color: var(--accent); }
     margin-bottom: 0;
   }
 }
+
+/* The radar line: the page's opening claim, with the intake beside it. */
+.radar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  margin-bottom: var(--s3);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+}
+.radar b { color: var(--text); }
+
+.radar-paste {
+  display: flex;
+  gap: var(--s2);
+  flex: 0 1 360px;
+  min-width: 240px;
+}
+.radar-paste .field { flex: 1; min-width: 0; }
+.radar-paste .btn { flex-shrink: 0; white-space: nowrap; }
+
+/* One tap when they answer. Styled as the good news it is. */
+.board-replied {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.board-replied:hover { color: var(--good); border-color: var(--good); }
+
+/* Packet readiness at the moment of applying. */
+.packet-pulse {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--s3);
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+}
+.packet-pulse.is-ready { color: var(--text); }
+.packet-pulse .meter { max-width: 220px; }
+
+@media (max-width: 640px) {
+  .radar { flex-direction: column; align-items: stretch; }
+  .radar-paste { flex-basis: auto; }
+}

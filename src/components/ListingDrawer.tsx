@@ -37,6 +37,7 @@ import { lastChangeOf } from "@/lib/timeline";
 import { formatPhone, isCompletePhone } from "@/lib/phone";
 import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
+import { packetReadiness } from "@/lib/packet";
 // Leaflet reads `window` on import, which detonates the server render.
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
@@ -1444,6 +1445,11 @@ export default function ListingDrawer({
               and one click away once pasted. Saves on blur, like notes. */}
           <section className="dsec" data-sec="sec-apply">
             <h3 className="dsec-label">The application</h3>
+            {/* The handoff the funnel was missing: at the moment of applying,
+                how ready the packet actually is — files, not checkboxes —
+                with the jump to finish it. The fastest complete application
+                usually wins the apartment. */}
+            <PacketPulse profile={profile} />
             <div className="applink">
               <input
                 className="field"
@@ -1623,5 +1629,53 @@ export default function ListingDrawer({
         </footer>
       </aside>
     </>
+  );
+}
+
+
+/**
+ * The packet's readiness, read live where applying happens. Fetches the
+ * document list on first render of the section; a percent and the missing
+ * names, then one link to the packet itself.
+ */
+function PacketPulse({ profile }: { profile: Profile }) {
+  const [docs, setDocs] = useState<{ slot: string }[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/documents")
+      .then((r) => r.json())
+      .then((b) => {
+        if (alive) setDocs(b.documents ?? []);
+      })
+      .catch(() => {
+        if (alive) setDocs([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (docs === null) return null;
+  const { percent, missing } = packetReadiness(profile, docs);
+  return (
+    <div className={percent >= 80 ? "packet-pulse is-ready" : "packet-pulse"}>
+      <div className="meter">
+        <span
+          style={{
+            width: `${percent}%`,
+            background: percent >= 80 ? "var(--good)" : "var(--warn)",
+          }}
+        />
+      </div>
+      <span>
+        Your packet is {percent}% ready
+        {missing.length > 0 && percent < 100
+          ? `. Still needed: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}`
+          : ". Send it with the application"}
+        {" "}
+        <a className="linkish" href="/you#packet">
+          {percent < 100 ? "Finish it" : "Open it"}
+        </a>
+      </span>
+    </div>
   );
 }

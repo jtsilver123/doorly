@@ -415,6 +415,30 @@ export default function Home() {
   const [showLate, setShowLate] = useState(false);
   /** Phones: which of the two views the toggle is showing. */
   const [mobileMap, setMobileMap] = useState(false);
+  /*
+   * The radar: what happened since you last stood here. The page's job is
+   * not browsing (StreetEasy is better at that, and the jump buttons say
+   * so); it's watching all five sites so you don't have to. The watermark
+   * lives in this browser because "since you last looked" is a fact about
+   * you, not about the corpus.
+   */
+  const [radarPrev, setRadarPrev] = useState<number | null>(null);
+  const [radarOnly, setRadarOnly] = useState(false);
+  useEffect(() => {
+    if (tab !== "feed") return;
+    const KEY = "damnlease.feed.lastVisit";
+    const prev = Number(window.localStorage.getItem(KEY)) || null;
+    setRadarPrev(prev);
+    window.localStorage.setItem(KEY, String(Date.now()));
+  }, [tab]);
+  const sinceRadar = useCallback(
+    (l: FeedListing) => {
+      if (!radarPrev) return false;
+      const after = (iso: string | null) => Boolean(iso && new Date(iso).getTime() > radarPrev);
+      return after(l.firstSeenAt) || after(l.priceChangedAt) || after(l.relistedAt);
+    },
+    [radarPrev]
+  );
   const { visible, lateHidden } = useMemo(() => {
     let filtered = applyFilters(listings, {
       stage: "all",
@@ -442,6 +466,7 @@ export default function Home() {
         return est != null && est.minutes <= cap;
       });
     }
+    if (radarOnly) filtered = filtered.filter(sinceRadar);
     /*
      * A place that won't be free until weeks after the move-in date is not a
      * candidate, and showing it as one reads as the app not listening. Hidden
@@ -454,6 +479,8 @@ export default function Home() {
     return { visible: kept, lateHidden: filtered.length - kept.length };
   }, [
     showLate,
+    radarOnly,
+    sinceRadar,
     listings,
     query,
     priceMin,
@@ -888,6 +915,31 @@ export default function Home() {
       });
     },
     [patch, loadFeed, toast, optimisticPass]
+  );
+
+  /**
+   * They answered. The reply arrives on your phone, not in the app, so the
+   * record takes one tap: an inbound contact in the log, and the card's next
+   * action flips from chasing to booking on the spot.
+   */
+  const logReply = useCallback(
+    (listing: FeedListing) => {
+      setListings((list) =>
+        list.map((l) => (l.id === listing.id ? { ...l, hasReply: true, needsFollowUp: false } : l))
+      );
+      patch(
+        listing.id,
+        {
+          action: "contact",
+          channel: listing.lastContactChannel ?? "text",
+          direction: "in",
+          who: listing.contactName,
+          note: "They replied",
+        },
+        false
+      ).catch(() => loadFeed());
+    },
+    [patch, loadFeed]
   );
 
   /**
@@ -1590,6 +1642,64 @@ export default function Home() {
               // ways. Phones choose one at a time via the floating toggle —
               // a 300px map above the cards taxed every visit a scroll.
               <>
+                {/* The radar line: the page's opening claim. Counts what
+                    appeared or moved since your last visit, filters to just
+                    that on request, and — when there's nothing — says so
+                    instead of pretending there's always more to browse. */}
+                {radarPrev != null &&
+                  (() => {
+                    const news = listings.filter(
+                      (l) => sinceRadar(l) && l.isActive
+                    ).length;
+                    return (
+                      <div className="radar" role="status">
+                        <span>
+                          {news > 0 ? (
+                            <>
+                              <b>
+                                {news} new or changed
+                              </b>{" "}
+                              since you last looked.{" "}
+                              <button
+                                className="linkish"
+                                onClick={() => setRadarOnly((v) => !v)}
+                              >
+                                {radarOnly ? "Show everything" : "Just the news"}
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              You&apos;re caught up. Nothing new on any of the
+                              five sites since you last looked. Browse deeper
+                              on StreetEasy if you like; this is where a place
+                              gets won.
+                            </>
+                          )}
+                        </span>
+                        <form
+                          className="radar-paste"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const input = e.currentTarget.elements.namedItem(
+                              "paste"
+                            ) as HTMLInputElement;
+                            if (input.value.trim()) quickAdd(input.value.trim());
+                            input.value = "";
+                          }}
+                        >
+                          <input
+                            name="paste"
+                            className="field"
+                            placeholder="Found one elsewhere? Paste the link"
+                            aria-label="Pull in a listing by address or link"
+                          />
+                          <button className="btn" type="submit">
+                            Pull it in
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  })()}
                 {(lateHidden > 0 || showLate) && (
                   <div className="late-note" role="status">
                     {showLate ? (
@@ -1695,6 +1805,7 @@ export default function Home() {
               onChaseAll={() => setBulkMode("chase")}
               onReachAll={() => setBulkMode("first")}
               onReviewTours={() => setReviewing(true)}
+              onReplied={logReply}
               onLean={setLean}
               onAppResult={setAppResult}
               onSecured={setSecured}
@@ -1939,7 +2050,7 @@ function Empty({
       <p className="empty-body">
         {filtered
           ? "Everything we're tracking got filtered out. Clearing the filters will bring the full list back."
-          : "Pull listings from StreetEasy, Zillow, Apartments.com, HotPads and Craigslist."}
+          : "Pull listings from StreetEasy, Zillow, Apartments.com, HotPads and Craigslist. Browse deep on the big sites; run the chase here."}
       </p>
       <div className="empty-actions">
         {filtered ? (

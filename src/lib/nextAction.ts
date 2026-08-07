@@ -95,6 +95,17 @@ export function nextAction(listing: FeedListing): NextAction {
     }
 
     case "contacted":
+      // They answered: the thread is live, and the only move that converts a
+      // live thread is a booked viewing.
+      if (listing.hasReply) {
+        return {
+          kind: "schedule",
+          label: "Book the viewing",
+          hint: "They replied — lock a time while it's warm",
+          becomes: "tour",
+          urgent: true,
+        };
+      }
       return listing.needsFollowUp
         ? {
             kind: "chase",

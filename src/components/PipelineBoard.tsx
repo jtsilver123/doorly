@@ -57,6 +57,7 @@ export default function PipelineBoard({
   onChaseAll,
   onReachAll,
   onReviewTours,
+  onReplied,
   crewTag,
   onPass,
   onLean,
@@ -86,6 +87,8 @@ export default function PipelineBoard({
   onReachAll: () => void;
   /** Opens review mode: each toured place's footage, one thumb at a time. */
   onReviewTours: () => void;
+  /** One tap when the broker answers — logs the inbound reply. */
+  onReplied: (listing: FeedListing) => void;
   /**
    * Tag-team line for a card — "Emma has point", "via Dad" — or null when
    * solo. Computed by the page, which holds the roster.
@@ -467,6 +470,32 @@ export default function PipelineBoard({
                       >
                         Google <Icon name="external" size={11} />
                       </a>
+                    </span>
+                  )}
+                  {/* The app can't read your texts, so the reply gets one
+                      tap instead: press it when they answer and the card's
+                      whole posture flips from chasing to booking. */}
+                  {l.stage === "contacted" && !l.hasReply && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="board-replied"
+                      title="Mark that they answered"
+                      aria-label={`They replied about ${l.address}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReplied(l);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onReplied(l);
+                        }
+                      }}
+                    >
+                      <Icon name="message" size={13} />
+                      They replied
                     </span>
                   )}
                   {/* Fresh from the viewing: which way are you leaning? A

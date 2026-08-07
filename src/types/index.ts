@@ -242,6 +242,8 @@ export interface FeedListing extends Listing {
   amenityMarks: Record<string, "yes" | "no">;
   contactCount: number;
   lastContactAt: string | null;
+  /** Any inbound reply logged on this thread. */
+  hasReply: boolean;
   /** How you last reached out — shown on the card so it's visible at a glance. */
   lastContactChannel: ContactChannel | null;
   score: number | null;

@@ -333,6 +333,7 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     originalPrice: 3500,
     priceChangedAt: null,
     relistedAt: null,
+    hasReply: false,
     alsoOn: [],
     stage: "inbox",
     stageChangedAt: null,
