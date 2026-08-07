@@ -24,6 +24,53 @@
  */
 
 /** Matches the app's own key layout — see lib/r2.ts. */
+/*
+ * What the packet accepts: the papers a rental application is made of.
+ * Images count (people photograph documents), video does not.
+ */
+function packetType(contentType) {
+  return (
+    contentType.startsWith("image/") ||
+    contentType === "application/pdf" ||
+    contentType === "application/msword" ||
+    contentType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
+}
+
+/** The packet uses the reserved listing id "packet"; keys carry it too. */
+function isPacket(listingId) {
+  return listingId === "packet";
+}
+
+/**
+ * The metadata row for a stored object, branched by what it is: listing
+ * media goes to user_listing_media, packet documents to user_documents.
+ * Both written as the user, so RLS governs each the same way.
+ */
+async function recordUpload(env, user, { listingId, key, contentType, filename, size }) {
+  const packet = key.split("/")[1] === "packet";
+  const target = packet ? "user_documents" : "user_listing_media";
+  const row = packet
+    ? { user_id: user.id, path: key, name: filename, kind: contentType, size: size ?? null }
+    : {
+        user_id: user.id,
+        listing_id: listingId,
+        path: key,
+        kind: contentType.startsWith("video/") ? "video" : "photo",
+      };
+  return fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${target}`, {
+    method: "POST",
+    headers: {
+      apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      authorization: `Bearer ${user.token}`,
+      "content-type": "application/json",
+      prefer: "return=minimal",
+    },
+    body: JSON.stringify(row),
+  });
+}
+
 function mediaKey(userId, listingId, filename) {
   const safe = String(filename).replace(/[^\w.\-]+/g, "_").slice(-80);
   return `${userId}/${listingId}/${Date.now()}-${safe}`;
@@ -126,8 +173,12 @@ export async function handleMediaGet(request, env) {
 
     // RLS does the deciding: own rows and crew rows are visible, and a 404
     // deliberately looks the same whether the file is missing or not theirs.
+    // Packet documents check their own table; everything else stays with
+    // listing media. Either way the read is as the viewer, and a miss is a
+    // 404 that looks the same whether the file is absent or someone else's.
+    const table = key.split("/")[1] === "packet" ? "user_documents" : "user_listing_media";
     const row = await fetch(
-      `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/user_listing_media?path=eq.${encodeURIComponent(key)}&select=id&limit=1`,
+      `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${table}?path=eq.${encodeURIComponent(key)}&select=id&limit=1`,
       {
         headers: {
           apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -265,7 +316,11 @@ async function handleMultipart(request, env, url, user) {
     const filename = url.searchParams.get("name") || "upload";
     const contentType = url.searchParams.get("type") || "application/octet-stream";
     if (!listingId) return json({ error: "no listing" }, 400);
-    if (!contentType.startsWith("video/") && !contentType.startsWith("image/")) {
+    if (isPacket(listingId)) {
+      if (!packetType(contentType)) {
+        return json({ error: "documents and photos only" }, 415);
+      }
+    } else if (!contentType.startsWith("video/") && !contentType.startsWith("image/")) {
       return json({ error: "only photos and video" }, 415);
     }
     const key = mediaKey(user.id, listingId, filename);
@@ -319,20 +374,12 @@ async function handleMultipart(request, env, url, user) {
     );
     // The row only after the object exists, written as the user so RLS
     // still governs it — same order, same reason as the single-shot path.
-    const insert = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/user_listing_media`, {
-      method: "POST",
-      headers: {
-        apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        authorization: `Bearer ${user.token}`,
-        "content-type": "application/json",
-        prefer: "return=minimal",
-      },
-      body: JSON.stringify({
-        user_id: user.id,
-        listing_id: body.listingId,
-        path: body.key,
-        kind: (body.contentType ?? "").startsWith("video/") ? "video" : "photo",
-      }),
+    const insert = await recordUpload(env, user, {
+      listingId: body.listingId,
+      key: body.key,
+      contentType: body.contentType ?? "application/octet-stream",
+      filename: String(body.key).split("/").pop() ?? "document",
+      size: null,
     });
     if (!insert.ok) {
       await env.MEDIA.delete(body.key).catch(() => {});
@@ -374,7 +421,11 @@ export async function handleUpload(request, env) {
     const filename = url.searchParams.get("name") || "upload";
     const contentType = request.headers.get("content-type") || "application/octet-stream";
     if (!listingId) return json({ error: "no listing" }, 400);
-    if (!contentType.startsWith("video/") && !contentType.startsWith("image/")) {
+    if (isPacket(listingId)) {
+      if (!packetType(contentType)) {
+        return json({ error: "documents and photos only" }, 415);
+      }
+    } else if (!contentType.startsWith("video/") && !contentType.startsWith("image/")) {
       return json({ error: "only photos and video" }, 415);
     }
     if (!request.body) return json({ error: "no file" }, 400);
@@ -390,20 +441,12 @@ export async function handleUpload(request, env) {
 
     // Written as the user, so row-level security governs this insert exactly
     // as it governs every other one.
-    const insert = await fetch(`${supabaseUrl}/rest/v1/user_listing_media`, {
-      method: "POST",
-      headers: {
-        apikey: anonKey,
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-        prefer: "return=minimal",
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        listing_id: listingId,
-        path: key,
-        kind: contentType.startsWith("video/") ? "video" : "photo",
-      }),
+    const insert = await recordUpload(env, user, {
+      listingId,
+      key,
+      contentType,
+      filename,
+      size: Number(request.headers.get("content-length")) || null,
     });
     if (!insert.ok) {
       // Don't leave an orphan object paying rent for a row that never existed.

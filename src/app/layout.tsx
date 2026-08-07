@@ -34,9 +34,28 @@ export const metadata: Metadata = {
   // Absolute base for the social card URL — link unfurlers won't chase a
   // relative path.
   metadataBase: new URL("https://damnlease.com"),
-  title: "DamnLease",
+  /*
+   * Written for the searches people actually type on their worst apartment
+   * day: "nyc apartment search tracker", "apartment hunting spreadsheet",
+   * "rental CRM". The phrases live in honest sentences, not a keyword pile —
+   * stuffing reads worse to Google than to humans now.
+   */
+  title: {
+    default: "DamnLease · NYC apartment hunting, run like a pipeline",
+    template: "%s · DamnLease",
+  },
   description:
-    "A good NYC apartment is gone in a day, and it goes to whoever replied first. Every listing site checked hourly, priced against real comps, with your message already written.",
+    "A free CRM for finding an NYC apartment. Every rental listing site checked hourly, priced against real comps, tracked through outreach, tours, and applications. The spreadsheet, retired.",
+  keywords: [
+    "NYC apartment search",
+    "apartment hunting tracker",
+    "rental search CRM",
+    "find an apartment in New York",
+    "apartment hunting spreadsheet replacement",
+    "StreetEasy tracker",
+    "NYC rental pipeline",
+  ],
+  alternates: { canonical: "https://damnlease.com" },
   openGraph: {
     title: "DamnLease — Be first, not lucky.",
     description:

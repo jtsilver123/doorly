@@ -1362,26 +1362,11 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /* Column headers stay while the column scrolls, so a long pipeline never
    leaves you guessing which stage you're reading. */
-/*
- * Column names hold still while their cards scroll. The sticky context is
- * the page's scroller, and each header pins within its own column box, so a
- * long Contacted column keeps saying "Contacted" all the way down. Desktop
- * offsets below the frozen paste bar; phones pin to the true top.
- */
+/* A plain caption. The column scrolls its own cards underneath it (see the
+   kanban block), so the header never needs to move to stay visible. */
 .board-head {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  /* The column tint over the page ground, layered so the pinned header is
-     opaque — the tint alone is translucent and let card prices ghost
-     through the column names while scrolling. */
-  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
+  flex-shrink: 0;
   padding: var(--s2) 0;
-}
-
-@media (min-width: 861px) {
-  /* One pixel under the paste bar's 41px bottom edge — see .quickadd above. */
-  .board-head { top: 62px; }
 }
 
 /* Your own amenity verdicts, tappable in place. The ring marks cells where
@@ -1489,6 +1474,45 @@ button.fact:hover .fact-label { color: var(--accent); }
   overflow-x: auto;
   align-items: start;
   padding-bottom: var(--s3);
+}
+
+/*
+ * Desktop is a real kanban: the page holds still and each column scrolls
+ * its own cards under its own header. This is the third attempt at "freeze
+ * the headers" and the first one that can't glitch, because nothing is
+ * sticky — the paste bar and the headers are frozen by being outside the
+ * thing that scrolls. Phones keep the flowing layout; a nested scroller
+ * under a thumb fights the browser's own chrome.
+ */
+@media (min-width: 861px) {
+  .page-pipeline {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .page-pipeline .board {
+    flex: 1 1 0;
+    min-height: 0;
+    align-items: stretch;
+    padding-bottom: 0;
+  }
+
+  .page-pipeline .board-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .page-pipeline .board-stack {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    /* Breathing room so the last card's shadow isn't clipped. */
+    padding-bottom: var(--s2);
+  }
 }
 
 .board-col {
@@ -2113,29 +2137,15 @@ button.fact:hover .fact-label { color: var(--accent); }
  * frozen bar itself can span and paint the full panel width.
  */
 /*
- * The frozen stack, sized to the pixel. The paste bar's pinned box is
- * 10 + 38 + 10 + 1 = 59px tall with its top 18px above the scrollport (the
- * padding-cancel trick), so its visible bottom edge lands at 41px — and the
- * column headers pin at 40px, one pixel tucked underneath so no seam ever
- * shows. Change one number here and the other must follow; eyeballed
- * offsets are how the headers ended up guillotined mid-letter under the bar.
+ * On desktop the pipeline page does not scroll at all — see the kanban
+ * block by `.board` — so the paste bar is frozen by standing still, not by
+ * position: sticky. Sticky was tried twice here and lost twice: the board
+ * is its own horizontal scroll container, and sticky descendants resolve
+ * against IT, not the page, which pinned headers into the middle of cards.
  */
 @media (min-width: 861px) {
   .page-pipeline .quickadd {
-    position: sticky;
-    top: -18px;
-    z-index: 25;
-    margin: -18px -20px var(--s4);
-    padding: 10px 20px;
-    max-width: none;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .page-pipeline .quickadd .field,
-  .page-pipeline .quickadd .btn {
-    height: 38px;
-    max-width: 30rem;
+    margin-bottom: var(--s3);
   }
 }
 
@@ -3064,6 +3074,154 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .compare-lean { margin-top: 0; }
 
+/*
+ * Compare, frozen the honest way: on desktop the page fills the panel and
+ * holds still, the table scrolls inside its own box, and the header row of
+ * finalists pins with plain sticky-within-the-scroller — the only geometry
+ * where table sticky actually works. Same architecture as the kanban board,
+ * for the same reason.
+ */
+@media (min-width: 861px) {
+  .page-compare {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .page-compare .compare-wrap {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .page-compare .compare-scroller {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .compare thead th {
+    position: sticky;
+    top: 0;
+    z-index: 7;
+    background: var(--surface);
+    box-shadow: 0 8px 14px -12px rgba(20, 20, 26, 0.4);
+  }
+}
+
+/* The corner control sits over both frozen axes, so it outranks them. */
+.compare-corner {
+  z-index: 8 !important;
+  vertical-align: bottom;
+}
+
+.compare-editbtn {
+  font-size: var(--t-xs);
+  padding: 6px 10px;
+}
+
+/* The picker, as a proper dialog: choosing the finalists is a moment of
+   attention, not a strip squeezed above the table. */
+.compare-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: grid;
+  place-items: center;
+  padding: var(--s4);
+  background: rgba(20, 20, 26, 0.5);
+  backdrop-filter: blur(2px);
+  animation: fadein 0.15s var(--ease);
+}
+
+.compare-modal-panel {
+  width: min(680px, 94vw);
+  max-height: 82dvh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--s4);
+  display: grid;
+  gap: var(--s3);
+}
+
+.compare-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.compare-modal .compare-pick {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+}
+
+@keyframes fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* The packet's file well: a drop-in door that looks like one. */
+.packet-drop {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 12px 14px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.packet-drop:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.packet-docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.packet-docs li {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: var(--t-sm);
+}
+
+.packet-docs a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.packet-docs a:hover { text-decoration: underline; }
+
+.packet-docs .muted { font-size: var(--t-xs); white-space: nowrap; }
+
+.packet-remove { flex-shrink: 0; }
+
 /* The Activity toggle rides the sticky header's bottom edge. */
 .activity-row {
   display: flex;
@@ -3291,20 +3449,40 @@ button.fact:hover .fact-label { color: var(--accent); }
 .drawer-close { padding: 5px 8px; flex-shrink: 0; }
 
 /* Sections: one label style, one rhythm, a hairline between thoughts. */
+/*
+ * Sections are rooms, not paragraphs. The drawer carries a lot per listing,
+ * and with hairline rules and whisper-sized labels it read as one long
+ * corridor — you were somewhere, but never anywhere. More air between
+ * sections, a doubled rule, and a heading you can aim for while flicking
+ * the scroll wheel.
+ */
 .dsec {
   display: grid;
   gap: var(--s3);
-  padding-top: var(--s4);
-  border-top: 1px solid var(--border);
+  margin-top: var(--s4);
+  padding-top: var(--s5);
+  border-top: 2px solid var(--border-strong);
 }
 
 .dsec-label {
   margin: 0;
-  font-size: var(--t-2xs);
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: var(--t-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text);
+}
+
+/* The label's little echo of the accent, so headings register in a scan. */
+.dsec-label::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--action);
+  vertical-align: 1px;
 }
 
 .dsec-sub { display: grid; gap: var(--s2); padding-top: var(--s2); }

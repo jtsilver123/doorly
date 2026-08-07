@@ -16,7 +16,7 @@ export interface UploadJob {
   id: number;
   listingId: string;
   name: string;
-  kind: "photo" | "video";
+  kind: "photo" | "video" | "file";
   state: "queued" | "uploading" | "done" | "error";
   /** How much of the body has left the browser, 0–1. */
   progress: number;
@@ -178,7 +178,22 @@ const EXT_TYPES: Record<string, string> = {
 function sniffType(file: File): string {
   if (file.type) return file.type;
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return EXT_TYPES[ext] ?? "";
+  return EXT_TYPES[ext] ?? DOC_TYPES[ext] ?? "";
+}
+
+/*
+ * The application packet takes papers, not footage: PDFs, word documents,
+ * and photographs of documents. Scoped to the reserved "packet" listing id
+ * so a stray PDF can never sneak into a listing's gallery.
+ */
+const DOC_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+function packetAccepts(type: string): boolean {
+  return type.startsWith("image/") || Object.values(DOC_TYPES).includes(type);
 }
 
 /** 5xx and dropped connections are worth another go; 4xx never is. */
@@ -402,12 +417,20 @@ export function enqueueUploads(listingId: string, files: File[] | FileList): voi
   if (!running) batchTotal = 0;
   for (const file of [...files]) {
     const type = sniffType(file);
-    if (!type.startsWith("image/") && !type.startsWith("video/")) continue;
+    const ok =
+      listingId === "packet"
+        ? packetAccepts(type)
+        : type.startsWith("image/") || type.startsWith("video/");
+    if (!ok) continue;
     jobs.push({
       id: ++seq,
       listingId,
       name: file.name,
-      kind: type.startsWith("video/") ? "video" : "photo",
+      kind: type.startsWith("video/")
+        ? "video"
+        : type.startsWith("image/")
+          ? "photo"
+          : "file",
       state: "queued",
       progress: 0,
       bytes: file.size,

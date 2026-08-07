@@ -1,11 +1,121 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Profile } from "@/lib/outreach";
 import { DEFAULT_COSTS, type CostAssumptions } from "@/lib/cost";
 import { DOCUMENT_CHECKLIST, buildPacket, packetText, readiness } from "@/lib/packet";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import Icon from "@/components/Icon";
+import { enqueueUploads, pendingUploads, subscribeUploads } from "@/lib/uploadQueue";
+
+interface PacketDoc {
+  id: string;
+  path: string;
+  name: string;
+  kind: string;
+  size: number | null;
+  created_at: string;
+  url: string;
+}
+
+const docSize = (bytes: number | null) =>
+  bytes == null
+    ? ""
+    : bytes >= 1048576
+      ? `${(bytes / 1048576).toFixed(1)} MB`
+      : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+/**
+ * The papers themselves, not just a checklist about them.
+ *
+ * Ticking "pay stubs ✓" was a promise; a PDF sitting here is the thing
+ * itself. Uploads ride the same queue as tour footage (progress pill,
+ * retries, stall watchdog) under the reserved "packet" scope, stored
+ * private-per-user and readable only through the authenticated media route.
+ */
+function PacketDocs() {
+  const [docs, setDocs] = useState<PacketDoc[]>([]);
+  const [uploading, setUploading] = useState(0);
+
+  const load = useCallback(async () => {
+    try {
+      const body = await fetch("/api/documents").then((r) => r.json());
+      setDocs(body.documents ?? []);
+    } catch {
+      /* the next upload or visit retries */
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    // Refresh when the queue drains — that's the moment new rows exist.
+    return subscribeUploads(() => {
+      const left = pendingUploads("packet");
+      setUploading(left);
+      if (left === 0) load();
+    });
+  }, [load]);
+
+  const remove = async (doc: PacketDoc) => {
+    setDocs((list) => list.filter((d) => d.id !== doc.id));
+    try {
+      await fetch(`/api/media/${doc.path}`, { method: "DELETE" });
+    } finally {
+      load();
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <span className="muted" style={{ fontSize: 12 }}>
+        The files themselves
+      </span>
+      <label className="packet-drop">
+        <input
+          type="file"
+          multiple
+          accept=".pdf,.doc,.docx,image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            if (e.target.files?.length) {
+              enqueueUploads("packet", e.target.files);
+              setUploading(pendingUploads("packet"));
+            }
+            e.target.value = "";
+          }}
+        />
+        <Icon name="image" size={15} />
+        {uploading > 0
+          ? `Uploading ${uploading} file${uploading === 1 ? "" : "s"}…`
+          : "Add pay stubs, ID, bank statements. PDFs and photos"}
+      </label>
+      {docs.length > 0 && (
+        <ul className="packet-docs">
+          {docs.map((doc) => (
+            <li key={doc.id}>
+              <a href={doc.url} target="_blank" rel="noreferrer" title="Open in a new tab">
+                {doc.name || doc.path.split("/").pop()}
+              </a>
+              <span className="muted">
+                {docSize(doc.size)}
+                {doc.size != null ? " · " : ""}
+                {new Date(doc.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+              <button
+                className="btn-icon packet-remove"
+                aria-label={`Delete ${doc.name}`}
+                title="Delete"
+                onClick={() => remove(doc)}
+              >
+                <Icon name="close" size={13} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * The application packet, and the assumptions behind the cost figures.
@@ -103,6 +213,8 @@ export default function ApplicationPacket({
           </div>
         )}
       </div>
+
+      <PacketDocs />
 
       <div style={{ display: "grid", gap: 6 }}>
         <span className="muted" style={{ fontSize: 12 }}>

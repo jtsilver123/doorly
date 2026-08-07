@@ -75,6 +75,21 @@ const TABS: Tab[] = ["pipeline", "feed", "compare", "profile"];
  */
 const LEGACY_TABS: Record<string, Tab> = { today: "feed", changes: "feed" };
 
+/** The clean addresses, one per section, and the way back. */
+const TAB_PATHS: Record<Tab, string> = {
+  pipeline: "pipeline",
+  feed: "listings",
+  compare: "compare",
+  profile: "you",
+  changes: "listings",
+};
+const PATH_TABS: Record<string, Tab> = {
+  pipeline: "pipeline",
+  listings: "feed",
+  compare: "compare",
+  you: "profile",
+};
+
 interface ApiStatus {
   usage: {
     used: number;
@@ -150,26 +165,51 @@ export default function Home() {
    * `location` there would hydrate mismatched.
    */
   useLayoutEffect(() => {
-    const fromHash = () => {
+    /*
+     * On the real app host the section is the pathname — /pipeline,
+     * /listings, /compare, /you — served by a middleware rewrite of the same
+     * shell. Hashes are the legacy address (#compare bookmarks, and local
+     * dev where the shell lives at /app with no rewrite in front); they're
+     * honored on arrival, then the URL is upgraded in place.
+     */
+    const read = (): Tab | null => {
+      // The hash outranks the path on arrival: /pipeline#compare is an old
+      // #compare bookmark that rode through the /app redirect, and the
+      // person meant Compare. The next replaceState erases the hash anyway.
       const raw = window.location.hash.replace(/^#/, "");
-      const key = (LEGACY_TABS[raw] ?? raw) as Tab;
-      return TABS.includes(key) ? key : null;
+      if (raw) {
+        const key = (LEGACY_TABS[raw] ?? raw) as Tab;
+        if (TABS.includes(key)) return key;
+      }
+      const seg = window.location.pathname.replace(/^\//, "");
+      return (PATH_TABS[seg] ?? null) as Tab | null;
     };
-    const initial = fromHash();
+    const initial = read();
     if (initial) setTab(initial);
     const onPop = () => {
-      const next = fromHash();
+      const next = read();
       if (next) setTab(next);
     };
+    window.addEventListener("popstate", onPop);
     window.addEventListener("hashchange", onPop);
-    return () => window.removeEventListener("hashchange", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("hashchange", onPop);
+    };
   }, []);
 
   // replaceState rather than pushState: switching tabs shouldn't stack up
   // history entries you then have to press Back through five times.
   useEffect(() => {
-    if (window.location.hash.replace(/^#/, "") !== tab) {
-      window.history.replaceState(null, "", `#${tab}`);
+    // Clean paths only where the middleware serves them — everywhere the
+    // shell answers at /app (local dev), the hash keeps doing the job.
+    const cleanUrls = window.location.pathname !== "/app";
+    const want = cleanUrls ? `/${TAB_PATHS[tab]}` : `#${tab}`;
+    const have = cleanUrls
+      ? window.location.pathname
+      : `#${window.location.hash.replace(/^#/, "")}`;
+    if (have !== want) {
+      window.history.replaceState(null, "", want + (cleanUrls ? "" : ""));
     }
     // A new tab starts at its top. Carrying the last tab's scroll position
     // over opened Pipeline mid-page on a phone, with the view toggle clipped
@@ -1513,7 +1553,7 @@ export default function Home() {
         {/* Compare is the choosing step, so it stands on its own in the nav:
             find (Listings), work it (Pipeline), choose (here). */}
         {!loading && tab === "compare" && (
-          <div className="page-panels">
+          <div className="page-panels page-compare">
             <Compare
               listings={listings}
               onOpen={setOpen}

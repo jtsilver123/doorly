@@ -259,6 +259,10 @@ export default function ListingDrawer({
   const panelRef = useRef<HTMLElement>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
 
+  // The same-agent memory feeds both the callout and the drafts, so the
+  // message itself says "we've spoken" instead of leaving it to the reader.
+  const knownBroker = brokerHistory(all ?? [], listing);
+
   /**
    * Which draft this panel is holding.
    *
@@ -271,8 +275,8 @@ export default function ListingDrawer({
    */
   const chasing = listing.stage === "contacted";
   const message = chasing
-    ? draftFollowUp(listing, profile)
-    : draftTourMessage(listing, profile);
+    ? draftFollowUp(listing, profile, knownBroker?.others[0] ?? null)
+    : draftTourMessage(listing, profile, knownBroker?.others[0] ?? null);
 
   // A different listing in the same panel starts from its own stage.
   useEffect(() => setStage(listing.stage), [listing.id, listing.stage]);
@@ -1121,18 +1125,18 @@ export default function ListingDrawer({
                 message to the same agent shouldn't read like a stranger's
                 form letter. */}
             {(() => {
-              const known = brokerHistory(all ?? [], listing);
+              const known = knownBroker;
               if (!known) return null;
               return (
                 <p className="brokerknown">
-                  You&apos;ve dealt with <b>{known.name}</b> before —{" "}
+                  You&apos;ve dealt with <b>{known.name}</b> before:{" "}
                   {known.others.length === 1
                     ? `${known.others[0].address}${known.others[0].unit ? ` #${known.others[0].unit}` : ""} (${STAGE_LABEL[known.others[0].stage]})`
                     : `${known.others.length} other places: ${known.others
                         .slice(0, 3)
                         .map((o) => `${o.address} (${STAGE_LABEL[o.stage]})`)
                         .join(", ")}`}
-                  . Mention it — repeat interest gets faster replies.
+                  . The drafts below say so, since repeat interest gets faster replies.
                 </p>
               );
             })()}

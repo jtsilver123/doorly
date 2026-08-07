@@ -124,7 +124,17 @@ function firstNameOf(full: string): string {
  * bigger one, the tour. The qualifications still ride along, but as a "bit
  * about me" near the end, where they land as reassurance instead of a resume.
  */
-export function draftTourMessage(listing: FeedListing, profile: Profile): string {
+/** A prior thread with the same agent, so the draft can say so. */
+export interface PriorContact {
+  address: string;
+  unit?: string;
+}
+
+export function draftTourMessage(
+  listing: FeedListing,
+  profile: Profile,
+  prior?: PriorContact | null
+): string {
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
   const greeting = agent ? `Hi ${agent}!` : "Hi there!";
   const me = profile.name ? `I'm ${firstNameOf(profile.name)} —` : "";
@@ -137,13 +147,15 @@ export function draftTourMessage(listing: FeedListing, profile: Profile): string
         ? `${listing.bedrooms} bed`
         : "place";
   const price = listing.price ? ` listed at $${listing.price.toLocaleString()}` : "";
-  const opener = [
-    greeting,
-    me,
-    `I came across the ${size} at ${listing.address}${unit}${price} and it looks great.`,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  /*
+   * Third message to the same agent shouldn't read like a stranger's form
+   * letter — brokers remember repeat interest, and saying so out loud is
+   * exactly the leverage the broker-memory panel tells the user to use.
+   */
+  const intro = prior
+    ? `We spoke about ${prior.address}${prior.unit ? ` #${prior.unit}` : ""} recently. I also came across the ${size} at ${listing.address}${unit}${price} and it looks great.`
+    : `I came across the ${size} at ${listing.address}${unit}${price} and it looks great.`;
+  const opener = [greeting, me, intro].filter(Boolean).join(" ");
 
   // The small ask first. A video costs the agent ninety seconds and filters
   // out the places that photograph better than they live — then the tour ask
@@ -265,13 +277,20 @@ export function smsLink(phone: string, body: string): string {
  *
  * Deliberately no re-pitch and no new ask. The only goal is a reply.
  */
-export function draftFollowUp(listing: FeedListing, profile: Profile): string {
+export function draftFollowUp(
+  listing: FeedListing,
+  profile: Profile,
+  prior?: PriorContact | null
+): string {
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
   const greeting = agent ? `Hi ${agent} —` : "Hi —";
   const unit = listing.unit ? ` #${listing.unit}` : "";
   const me = profile.name ? ` This is ${firstNameOf(profile.name)}.` : "";
+  const also = prior
+    ? ` (We were also in touch about ${prior.address}${prior.unit ? ` #${prior.unit}` : ""}.)`
+    : "";
   return (
-    `${greeting} following up on ${listing.address}${unit}.${me} ` +
+    `${greeting} following up on ${listing.address}${unit}.${me}${also} ` +
     `Is it still available? Happy to come see it whenever suits you.`
   );
 }

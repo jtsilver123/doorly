@@ -126,6 +126,25 @@ export default async function Home({
       {/* Old bookmarks look like /#pipeline — the app lived on the root
           before it moved to /app, and hashes never reach the server. Anyone
           arriving with an app-shaped hash meant the app, not the pitch. */}
+      {/* Structured data: the app as a (free) product, so search results can
+          say so without guessing. Honest fields only. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "DamnLease",
+            applicationCategory: "LifestyleApplication",
+            operatingSystem: "Web",
+            url: "https://damnlease.com",
+            description:
+              "A free CRM for the NYC apartment hunt: every listing site checked hourly, real comps on every price, and a pipeline from first text to signed lease.",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            creator: { "@type": "Person", name: "Jake" },
+          }),
+        }}
+      />
       <script
         dangerouslySetInnerHTML={{
           __html: `(function(){var h=location.hash.replace("#","");if(["today","feed","changes","pipeline","compare","profile"].indexOf(h)>=0){location.replace("/app"+location.search+location.hash)}})()`,

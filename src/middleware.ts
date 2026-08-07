@@ -183,6 +183,10 @@ export async function middleware(request: NextRequest) {
     path === "/opengraph-image" ||
     path === "/apple-icon" ||
     path === "/sw.js" ||
+    // Crawler plumbing is public by definition: a robots file behind a
+    // login redirect reads as "Disallow: nothing works".
+    path === "/sitemap.xml" ||
+    path === "/robots.txt" ||
     // Privacy and terms are the pages people read *before* deciding to sign
     // up, and the ones a store or a link-checker fetches with no session at
     // all. Gating them behind login is the classic way to make a policy page
@@ -231,7 +235,7 @@ export async function middleware(request: NextRequest) {
 
   // Just signed in: straight into the app, on the app's own host.
   if (user && isAuthRoute && !path.startsWith("/auth") && !isPasswordSet) {
-    const to = origins ? new URL("/app", origins.app) : request.nextUrl.clone();
+    const to = origins ? new URL("/pipeline", origins.app) : request.nextUrl.clone();
     if (!origins) to.pathname = "/app";
     return finish(NextResponse.redirect(to));
   }
@@ -273,11 +277,17 @@ export async function middleware(request: NextRequest) {
     return finish(NextResponse.redirect(new URL(path + search, origins.app), 307));
   }
 
-  // The app host's front door is the board, not the pitch.
-  if (onApp && origins && path === "/") {
-    return finish(NextResponse.redirect(new URL(`/app${search}`, origins.app), 307));
+  // The app host's front door is the board, not the pitch. The old /app
+  // address redirects too, hash and all — the hash never reaches the server,
+  // so the browser carries #compare across and the client honors it.
+  if (onApp && origins && (path === "/" || path === "/app")) {
+    return finish(NextResponse.redirect(new URL(`/pipeline${search}`, origins.app), 307));
   }
 
+  // The clean section addresses (/pipeline, /listings, /compare, /you)
+  // rewrite to the app shell in next.config.ts. Config-level, not here: a
+  // middleware rewrite re-enters the worker's router without this request's
+  // context and bounced signed-in people to a login page they didn't need.
   return finish(response);
 }
 

@@ -497,29 +497,24 @@ export default function Compare({
         you make on the night, so they're one click away rather than derived
         and unchangeable.
       */}
-      <div className="compare-bar">
-        <button className="btn" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
-          <Icon name="filter" size={15} />
-          {finalists.length} of {candidates.length} places
-        </button>
-        <span className="muted">
-          Five at a time. Drag a column heading to reorder, or focus one and
-          use ← →.
-        </span>
-        {excluded.length > 0 && (
-          <button
-            className="linkish"
-            onClick={() => {
-              setExcluded([]);
-              persist(OUT_KEY, []);
-            }}
-          >
-            Put back {excluded.length}
-          </button>
-        )}
-      </div>
-
       {picking && (
+        <div
+          className="compare-modal"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPicking(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setPicking(false);
+          }}
+        >
+        <div className="compare-modal-panel" role="dialog" aria-label="Choose places to compare" aria-modal="true">
+        <div className="compare-modal-head">
+          <b>Who&apos;s in the running</b>
+          <button className="btn" onClick={() => setPicking(false)}>
+            Done
+          </button>
+        </div>
         <div className="compare-pick" role="group" aria-label="Places to compare">
           {/*
             Grouped under the same headings as the board's columns, so picking
@@ -569,13 +564,39 @@ export default function Compare({
               </div>
             ))}
         </div>
+        {excluded.length > 0 && (
+          <button
+            className="linkish"
+            onClick={() => {
+              setExcluded([]);
+              persist(OUT_KEY, []);
+            }}
+          >
+            Put back everything taken out ({excluded.length})
+          </button>
+        )}
+        </div>
+        </div>
       )}
 
-      <div className="surface" style={{ overflowX: "auto" }}>
+      <div className="surface compare-scroller">
       <table className="compare">
         <thead>
           <tr>
-            <th />
+            {/* The corner cell was dead space over the row labels; now it
+                holds the one control this table needs, inside the frozen
+                header where it's always reachable. */}
+            <th className="compare-corner">
+              <button
+                className="btn compare-editbtn"
+                onClick={() => setPicking(true)}
+                aria-haspopup="dialog"
+                title={`${finalists.length} of ${candidates.length} places shown. Add, remove, or reorder — or drag a column heading.`}
+              >
+                <Icon name="filter" size={14} />
+                Edit
+              </button>
+            </th>
             {finalists.map((l) => (
               <th key={l.id}>
                 <button

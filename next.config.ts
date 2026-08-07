@@ -17,6 +17,20 @@ const nextConfig: NextConfig = {
      */
     ignoreDuringBuilds: true,
   },
+  /*
+   * The app's sections wear honest addresses: /pipeline, /listings,
+   * /compare, /you all serve the same shell, which reads the pathname to
+   * pick its tab. Build-time rewrites, deliberately not middleware ones — a
+   * middleware rewrite re-enters the worker's router stripped of the
+   * request's context and bounced signed-in people to login. These run after
+   * middleware, so the auth gate still sees the real path.
+   */
+  async rewrites() {
+    return ["/pipeline", "/listings", "/compare", "/you"].map((source) => ({
+      source,
+      destination: "/app",
+    }));
+  },
   experimental: {
     /*
      * The app answers on two hostnames now, and Server Actions carry a CSRF
