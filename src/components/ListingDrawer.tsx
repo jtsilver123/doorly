@@ -755,6 +755,25 @@ export default function ListingDrawer({
             )}
           </div>
 
+          {/* Staleness, before the numbers. A listing nothing has confirmed
+              in days can be gone — or worse, its page can have moved on to
+              selling the unit — and the price below deserves that caveat. */}
+          {(() => {
+            const quiet = Math.floor(
+              (Date.now() - new Date(listing.lastSeenAt).getTime()) / 86_400_000
+            );
+            if (quiet < 2 || !listing.isActive) return null;
+            return (
+              <div className="stale-warn" role="note">
+                <Icon name="alert" size={14} />
+                <span>
+                  No listing site has confirmed this in {quiet} days. Open the
+                  listing and check it&apos;s still up before reaching out.
+                </span>
+              </div>
+            );
+          })()}
+
           <dl className="drawer-facts" data-sec="sec-costs">
             <div>
               <dt>Rent</dt>

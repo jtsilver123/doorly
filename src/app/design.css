@@ -5301,3 +5301,21 @@ button.fact:hover .fact-label { color: var(--accent); }
   color: var(--text-muted);
   letter-spacing: 0.01em;
 }
+
+/* The staleness caveat: quiet, but before the price, not after it. */
+.stale-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  margin-top: var(--s3);
+  padding: 8px 12px;
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+}
+.stale-warn .icon { flex-shrink: 0; margin-top: 2px; }
+
+.card-stale { color: var(--warn); font-weight: 600; }

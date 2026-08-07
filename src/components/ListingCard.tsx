@@ -252,6 +252,20 @@ export default function ListingCard({
 
         <div className="card-where">
           {listing.neighborhood || listing.borough || "NYC"} · {relative(listing.firstSeenAt)}
+          {/* A row nothing has confirmed in days may already be gone — the
+              25 W 13th problem: a "live" rental whose Zillow page had moved
+              on to selling the place. Say so instead of looking sure. */}
+          {(() => {
+            const quiet = Math.floor(
+              (Date.now() - new Date(listing.lastSeenAt).getTime()) / 86_400_000
+            );
+            if (quiet < 2 || !listing.isActive) return null;
+            return (
+              <span className="card-stale" title="No listing site has confirmed this recently. Check it's still up before reaching out.">
+                {" · "}unverified {quiet}d
+              </span>
+            );
+          })()}
           {/* When the ad itself last moved — a drop or a relist newer than
               the listing date is the freshness that matters. */}
           {(() => {
