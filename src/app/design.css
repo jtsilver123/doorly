@@ -2065,6 +2065,29 @@ button.fact:hover .fact-label { color: var(--accent); }
   max-width: 34rem;
 }
 
+/*
+ * On the board, the paste box freezes at the top while the columns scroll —
+ * it's the board's own front door, and it was scrolling away exactly when a
+ * long column meant you'd scrolled. Same flush-pin arithmetic as the drawer
+ * tabs: negative top and margins cancel `.main`'s padding so nothing peeks
+ * over it while it's stuck. The max-width lives on the inner form so the
+ * frozen bar itself can span and paint the full panel width.
+ */
+@media (min-width: 861px) {
+  .page-pipeline .quickadd {
+    position: sticky;
+    top: -18px;
+    z-index: 25;
+    margin: -18px -20px var(--s4);
+    padding: 14px 20px;
+    max-width: none;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-pipeline .quickadd .field { max-width: 30rem; }
+}
+
 .quickadd .field { flex: 1; }
 
 /* --- the rail ------------------------------------------------------------- */

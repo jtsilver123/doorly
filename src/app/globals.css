@@ -1001,37 +1001,17 @@ kbd {
   transition: left 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
-/* The funnel as a shape: four bars falling from contacted to applied.
-   Conversion reads at a glance before any number is read at all. */
+/* The funnel: contacted through applied, digits over small labels. */
 .railstatus-funnel {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--s2);
-  align-items: end;
 }
 
 .railstatus-step {
   display: grid;
   gap: 3px;
   justify-items: start;
-}
-
-.railstatus-stepbar {
-  width: 100%;
-  height: 34px;
-  display: flex;
-  align-items: flex-end;
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  overflow: hidden;
-}
-
-.railstatus-stepbar i {
-  display: block;
-  width: 100%;
-  background: var(--accent);
-  opacity: 0.85;
-  border-radius: var(--r-sm) var(--r-sm) 0 0;
 }
 
 .railstatus-step b {

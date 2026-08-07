@@ -43,7 +43,6 @@ export default function RailStatus({
     ["Viewed", funnel.viewed],
     ["Applied", funnel.applied],
   ];
-  const most = Math.max(funnel.contacted, 1);
   const showPace = info.phase !== "early" && info.phase !== "past";
 
   return (
@@ -84,12 +83,11 @@ export default function RailStatus({
         />
       </div>
 
-      <div className="railstatus-funnel" role="img" aria-label={steps.map(([l, v]) => `${v} ${l.toLowerCase()}`).join(", ")}>
+      {/* Numbers and labels, nothing drawn: the bar-chart version read as
+          four grey blobs at rail width and said less than the digits do. */}
+      <div className="railstatus-funnel">
         {steps.map(([label, value]) => (
           <div key={label} className="railstatus-step">
-            <span className="railstatus-stepbar">
-              <i style={{ height: `${Math.max(8, (value / most) * 100)}%` }} />
-            </span>
             <b>{value}</b>
             <span>{label}</span>
           </div>

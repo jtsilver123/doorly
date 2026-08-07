@@ -1672,13 +1672,15 @@ test("an address with no usable text is empty, not nonsense", () => {
 
 // --- compare: amenities as rows -------------------------------------------
 
-test("decision amenities are rows whenever anyone says anything", () => {
+test("every decision amenity is a row, spoken for or not", () => {
   const a = feed({ id: "a", amenities: ["Washer/Dryer in unit", "Dishwasher"] });
   const b = feed({ id: "b", amenities: ["Dishwasher"] });
   const labels = amenityRowsFor([a, b]).map((r) => r.label);
   assert.ok(labels.includes("W/D in unit"), "the differing amenity is a row");
   assert.ok(labels.includes("Dishwasher"), "agreement is still a row for decision amenities");
-  assert.ok(!labels.includes("Gym"), "an amenity nobody mentions is not a row");
+  // Silence is an answer now: nobody listing an elevator IS the elevator row.
+  assert.ok(labels.includes("Elevator"), "unmentioned decision amenities still show");
+  assert.ok(!labels.includes("Gym"), "a non-decision amenity nobody mentions is not a row");
 });
 
 test("decision rows lead, in decision order; the rest follow", () => {
@@ -1687,9 +1689,17 @@ test("decision rows lead, in decision order; the rest follow", () => {
     amenities: ["gym", "washer and dryer in unit", "private balcony"],
   });
   const rows = amenityRowsFor([a]).map((r) => r.label);
-  // W/D is a decision row (and implies building laundry); outdoor and gym
-  // trail in the old order.
-  assert.deepEqual(rows, ["W/D in unit", "Laundry in building", "Outdoor space", "Gym"]);
+  // All six decision rows, in their fixed order, then the trailing extras.
+  assert.deepEqual(rows, [
+    "W/D in unit",
+    "Laundry in building",
+    "Elevator",
+    "Doorman",
+    "Dishwasher",
+    "Good light",
+    "Outdoor space",
+    "Gym",
+  ]);
 });
 
 test("a decision row tells yes from no from never-said", () => {

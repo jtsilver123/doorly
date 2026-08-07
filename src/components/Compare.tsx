@@ -100,16 +100,24 @@ type Row = {
  * amenity count went with it — every amenity that matters gets its own row
  * below, and a count of the rest compares nothing.
  */
+/*
+ * Rent leads and carries its own asterisk: when free months make the
+ * effective rent cheaper than the sticker, the cell says so right there, and
+ * best-in-row judges the effective figure — the one you'd actually pay.
+ */
+const RENT_ROW: Row = {
+  label: "Rent",
+  value: (l) =>
+    l.effectiveRent < l.price
+      ? `${money(l.price)} · eff ${money(l.effectiveRent)}`
+      : money(l.price),
+  num: (l) => l.effectiveRent,
+  alwaysShow: true,
+};
+
 const MONEY_ROWS: Row[] = [
-  { label: "Rent", value: (l) => money(l.price), num: (l) => l.price },
   { label: "All-in monthly", value: (l) => money(l.allInMonthly), num: (l) => l.allInMonthly },
   { label: "Cash to move in", value: (l) => money(l.upfrontCost), num: (l) => l.upfrontCost },
-  {
-    label: "Effective rent",
-    value: (l) =>
-      l.effectiveRent < l.price ? `${money(l.effectiveRent)}/mo` : "—",
-    num: (l) => (l.effectiveRent < l.price ? l.effectiveRent : null),
-  },
   {
     label: "Vs market",
     value: (l) =>
@@ -212,15 +220,16 @@ export function amenityRowsFor(finalists: FeedListing[]): Row[] {
   const facts = new Map(finalists.map((l) => [l.id, amenityFacts(l)]));
   const factOf = (l: FeedListing, key: AmenityKey) => facts.get(l.id)?.[key] ?? "unknown";
 
+  // Every decision amenity, every time — these are the questions the
+  // comparison exists to answer, and a row of dashes is itself the answer
+  // "nobody's listing says": bring it up on the tours.
   const decision: Row[] = DECISION_KEYS.map((key) => ({
     label: AMENITIES[key].label,
     value: (l: FeedListing) => FACT_MARK[factOf(l, key)],
     num: (l: FeedListing) => FACT_RANK[factOf(l, key)],
     invert: true,
-    // Skipped only when no finalist says anything at all — a row of dashes
-    // answers nothing.
-    alwaysShow: finalists.some((l) => factOf(l, key) !== "unknown"),
-  })).filter((row) => row.alwaysShow);
+    alwaysShow: true,
+  }));
 
   // Same extractor as the decision rows — reading `perks` here would be a
   // second source of truth for the same question, and the two would drift.
@@ -416,7 +425,9 @@ export default function Compare({
 
   const rows: Row[] = [];
   const agreed: string[] = [];
-  for (const row of [...MONEY_ROWS, ...amenityRows, ...CONTEXT_ROWS]) {
+  // Rent, then the amenities that decide leases, then the rest of the money
+  // and the context — the order the user actually compares in.
+  for (const row of [RENT_ROW, ...amenityRows, ...MONEY_ROWS, ...CONTEXT_ROWS]) {
     const values = finalists.map((l) => row.value(l));
     // Decision amenities stay on the table even in agreement — "everyone has
     // a washer" is the kind of agreement people are checking for.
