@@ -83,6 +83,7 @@ interface StateRow {
   lean: number | null;
   app_result: number | null;
   secured: boolean | null;
+  amenity_marks: Record<string, string> | null;
   tour_kind: string | null;
   tour_ends_at: string | null;
   added_by: string | null;
@@ -381,6 +382,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       lean: state?.lean ?? 0,
       appResult: state?.app_result ?? 0,
       secured: Boolean(state?.secured),
+      amenityMarks: (state?.amenity_marks as Record<string, "yes" | "no">) ?? {},
       tourKind: state?.tour_kind === "open_house" ? "open_house" : "private",
       tourEndsAt: state?.tour_ends_at ?? null,
       passReason: state?.pass_reason ?? "",
@@ -894,6 +896,38 @@ export async function saveProfile(profile: Partial<Profile>): Promise<void> {
       { user_id: await currentUserId(), profile: merged, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
+}
+
+/**
+ * Record your own answer to an amenity question — or clear it with null to
+ * defer back to what the listing says. Read-modify-write on the jsonb map,
+ * because a blind upsert of the whole column would erase the other answers.
+ */
+export async function setAmenityMark(
+  listingId: string,
+  key: string,
+  fact: "yes" | "no" | null
+): Promise<void> {
+  const supabase = await db();
+  const ownerId = await pipelineOwnerId();
+  const { data } = await supabase
+    .from("user_listing_state")
+    .select("amenity_marks")
+    .eq("user_id", ownerId)
+    .eq("listing_id", listingId)
+    .maybeSingle();
+  const marks = { ...((data?.amenity_marks as Record<string, string>) ?? {}) };
+  if (fact) marks[key] = fact;
+  else delete marks[key];
+  await supabase.from("user_listing_state").upsert(
+    {
+      user_id: ownerId,
+      listing_id: listingId,
+      amenity_marks: marks,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,listing_id" }
+  );
 }
 
 /**

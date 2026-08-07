@@ -969,64 +969,6 @@ kbd {
 
 .railstatus-days[data-soon="true"] { color: var(--warn); }
 
-/* The move-in runway in miniature: which stretch of it you're standing on. */
-.railstatus-bar {
-  position: relative;
-  display: flex;
-  gap: 2px;
-  height: 6px;
-}
-
-.railstatus-band {
-  flex-basis: 0;
-  min-width: 3px;
-  border-radius: var(--r-full);
-  background: var(--surface-2);
-}
-
-.railstatus-band.is-current.band-early,
-.railstatus-band.is-current.band-decide { background: var(--accent); }
-.railstatus-band.is-current.band-prime { background: var(--good); }
-.railstatus-band.is-current.band-crunch,
-.railstatus-band.is-current.band-final { background: var(--warn); }
-
-.railstatus-marker {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  width: 2px;
-  border-radius: var(--r-full);
-  background: var(--text);
-  transform: translateX(-1px);
-  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-/* The funnel: contacted through applied, digits over small labels. */
-.railstatus-funnel {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--s2);
-}
-
-.railstatus-step {
-  display: grid;
-  gap: 3px;
-  justify-items: start;
-}
-
-.railstatus-step b {
-  font-size: var(--t-md);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.railstatus-step span {
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
 .railstatus-pace {
   display: grid;
   gap: 4px;

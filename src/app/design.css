@@ -1362,12 +1362,47 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /* Column headers stay while the column scrolls, so a long pipeline never
    leaves you guessing which stage you're reading. */
+/*
+ * Column names hold still while their cards scroll. The sticky context is
+ * the page's scroller, and each header pins within its own column box, so a
+ * long Contacted column keeps saying "Contacted" all the way down. Desktop
+ * offsets below the frozen paste bar; phones pin to the true top.
+ */
 .board-head {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--bg);
+  background: var(--surface-2);
   padding: var(--s2) 0;
+}
+
+@media (min-width: 861px) {
+  .board-head { top: 46px; }
+}
+
+/* Your own amenity verdicts, tappable in place. The ring marks cells where
+   your word is overriding the listing's. */
+.factbtn {
+  min-width: 30px;
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.factbtn:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.factbtn[data-marked="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* Same idea for the comparison table: the row labels are the only thing that

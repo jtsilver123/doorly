@@ -1,5 +1,6 @@
 import type { FeedListing, SearchCriteria } from "@/types";
 import { AMENITIES, type AmenityKey, qualityScore } from "@/lib/amenities";
+import { nearestStation, routesWithin } from "@/lib/subway";
 
 /**
  * One number, and the reasons behind it.
@@ -23,13 +24,26 @@ import { AMENITIES, type AmenityKey, qualityScore } from "@/lib/amenities";
  */
 
 const WEIGHTS = {
-  price: 30,     // vs. comparable listings
-  amenities: 25, // what you actually get
-  budget: 18,    // against your ceiling, all-in
-  timing: 10,    // free when you need it
-  taste: 12,     // learned from your stars and passes
-  condition: 5,  // photos, size, fee
+  price: 26,      // vs. comparable listings
+  amenities: 22,  // what you actually get
+  location: 14,   // how fast you're on a train, how many lines
+  budget: 14,     // against your ceiling, all-in
+  renovation: 8,  // what the listing shows and claims about condition
+  timing: 6,      // free when you need it
+  taste: 6,       // learned from your stars and passes
+  description: 4, // a listing that tells you things beats one that won't
 } as const;
+
+/*
+ * Condition, read from what we can actually read. "How renovated the photos
+ * look" wants eyes we don't have — no vision model runs here — so the honest
+ * proxies are the words (listings brag about renovations loudly and
+ * specifically) and how much the listing is willing to show.
+ */
+const RENOVATED_RE =
+  /gut[\s-]?renovated|newly renovated|fully renovated|renovated (kitchen|bath)|brand[\s-]?new|new (kitchen|bath|appliances|renovation)|stainless[\s-]?steel|updated (kitchen|bath)|modern finishes|(marble|quartz) (bath|counter)/i;
+const NEEDS_WORK_RE =
+  /needs (tlc|work|updating)|as[\s-]?is\b|estate (sale|condition)|bring your (contractor|architect)|handyman|fixer/i;
 
 /** Worst case the risk flags can cost a listing. */
 const MAX_RISK_PENALTY = 18;
@@ -159,6 +173,26 @@ export function verdictFor(listing: FeedListing, criteria: SearchCriteria): Verd
   // Say so plainly rather than implying the apartment is bare.
   if (!described) con(20, "The listing says almost nothing about it");
 
+  // --- location ----------------------------------------------------------
+  // Judged only when the listing has coordinates; a geocoding gap is our
+  // missing data, not the apartment's fault.
+  const station = nearestStation(listing.lat, listing.lon);
+  if (station) {
+    available += WEIGHTS.location;
+    const lines = routesWithin(listing.lat, listing.lon, 12).length;
+    // 3 minutes to a platform is as good as it gets; 14 is a hike. Line
+    // count matters less than having any station close.
+    const walkShare = ramp(-station.minutes, -14, -3);
+    const lineShare = ramp(lines, 0, 5);
+    points += (walkShare * 0.7 + lineShare * 0.3) * WEIGHTS.location;
+
+    if (station.minutes <= 5) {
+      pro(58, `${station.minutes} min to the ${station.routes.split("").join("/")}`);
+    } else if (station.minutes >= 13) {
+      con(62, `${station.minutes} min walk to any train`);
+    }
+  }
+
   // --- does it fit the budget -------------------------------------------
   // Measured on all-in monthly, so a cheap rent with a fat broker fee can't
   // pass itself off as affordable.
@@ -200,22 +234,43 @@ export function verdictFor(listing: FeedListing, criteria: SearchCriteria): Verd
     pro(30, `Matches what you've liked: ${listing.scoreReasons[0]}`);
   }
 
-  // --- the small stuff ----------------------------------------------------
-  available += WEIGHTS.condition;
-  let condition = 0;
-  if (listing.noFee) {
-    condition += 0.5;
-    pro(66, "No broker fee");
+  // --- condition, as far as it can be read -------------------------------
+  available += WEIGHTS.renovation;
+  let reno = 0;
+  const text = listing.description ?? "";
+  if (RENOVATED_RE.test(text)) {
+    reno += 0.5;
+    pro(60, "Describes itself as renovated");
+  } else if (NEEDS_WORK_RE.test(text)) {
+    con(70, "The listing itself says it needs work");
+  } else if (described) {
+    reno += 0.25; // no claims either way — average condition until seen
   }
-  if (listing.imageUrl) condition += 0.25;
+  // What a listing is willing to show correlates with what there is to show.
+  const photos = listing.images?.length ?? (listing.imageUrl ? 1 : 0);
+  if (photos >= 4) reno += 0.3;
+  else if (photos >= 1) reno += 0.15;
   else con(58, "No photos yet");
   if (listing.sqft && listing.sqft >= 600) {
-    condition += 0.25;
+    reno += 0.2;
     pro(34, `${listing.sqft} sq ft`);
   } else if (!listing.sqft) {
     con(12, "Square footage not listed");
   }
-  points += Math.min(1, condition) * WEIGHTS.condition;
+  points += Math.min(1, reno) * WEIGHTS.renovation;
+
+  // No fee stays a pro line without weight: its dollars already count in the
+  // all-in monthly the budget component measures.
+  if (listing.noFee) pro(66, "No broker fee");
+
+  // --- does the listing tell you anything --------------------------------
+  if (described) {
+    available += WEIGHTS.description;
+    const len = listing.description?.length ?? 0;
+    points +=
+      (len >= 400 ? 1 : len >= 150 ? 0.7 : len >= 80 ? 0.4 : 0.2) *
+      WEIGHTS.description;
+  }
 
   // --- risk ---------------------------------------------------------------
   // Flags don't just annotate, they cost the listing points — a suspiciously

@@ -91,6 +91,8 @@ type Row = {
   invert?: boolean;
   /** Exempt from the fold-if-everyone-agrees rule — see amenityRowsFor. */
   alwaysShow?: boolean;
+  /** Present on amenity rows: the cell is a button that cycles your mark. */
+  cycle?: (l: FeedListing) => void;
 };
 
 /*
@@ -214,11 +216,42 @@ const DECISION_KEYS: AmenityKey[] = [
 ];
 
 const FACT_MARK = { yes: "✓", no: "✗", unknown: "—" } as const;
+
+/** Label → amenity key, for showing which cells carry your own mark. */
+const KEY_BY_LABEL = new Map(
+  Object.values(AMENITIES).map((a) => [a.label, a.key as string])
+);
+function rowKeyOf(label: string): string {
+  return KEY_BY_LABEL.get(label) ?? label;
+}
 const FACT_RANK = { yes: 1, no: -1, unknown: 0 } as const;
 
-export function amenityRowsFor(finalists: FeedListing[]): Row[] {
+export function amenityRowsFor(
+  finalists: FeedListing[],
+  onMark?: (l: FeedListing, key: AmenityKey, fact: "yes" | "no" | null) => void
+): Row[] {
   const facts = new Map(finalists.map((l) => [l.id, amenityFacts(l)]));
-  const factOf = (l: FeedListing, key: AmenityKey) => facts.get(l.id)?.[key] ?? "unknown";
+  /*
+   * Your own mark outranks the listing's word: you stood in the kitchen, the
+   * listing didn't. A missing mark defers to what the listing implied.
+   */
+  const factOf = (l: FeedListing, key: AmenityKey) =>
+    (l.amenityMarks?.[key] as "yes" | "no" | undefined) ??
+    facts.get(l.id)?.[key] ??
+    "unknown";
+
+  // A tap cycles what you know: unknown → yes → no → back to the listing's
+  // own answer. Cycling to "clear" rather than to "unknown" matters — the
+  // listing's ✓ comes back instead of being buried under a dash forever.
+  const cycler = (key: AmenityKey) =>
+    onMark
+      ? (l: FeedListing) => {
+          const marked = l.amenityMarks?.[key] as "yes" | "no" | undefined;
+          const shown = factOf(l, key);
+          const next = marked === "no" ? null : shown === "yes" ? "no" : "yes";
+          onMark(l, key, next);
+        }
+      : undefined;
 
   // Every decision amenity, every time — these are the questions the
   // comparison exists to answer, and a row of dashes is itself the answer
@@ -229,6 +262,7 @@ export function amenityRowsFor(finalists: FeedListing[]): Row[] {
     num: (l: FeedListing) => FACT_RANK[factOf(l, key)],
     invert: true,
     alwaysShow: true,
+    cycle: cycler(key),
   }));
 
   // Same extractor as the decision rows — reading `perks` here would be a
@@ -242,6 +276,7 @@ export function amenityRowsFor(finalists: FeedListing[]): Row[] {
     value: (l: FeedListing) => FACT_MARK[factOf(l, key)],
     num: (l: FeedListing) => FACT_RANK[factOf(l, key)],
     invert: true,
+    cycle: cycler(key),
   }));
 
   return [...decision, ...rest];
@@ -252,6 +287,7 @@ export default function Compare({
   onOpen,
   onMove,
   onLean,
+  onMark,
   onNotes,
 }: {
   listings: FeedListing[];
@@ -260,6 +296,8 @@ export default function Compare({
   onMove: (l: FeedListing, stage: Stage) => void;
   /** The post-tour thumb, same handler as the board. */
   onLean: (l: FeedListing, lean: number) => void;
+  /** Your own amenity answer: yes, no, or null to defer to the listing. */
+  onMark: (l: FeedListing, key: string, fact: "yes" | "no" | null) => void;
   onNotes: (id: string, notes: string) => Promise<void> | void;
 }) {
   const [order, setOrder] = useState<string[]>([]);
@@ -421,7 +459,7 @@ export default function Compare({
    *
    * Ordered by how much each moves a decision, so laundry sits above gym.
    */
-  const amenityRows = amenityRowsFor(finalists);
+  const amenityRows = amenityRowsFor(finalists, onMark);
 
   const rows: Row[] = [];
   const agreed: string[] = [];
@@ -619,7 +657,19 @@ export default function Compare({
                 <td className="muted compare-label">{row.label}</td>
                 {finalists.map((l, i) => (
                   <td key={l.id} className={i === best ? "compare-best" : ""}>
-                    {row.value(l) === "yes" ? (
+                    {row.cycle ? (
+                      /* Your call beats the listing's: tap to cycle yes, no,
+                         and back to whatever the listing itself said. */
+                      <button
+                        className="factbtn"
+                        data-marked={l.amenityMarks?.[rowKeyOf(row.label)] ? "true" : undefined}
+                        title="Tap to record what you saw: yes, no, then back to the listing's word"
+                        aria-label={`${row.label} at ${l.address}: ${row.value(l) === "✓" ? "yes" : row.value(l) === "✗" ? "no" : "unknown"}. Tap to change.`}
+                        onClick={() => row.cycle!(l)}
+                      >
+                        {row.value(l)}
+                      </button>
+                    ) : row.value(l) === "yes" ? (
                       <Icon name="check" size={15} className="compare-has" />
                     ) : (
                       row.value(l)

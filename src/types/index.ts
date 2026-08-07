@@ -234,6 +234,12 @@ export interface FeedListing extends Listing {
   appResult: number;
   /** Accepted and taken. The flag the whole hunt exists to set. */
   secured: boolean;
+  /**
+   * Your own answers to the amenity questions, keyed by amenity. What you
+   * saw on the tour outranks what the listing said; a missing key defers to
+   * the listing-derived fact.
+   */
+  amenityMarks: Record<string, "yes" | "no">;
   contactCount: number;
   lastContactAt: string | null;
   /** How you last reached out — shown on the card so it's visible at a glance. */

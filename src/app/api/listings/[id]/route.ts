@@ -3,6 +3,7 @@ import {
   addContact,
   loadListingDetail,
   recordFeedback,
+  setAmenityMark,
   setListingFields,
   setStage,
   passListing,
@@ -83,6 +84,14 @@ export async function PATCH(request: Request, { params }: Params) {
       case "secured":
         await setListingFields(id, { secured: Boolean(body.secured) });
         break;
+      case "amenityMark": {
+        // What you saw with your own eyes, keyed by amenity. null clears the
+        // override and defers back to the listing.
+        const fact =
+          body.fact === "yes" ? "yes" : body.fact === "no" ? "no" : null;
+        await setAmenityMark(id, String(body.key ?? "").slice(0, 40), fact);
+        break;
+      }
       case "seen":
         await setListingFields(id, { events_seen_at: new Date().toISOString() });
         break;

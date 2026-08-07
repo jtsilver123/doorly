@@ -1,7 +1,6 @@
 "use client";
 
 import type { Funnel, PhaseInfo } from "@/lib/timeline";
-import { phaseBands } from "@/lib/timeline";
 
 /**
  * The hunt's vital signs, living in the rail.
@@ -29,7 +28,6 @@ export default function RailStatus({
   live: number;
   changed: number;
 }) {
-  const bands = phaseBands();
   const date = moveInDate
     ? new Date(`${moveInDate}T12:00:00Z`).toLocaleDateString("en-US", {
         month: "short",
@@ -37,12 +35,6 @@ export default function RailStatus({
         timeZone: "UTC",
       })
     : "";
-  const steps: [string, number][] = [
-    ["Contacted", funnel.contacted],
-    ["Replied", funnel.replied],
-    ["Viewed", funnel.viewed],
-    ["Applied", funnel.applied],
-  ];
   const showPace = info.phase !== "early" && info.phase !== "past";
 
   return (
@@ -61,39 +53,9 @@ export default function RailStatus({
         <i>days</i>
       </b>
 
-      <div
-        className="railstatus-bar"
-        role="img"
-        aria-label={`${info.label}, ${Math.max(info.daysLeft, 0)} days to your date`}
-      >
-        {bands.map((band) => (
-          <span
-            key={band.phase}
-            className={`railstatus-band band-${band.phase}${
-              band.phase === info.phase ? " is-current" : ""
-            }`}
-            style={{ flexGrow: band.width }}
-            title={band.label}
-          />
-        ))}
-        <span
-          className="railstatus-marker"
-          style={{ left: `${info.progress * 100}%` }}
-          aria-hidden="true"
-        />
-      </div>
-
-      {/* Numbers and labels, nothing drawn: the bar-chart version read as
-          four grey blobs at rail width and said less than the digits do. */}
-      <div className="railstatus-funnel">
-        {steps.map(([label, value]) => (
-          <div key={label} className="railstatus-step">
-            <b>{value}</b>
-            <span>{label}</span>
-          </div>
-        ))}
-      </div>
-
+      {/* One bar, one line. The phase word above already places you on the
+          calendar; what this adds is whether the work is keeping up, plus
+          the two funnel numbers that change what you do today. */}
       {showPace && (
         <div className={`railstatus-pace ${funnel.onPace ? "is-ok" : "is-behind"}`}>
           <span className="railstatus-meter">
@@ -105,8 +67,8 @@ export default function RailStatus({
           </span>
           <span>
             {funnel.onPace
-              ? `On pace. ${funnel.contacted} of ~${funnel.targetContacts} outreaches`
-              : `Behind pace. ~${funnel.expectedByNow} by now keeps you on track`}
+              ? `On pace · ${funnel.contacted} contacted · ${funnel.replied} replied`
+              : `Behind pace · ${funnel.contacted} contacted, ~${funnel.expectedByNow} by now keeps you on track`}
           </span>
         </div>
       )}

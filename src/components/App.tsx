@@ -593,6 +593,25 @@ export default function Home() {
     [patch, loadFeed]
   );
 
+  /** Your own amenity answer, from the compare table. */
+  const markAmenity = useCallback(
+    (listing: FeedListing, key: string, fact: "yes" | "no" | null) => {
+      setListings((list) =>
+        list.map((l) => {
+          if (l.id !== listing.id) return l;
+          const marks = { ...l.amenityMarks };
+          if (fact) marks[key] = fact;
+          else delete marks[key];
+          return { ...l, amenityMarks: marks };
+        })
+      );
+      patch(listing.id, { action: "amenityMark", key, fact }, false).catch(() =>
+        loadFeed()
+      );
+    },
+    [patch, loadFeed]
+  );
+
   /** Accepted and taken: the flag the whole hunt exists to set. */
   const setSecured = useCallback(
     (listing: FeedListing, secured: boolean) => {
@@ -1500,6 +1519,7 @@ export default function Home() {
               onOpen={setOpen}
               onMove={moveStage}
               onLean={setLean}
+              onMark={markAmenity}
               onNotes={async (id, notes) => {
                 await patch(id, { action: "notes", notes });
                 loadFeed();

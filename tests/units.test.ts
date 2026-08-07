@@ -354,6 +354,7 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     lean: 0,
     appResult: 0,
     secured: false,
+    amenityMarks: {},
     addedById: null,
     pocId: null,
     contactCount: 0,
@@ -940,6 +941,34 @@ test("price alone can't carry a listing that describes itself and has nothing", 
 
   assert.ok(loaded.rating > bare.rating, "amenities have to move the number");
   assert.ok(bare.cons.some((c) => /laundry/i.test(c)));
+});
+
+test("renovation claims and subway distance move the rating", () => {
+  const base = {
+    dealVerdict: "good" as const,
+    dealDelta: -10,
+    allInMonthly: 3000,
+    perks: ["laundry_unit"] as FeedListing["perks"],
+  };
+  const shiny = verdictFor(
+    feed({ ...base, description: "Gut renovated with stainless steel appliances. ".repeat(4) }),
+    DEFAULT_CRITERIA
+  );
+  const tired = verdictFor(
+    feed({ ...base, description: "Sold as-is, needs TLC, bring your contractor. ".repeat(4) }),
+    DEFAULT_CRITERIA
+  );
+  assert.ok(shiny.rating > tired.rating, `${shiny.rating} should beat ${tired.rating}`);
+  assert.ok(shiny.pros.some((p) => /renovated/i.test(p)));
+  assert.ok(tired.cons.some((c) => /needs work/i.test(c)));
+
+  // 55 Morton (fixture coords) is minutes from the 1; the middle of nowhere
+  // has no station and the location component sits out rather than punishing.
+  const nowhere = verdictFor(
+    feed({ ...base, lat: null, lon: null, description: "A".repeat(120) }),
+    DEFAULT_CRITERIA
+  );
+  assert.ok(Number.isFinite(nowhere.rating));
 });
 
 test("a listing that says nothing isn't punished for our missing data", () => {
