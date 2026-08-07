@@ -544,6 +544,15 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
 
 .perk-more { color: var(--text-muted); font-size: var(--t-xs); font-weight: 600; }
 
+/* A stated absence: same badge, struck through. Reads at a glance as "they
+   said no", which is different information from no badge at all. */
+.perk-no {
+  color: var(--warn);
+  background: var(--warn-soft);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
 .perks-empty {
   display: inline-flex;
   align-items: center;

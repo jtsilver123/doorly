@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FeedListing } from "@/types";
 import { STAGE_LABEL } from "@/types";
 import { CONTACT_LABEL } from "@/lib/outreach";
-import { AMENITIES, AMENITY_ORDER } from "@/lib/amenities";
+import { AMENITIES, AMENITY_ORDER, amenityFacts, type AmenityKey } from "@/lib/amenities";
 import { nearestStation, routesWithin } from "@/lib/subway";
 import { RatingDisc } from "@/components/Rating";
 import Icon from "@/components/Icon";
@@ -89,6 +89,8 @@ type Row = {
   /** Numeric extract for best-in-row marking; higher-is-better via `invert`. */
   num?: (l: FeedListing) => number | null;
   invert?: boolean;
+  /** Exempt from the fold-if-everyone-agrees rule — see amenityRowsFor. */
+  alwaysShow?: boolean;
 };
 
 const ROWS: Row[] = [
@@ -170,19 +172,59 @@ const ROWS: Row[] = [
 ];
 
 /**
- * One row per amenity any finalist has, ordered by how much each moves a
- * decision. Amenities nobody lists are left out entirely; ones everybody
- * shares are folded away by the same rule that folds any agreeing row.
+ * The six that decide NYC leases, each on its own line, always.
+ *
+ * These used to be yes-or-dash rows that folded away whenever the finalists
+ * agreed, which meant the questions people actually walk in with — is there a
+ * washer, is it a walk-up, who's at the door — could vanish from the table
+ * entirely. Decision criteria don't fold: agreement on "everyone has an
+ * elevator" is information, not noise.
+ *
+ * Three answers, honestly distinct: ✓ the listing said so, ✗ the listing said
+ * not (walk-up, "no pets"), — the listing never said, which is a question for
+ * the viewing rather than a fact for the table. Everything below these six stays
+ * on the old fold-if-agreed behaviour.
  */
+const DECISION_KEYS: AmenityKey[] = [
+  "laundry_unit",
+  "laundry_building",
+  "elevator",
+  "doorman",
+  "dishwasher",
+  "light",
+];
+
+const FACT_MARK = { yes: "✓", no: "✗", unknown: "—" } as const;
+const FACT_RANK = { yes: 1, no: -1, unknown: 0 } as const;
+
 export function amenityRowsFor(finalists: FeedListing[]): Row[] {
-  return AMENITY_ORDER.filter((key) => finalists.some((l) => l.perks.includes(key))).map(
-    (key) => ({
-      label: AMENITIES[key].label,
-      value: (l: FeedListing) => (l.perks.includes(key) ? "yes" : "—"),
-      num: (l: FeedListing) => (l.perks.includes(key) ? 1 : 0),
-      invert: true,
-    })
-  );
+  const facts = new Map(finalists.map((l) => [l.id, amenityFacts(l)]));
+  const factOf = (l: FeedListing, key: AmenityKey) => facts.get(l.id)?.[key] ?? "unknown";
+
+  const decision: Row[] = DECISION_KEYS.map((key) => ({
+    label: AMENITIES[key].label,
+    value: (l: FeedListing) => FACT_MARK[factOf(l, key)],
+    num: (l: FeedListing) => FACT_RANK[factOf(l, key)],
+    invert: true,
+    // Skipped only when no finalist says anything at all — a row of dashes
+    // answers nothing.
+    alwaysShow: finalists.some((l) => factOf(l, key) !== "unknown"),
+  })).filter((row) => row.alwaysShow);
+
+  // Same extractor as the decision rows — reading `perks` here would be a
+  // second source of truth for the same question, and the two would drift.
+  const rest = AMENITY_ORDER.filter(
+    (key) =>
+      !DECISION_KEYS.includes(key) &&
+      finalists.some((l) => factOf(l, key) === "yes")
+  ).map((key) => ({
+    label: AMENITIES[key].label,
+    value: (l: FeedListing) => FACT_MARK[factOf(l, key)],
+    num: (l: FeedListing) => FACT_RANK[factOf(l, key)],
+    invert: true,
+  }));
+
+  return [...decision, ...rest];
 }
 
 export default function Compare({
@@ -343,7 +385,9 @@ export default function Compare({
   const agreed: string[] = [];
   for (const row of [...ROWS, ...amenityRows]) {
     const values = finalists.map((l) => row.value(l));
-    if (new Set(values).size === 1) {
+    // Decision amenities stay on the table even in agreement — "everyone has
+    // a washer" is the kind of agreement people are checking for.
+    if (!row.alwaysShow && new Set(values).size === 1) {
       agreed.push(`${row.label.toLowerCase()}: ${values[0]}`);
     } else {
       rows.push(row);

@@ -19,6 +19,7 @@ import {
 } from "@/types";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
+import { amenityFacts, AMENITY_ORDER } from "@/lib/amenities";
 import PhotoGallery from "@/components/PhotoGallery";
 import TourMedia from "@/components/TourMedia";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
@@ -889,7 +890,17 @@ export default function ListingDrawer({
               </ul>
             )}
 
-            <Perks keys={listing.perks} limit={10} showLabels />
+            <Perks
+              keys={listing.perks}
+              // The full ledger here: everything stated present and everything
+              // stated absent. Silence stays invisible, which is the truth.
+              absent={(() => {
+                const facts = amenityFacts(listing);
+                return AMENITY_ORDER.filter((k) => facts[k] === "no");
+              })()}
+              limit={10}
+              showLabels
+            />
 
             {/* The 40× rule, before you fall for it. Only speaks when the
                 profile has an income to check against. */}

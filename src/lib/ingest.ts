@@ -47,6 +47,8 @@ interface ListingRow {
   last_seen_at: string;
   relisted_at: string | null;
   images: string[] | null;
+  description: string | null;
+  amenities: string[] | null;
 }
 
 interface EventInsert {
@@ -239,7 +241,7 @@ export async function ingest(
   for (const batch of chunk(fingerprints, 200)) {
     const { data } = await supabase
       .from("listings")
-      .select("id, fingerprint, price, original_price, is_active, first_seen_at, last_seen_at, relisted_at, images")
+      .select("id, fingerprint, price, original_price, is_active, first_seen_at, last_seen_at, relisted_at, images, description, amenities")
       .in("fingerprint", batch);
     for (const row of (data ?? []) as ListingRow[]) {
       knownFingerprints.set(row.fingerprint, row);
@@ -334,7 +336,17 @@ export async function ingest(
       sqft: primary.sqft,
       price,
       original_price: existingByFp?.original_price ?? price,
-      description: primary.description,
+      /*
+       * The words pool across sites the same way the photos do. StreetEasy's
+       * search rows carry a byline where a description should be, and HotPads
+       * carries the full paragraph — the same unit deserves the paragraph.
+       * Longest non-empty wins, and what's already stored competes too, so a
+       * source dropping out of one poll doesn't strip the text the amenity
+       * extractor reads.
+       */
+      description: [...group.map((l) => l.description), existingByFp?.description ?? ""]
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length)[0] ?? "",
       url: pickCanonicalUrl(group),
       image_url: primary.imageUrl,
       /*
@@ -353,7 +365,10 @@ export async function ingest(
       ].slice(0, 24),
       available_at: primary.availableAt,
       no_fee: primary.noFee,
-      amenities: primary.amenities,
+      // Union, not primary's: a feature is real no matter which site listed it.
+      amenities: [
+        ...new Set([...group.flatMap((l) => l.amenities), ...(existingByFp?.amenities ?? [])]),
+      ].slice(0, 60),
       building_type: primary.buildingType,
       // Contact details come from whichever site has them, not necessarily the
       // one that supplied the rest of the record — only Zillow exposes a phone.

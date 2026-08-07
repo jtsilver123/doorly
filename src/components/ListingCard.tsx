@@ -9,6 +9,7 @@ import { nextAction } from "@/lib/nextAction";
 import { lastChangeOf } from "@/lib/timeline";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
+import { amenityFacts } from "@/lib/amenities";
 import { RatingDisc, MyScoreDisc, ProsConsLine } from "@/components/Rating";
 import { nearestStation, subwayLabel } from "@/lib/subway";
 
@@ -272,7 +273,11 @@ export default function ListingCard({
           })()}
         </div>
 
-        <Perks keys={listing.perks} />
+        <Perks
+          keys={listing.perks}
+          // The walk-up flag earns card space; a whole list of noes would not.
+          absent={amenityFacts(listing).elevator === "no" ? ["elevator"] : []}
+        />
 
         <ProsConsLine listing={listing} />
 

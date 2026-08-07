@@ -104,14 +104,21 @@ const ICONS: Record<AmenityKey, JSX.Element> = {
 
 export default function Perks({
   keys,
+  absent = [],
   limit = 4,
   showLabels = false,
 }: {
   keys: AmenityKey[];
+  /**
+   * Stated absences — walk-up, "no pets". A different thing from silence,
+   * and often the more decisive fact: nobody skips a viewing because a
+   * listing has an elevator, plenty skip one because it doesn't.
+   */
+  absent?: AmenityKey[];
   limit?: number;
   showLabels?: boolean;
 }) {
-  if (!keys.length) {
+  if (!keys.length && !absent.length) {
     return <span className="perks-empty">No amenities listed</span>;
   }
 
@@ -134,6 +141,14 @@ export default function Perks({
           +{extra}
         </span>
       )}
+      {absent.map((key) => (
+        <span key={key} className="perk perk-no" title={`No ${AMENITIES[key].label.toLowerCase()}`}>
+          {ICONS[key]}
+          <span className={showLabels ? undefined : "sr-only"}>
+            No {AMENITIES[key].label.toLowerCase()}
+          </span>
+        </span>
+      ))}
     </span>
   );
 }

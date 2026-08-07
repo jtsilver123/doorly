@@ -31,7 +31,7 @@ import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
-import { amenitiesOf, qualityScore } from "@/lib/amenities";
+import { amenitiesOf, qualityScore, amenityFacts } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
 import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar.ts";
 import { tourDays } from "../src/lib/tourday.ts";
@@ -1594,29 +1594,36 @@ test("an address with no usable text is empty, not nonsense", () => {
 
 // --- compare: amenities as rows -------------------------------------------
 
-test("an amenity only one finalist has becomes its own row", () => {
-  // The table's job is diffing. A comma-run per column made the reader do it.
-  const a = feed({ id: "a", perks: ["laundry_unit", "dishwasher"] });
-  const b = feed({ id: "b", perks: ["dishwasher"] });
-  const rows = amenityRowsFor([a, b]);
-  const labels = rows.map((r) => r.label);
+test("decision amenities are rows whenever anyone says anything", () => {
+  const a = feed({ id: "a", amenities: ["Washer/Dryer in unit", "Dishwasher"] });
+  const b = feed({ id: "b", amenities: ["Dishwasher"] });
+  const labels = amenityRowsFor([a, b]).map((r) => r.label);
   assert.ok(labels.includes("W/D in unit"), "the differing amenity is a row");
-  assert.ok(labels.includes("Dishwasher"), "shared ones are rows too; folding removes them later");
-  assert.ok(!labels.includes("Gym"), "an amenity nobody has is not a row");
+  assert.ok(labels.includes("Dishwasher"), "agreement is still a row for decision amenities");
+  assert.ok(!labels.includes("Gym"), "an amenity nobody mentions is not a row");
 });
 
-test("amenity rows run in decision order, not alphabetically", () => {
-  const a = feed({ id: "a", perks: ["gym", "laundry_unit", "outdoor"] });
+test("decision rows lead, in decision order; the rest follow", () => {
+  const a = feed({
+    id: "a",
+    amenities: ["gym", "washer and dryer in unit", "private balcony"],
+  });
   const rows = amenityRowsFor([a]).map((r) => r.label);
-  assert.deepEqual(rows, ["W/D in unit", "Outdoor space", "Gym"]);
+  // W/D is a decision row (and implies building laundry); outdoor and gym
+  // trail in the old order.
+  assert.deepEqual(rows, ["W/D in unit", "Laundry in building", "Outdoor space", "Gym"]);
 });
 
-test("an amenity row reads yes or a dash, per listing", () => {
-  const a = feed({ id: "a", perks: ["elevator"] });
-  const b = feed({ id: "b", perks: [] });
-  const row = amenityRowsFor([a, b]).find((r) => r.label === "Elevator")!;
-  assert.equal(row.value(a), "yes");
-  assert.equal(row.value(b), "—");
+test("a decision row tells yes from no from never-said", () => {
+  const a = feed({ id: "a", amenities: ["Elevator"] });
+  const b = feed({ id: "b", description: "Sunny 3rd floor walk-up" });
+  const c = feed({ id: "c" });
+  const row = amenityRowsFor([a, b, c]).find((r) => r.label === "Elevator")!;
+  assert.equal(row.value(a), "✓", "stated presence");
+  assert.equal(row.value(b), "✗", "a walk-up is a stated absence");
+  assert.equal(row.value(c), "—", "silence is neither");
+  // And the fold rule must not eat these rows when finalists agree.
+  assert.equal(row.alwaysShow, true);
 });
 
 // --- distance to the train -------------------------------------------------
@@ -1933,4 +1940,46 @@ test("ordinary destinations pass through untouched", () => {
   assert.equal(safeNext(null), "/");
   assert.equal(safeNext(undefined, "/app"), "/app");
   assert.equal(safeNext("", "/app"), "/app");
+});
+
+// --- what a listing says it has, says it lacks, and never mentions ---------
+
+const amListing = (description: string, amenities: string[] = []) =>
+  ({ description, amenities, address: "" });
+
+test("a walk-up is an explicit no on the elevator", () => {
+  const facts = amenityFacts(amListing("Charming 4th floor walk-up with great light"));
+  assert.equal(facts.elevator, "no");
+  assert.equal(facts.light, "yes");
+  // Silence stays silence: nothing was said about laundry either way.
+  assert.equal(facts.laundry_unit, "unknown");
+});
+
+test("hookups are plumbing, not a washer", () => {
+  assert.equal(amenityFacts(amListing("W/D hookups in unit")).laundry_unit, "unknown");
+  assert.equal(
+    amenityFacts(amListing("washer and dryer in unit")).laundry_unit,
+    "yes"
+  );
+});
+
+test("an in-unit washer settles the building question too", () => {
+  const facts = amenityFacts(amListing("", ["Laundry: In Unit", "Elevator", "Doorman"]));
+  assert.equal(facts.laundry_unit, "yes");
+  assert.equal(facts.laundry_building, "yes");
+  assert.equal(facts.elevator, "yes");
+  assert.equal(facts.doorman, "yes");
+});
+
+test("stated absence beats a stray keyword", () => {
+  const facts = amenityFacts(amListing("No pets. No laundry in building, laundromat around the corner."));
+  assert.equal(facts.pets, "no");
+  assert.equal(facts.laundry_building, "no");
+});
+
+test("the chip list only carries confirmed yeses", () => {
+  const keys = amenitiesOf(amListing("Walk-up. Dishwasher, no pets."));
+  assert.ok(keys.includes("dishwasher"));
+  assert.ok(!keys.includes("elevator"));
+  assert.ok(!keys.includes("pets"));
 });
