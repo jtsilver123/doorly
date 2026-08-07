@@ -50,7 +50,7 @@ export async function runSearch(c: SearchCriteria): Promise<SearchRun> {
           ok: false,
           fetched: 0,
           kept: 0,
-          message: "skipped: no API key — add one in Settings",
+          message: "skipped: no API key. Add one in Settings",
           listings: [],
         };
       }

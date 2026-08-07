@@ -1,5 +1,5 @@
 import type { Listing, SearchCriteria, SearchResponse, StreetEasyListing } from "@/types";
-import { realtyGet } from "@/lib/realtyapi";
+import { realtyGet, POLL_PAGE_CAP } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
 import { getArea, boroughFor } from "@/lib/areas";
 
@@ -98,7 +98,7 @@ export function normalizeStreetEasy(raw: StreetEasyListing[]): Listing[] {
 export async function fetchStreetEasy(c: SearchCriteria): Promise<Listing[]> {
   // Pages per source is the main lever on the monthly request budget;
   // sorted by newest, one page already catches everything fresh.
-  const PAGES_PER_BED = (await loadConfig()).pagesPerSource;
+  const PAGES_PER_BED = Math.min((await loadConfig()).pagesPerSource, POLL_PAGE_CAP);
   const byId = new Map<string, Listing>();
 
   const requests = seLocations(c.areas).flatMap((location) =>

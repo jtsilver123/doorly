@@ -6,6 +6,8 @@ import { deliver, noticesForEvents } from "@/lib/notify";
 import { sweepPlan } from "@/lib/sweep";
 import { inBounds } from "@/lib/criteria";
 import { runSearch, type SourceReport } from "@/lib/sources";
+import { limitPollRequests, endPollRequests } from "@/lib/realtyapi";
+import { flushCallRecords } from "@/lib/apikey";
 
 /**
  * The ingest pipeline. Runs every saved search, folds the results into the
@@ -176,6 +178,17 @@ export async function ingest(
     .select("id")
     .single();
   const runId = runRow?.id as number | undefined;
+
+  /*
+   * The platform grants an invocation ~50 subrequests, and this function is
+   * the only thing that can spend them all: the pipeline's own database work
+   * needs roughly thirty, so upstream calls get what's left. Without the
+   * ledger, a wide search on a deep pages setting fanned out past the cap and
+   * every subsequent call in the run — including the update that closes the
+   * run row — died mid-poll. That is what an orphaned poll_runs row means.
+   */
+  limitPollRequests(16);
+  try {
 
   // 1. Scrape. Identical criteria across searches collapse to one fetch.
   const distinct = new Map<string, SavedSearch>();
@@ -634,4 +647,29 @@ export async function ingest(
     reports: allReports,
     errors,
   };
+
+  } catch (err) {
+    // The pipeline died partway. Close the run row with the reason — an
+    // orphaned row with no message reads as "the poll vanished", which is
+    // exactly the mystery this block exists to prevent.
+    const reason = err instanceof Error ? err.message : String(err);
+    errors.push(reason);
+    if (runId) {
+      await supabase
+        .from("poll_runs")
+        .update({
+          finished_at: new Date().toISOString(),
+          ok: false,
+          message: errors.join("; ").slice(0, 2000),
+        })
+        .eq("id", runId);
+    }
+    throw err;
+  } finally {
+    // The ledger is module state: left set, it would throttle the next
+    // request this isolate serves. The buffered usage rows land as one
+    // insert, which is the whole reason they were buffered.
+    endPollRequests();
+    await flushCallRecords();
+  }
 }

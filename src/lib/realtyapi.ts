@@ -58,6 +58,34 @@ export async function hasRealtyKey(): Promise<boolean> {
 
 const TIMEOUT_MS = 45_000;
 
+/*
+ * A per-poll ceiling on upstream calls, set by ingest for the duration of a
+ * run. The platform allows ~50 subrequests per invocation, and a poll's
+ * database work needs most of the headroom that isn't spent here; without a
+ * ledger, a generous pages-per-source setting fanned out enough requests to
+ * hit the platform cap mid-run, at which point every later call — including
+ * the bookkeeping that closes out the run — died. Sorted-by-newest queries
+ * front-load the value anyway: the pages this trims are the stale end.
+ */
+let pollBudget: number | null = null;
+
+/**
+ * Deepest page any one source may fetch in a single check, whatever the
+ * pages-per-source setting says. The setting still governs monthly budget
+ * planning; this governs what fits in one invocation. Newest-first sorting
+ * means page 3 and beyond of a twice-daily check is almost always yesterday's
+ * inventory again.
+ */
+export const POLL_PAGE_CAP = 2;
+
+export function limitPollRequests(n: number): void {
+  pollBudget = n;
+}
+
+export function endPollRequests(): void {
+  pollBudget = null;
+}
+
 export async function realtyGet<T>(
   host: RealtyHost,
   path: string,
@@ -81,6 +109,13 @@ export async function realtyGet<T>(
     Date.now() - new Date(usage.refusedAt).getTime() < RETRY_AFTER_MS;
   if (usage.remaining <= 0 || (usage.exhausted && refusalFresh)) {
     throw new BudgetExhaustedError(usage.used, usage.limit, host, path);
+  }
+
+  if (pollBudget !== null) {
+    if (pollBudget <= 0) {
+      throw new RealtyApiError("trimmed: per-check request cap", host, path);
+    }
+    pollBudget--;
   }
 
   const url = new URL(`https://${host}.realtyapi.io${path}`);

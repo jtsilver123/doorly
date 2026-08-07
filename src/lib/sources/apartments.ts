@@ -1,5 +1,5 @@
 import type { Listing, SearchCriteria } from "@/types";
-import { realtyGet } from "@/lib/realtyapi";
+import { realtyGet, POLL_PAGE_CAP } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
 import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
@@ -207,7 +207,7 @@ export async function fetchApartments(
   moveInDate = ""
 ): Promise<Listing[]> {
   const config = await loadConfig();
-  const pages = config.pagesPerSource;
+  const pages = Math.min(config.pagesPerSource, POLL_PAGE_CAP);
   const byId = new Map<string, Listing>();
   const window = availabilityWindow(moveInDate);
 

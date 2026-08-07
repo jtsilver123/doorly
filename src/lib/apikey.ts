@@ -172,9 +172,40 @@ export interface Usage {
   refusedAt: string | null;
 }
 
+/*
+ * One poll calls realtyGet dozens of times, and each budget check used to be
+ * three database reads. On Cloudflare's free plan an invocation gets 50
+ * subrequests TOTAL — the checks alone were spending triple the whole
+ * allowance, which killed polls halfway through and left their run rows
+ * orphaned. Within a few seconds the answer can't meaningfully change, so
+ * one read serves the whole burst.
+ */
+const usageCache = new Map<string, { at: number; promise: Promise<Usage> }>();
+const USAGE_CACHE_MS = 30_000;
+
 export async function getUsage(): Promise<Usage> {
   const config = await loadConfig();
   const hint = keyHint(config.realtyApiKey);
+  const cached = usageCache.get(hint);
+  if (cached && Date.now() - cached.at < USAGE_CACHE_MS) {
+    return cached.promise;
+  }
+  /*
+   * The promise goes in the cache, not the value. A poll fires its calls
+   * concurrently, so with a value cache every one of them missed (nobody had
+   * finished the first read yet) and the stampede re-ran the three reads per
+   * call — which is the exact spend this cache exists to prevent.
+   */
+  const promise = readUsage(config, hint);
+  usageCache.set(hint, { at: Date.now(), promise });
+  promise.catch(() => usageCache.delete(hint));
+  return promise;
+}
+
+async function readUsage(
+  config: AppConfig,
+  hint: string
+): Promise<Usage> {
   let used = 0;
   let exhausted = false;
   let refusedAtOut: string | null = null;
@@ -305,17 +336,38 @@ export async function nextCheckDue(userId?: string): Promise<{
  */
 export const NO_CREDITS_PATH = "__no_credits__";
 
-/** Fire-and-forget: metering must never be able to fail a real request. */
-export async function recordCall(
-  hint: string,
-  host: string,
-  path: string,
-  ok: boolean
-): Promise<void> {
-  const row = { key_hint: hint, host, path, ok };
+/**
+ * Fire-and-forget: metering must never be able to fail a real request.
+ *
+ * Buffered, not immediate: a poll makes dozens of calls, and a row-per-call
+ * insert was a subrequest-per-call on a platform that hands out 50 per
+ * invocation. Rows accumulate and land as one insert — either when the short
+ * timer fires, or when the poll calls `flushCallRecords` on its way out. A
+ * worker dying with an unflushed buffer under-counts by one burst, which the
+ * meter's arithmetic already treats as approximate.
+ */
+const pendingCalls: { key_hint: string; host: string; path: string; ok: boolean }[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function recordCall(hint: string, host: string, path: string, ok: boolean): void {
+  pendingCalls.push({ key_hint: hint, host, path, ok });
+  if (!flushTimer) {
+    flushTimer = setTimeout(() => {
+      void flushCallRecords();
+    }, 1000);
+  }
+}
+
+export async function flushCallRecords(): Promise<void> {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (!pendingCalls.length) return;
+  const rows = pendingCalls.splice(0, pendingCalls.length);
   for (const getClient of [async () => await db(), async () => adminDb()]) {
     try {
-      const { error } = await (await getClient()).from("api_usage").insert(row);
+      const { error } = await (await getClient()).from("api_usage").insert(rows);
       if (!error) return;
     } catch {
       // Fall through to the service role.

@@ -1,5 +1,5 @@
 import type { Listing, SearchCriteria } from "@/types";
-import { realtyGet } from "@/lib/realtyapi";
+import { realtyGet, POLL_PAGE_CAP } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
 import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
@@ -119,7 +119,7 @@ export async function fetchHotPads(c: SearchCriteria): Promise<Listing[]> {
   // Pages per source is the main lever on the monthly request budget;
   // sorted by newest, one page already catches everything fresh.
   const config = await loadConfig();
-  const PAGES = config.pagesPerSource;
+  const PAGES = Math.min(config.pagesPerSource, POLL_PAGE_CAP);
   const byId = new Map<string, Listing>();
   const bedsRange = `${c.bedMin}-${c.bedMax ?? 8}`;
   // Open-ended upper bound: baths are a floor, so never cap what qualifies.

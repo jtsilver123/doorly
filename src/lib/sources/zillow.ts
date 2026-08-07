@@ -1,5 +1,5 @@
 import type { Listing, SearchCriteria } from "@/types";
-import { realtyGet } from "@/lib/realtyapi";
+import { realtyGet, POLL_PAGE_CAP } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
 import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
@@ -203,7 +203,7 @@ export async function fetchZillow(c: SearchCriteria): Promise<Listing[]> {
   // Pages per source is the main lever on the monthly request budget;
   // sorted by newest, one page already catches everything fresh.
   const config = await loadConfig();
-  const MAX_PAGES = config.pagesPerSource;
+  const MAX_PAGES = Math.min(config.pagesPerSource, POLL_PAGE_CAP);
   const byId = new Map<string, Listing>();
 
   for (const area of queryScopes(c.areas, config.wideQueries)) {
