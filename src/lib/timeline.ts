@@ -52,21 +52,21 @@ const PHASE_STARTS: { phase: Phase; from: number; label: string; advice: string 
     from: 45,
     label: "Scouting",
     advice:
-      "Most listings up now are for earlier move-ins. Use this week to learn what your money buys and tune your search — don't burn outreach on units that'll be gone.",
+      "Most listings up now are for earlier move-ins. Use this week to learn what your money buys and tune your search. Don't burn outreach on units that'll be gone.",
   },
   {
     phase: "prime",
     from: 25,
     label: "Prime window",
     advice:
-      "Your inventory is listing right now — this is the widest choice you'll get. Book viewings aggressively; a place seen today can still be yours.",
+      "Your inventory is listing right now. This is the widest choice you'll get. Book viewings aggressively; a place seen today can still be yours.",
   },
   {
     phase: "decide",
     from: 12,
     label: "Decide",
     advice:
-      "The best units from this batch are going. Apply to anything you'd genuinely take — hesitating a day is how people lose apartments here.",
+      "The best units from this batch are going. Apply to anything you'd genuinely take. Hesitating a day is how people lose apartments here.",
   },
   {
     phase: "crunch",
@@ -92,7 +92,7 @@ export function phaseFor(daysLeft: number): PhaseInfo {
     return {
       phase: "past",
       label: "Past your date",
-      advice: "Your move-in date has passed — update it under My details.",
+      advice: "Your move-in date has passed. Update it under My details.",
       progress: 1,
       daysLeft,
     };
@@ -247,7 +247,7 @@ export function todaysActions(
     actions.push({
       key: "tour",
       title: `${tours} ${tours === 1 ? "viewing" : "viewings"} booked`,
-      detail: "Confirm the time the morning of — no-shows are common.",
+      detail: "Confirm the time the morning of. No-shows are common.",
       count: tours,
       tone: "good",
       filter: "tour",
@@ -261,7 +261,7 @@ export function todaysActions(
       title: `${fresh} new since yesterday`,
       detail:
         info.phase === "prime"
-          ? "Peak window — reach out to anything you'd live in."
+          ? "Peak window. Reach out to anything you'd live in."
           : "Triage these first; the newest listings get taken fastest.",
       count: fresh,
       tone: info.phase === "prime" ? "urgent" : "normal",

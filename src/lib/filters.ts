@@ -216,6 +216,46 @@ export function applyFilters(
   return filters.limit ? result.slice(0, filters.limit) : result;
 }
 
+/**
+ * Quick-add's matcher: an address, a scrap of one, or a whole pasted link.
+ *
+ * People paste what they have. A text from a friend has an address; a
+ * StreetEasy tab has a URL. Links are matched by pathname, because that part
+ * is the listing's identity on every source we watch, while the query string
+ * carries per-person tracking junk that would defeat an exact compare.
+ *
+ * URL matches ignore stage on purpose. Pasting a link to a place you passed
+ * on is deliberate in a way typing an address isn't, so it should find the
+ * card rather than pretend it never existed.
+ */
+export function findPasted(
+  listings: FeedListing[],
+  query: string
+): FeedListing | undefined {
+  const q = query.trim();
+  if (/^https?:\/\//i.test(q)) {
+    let path: string;
+    try {
+      path = new URL(q).pathname.replace(/\/+$/, "").toLowerCase();
+    } catch {
+      return undefined;
+    }
+    // "/" or "/rentals" is a whole site, not a listing.
+    if (path.split("/").filter(Boolean).length < 2) return undefined;
+    const matches = (u: string) => {
+      try {
+        return new URL(u).pathname.replace(/\/+$/, "").toLowerCase() === path;
+      } catch {
+        return false;
+      }
+    };
+    return listings.find(
+      (l) => matches(l.url) || l.alsoOn.some((s) => matches(s.url))
+    );
+  }
+  return applyFilters(listings, { stage: "all", search: q })[0];
+}
+
 /** How many filters are narrowing the list, for the "clear" affordance. */
 export function activeFilterCount(filters: FeedFilterOptions): number {
   let n = 0;

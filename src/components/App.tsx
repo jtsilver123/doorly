@@ -17,7 +17,7 @@ import {
   type Profile,
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
-import { applyFilters } from "@/lib/filters";
+import { applyFilters, findPasted } from "@/lib/filters";
 import { nextAction } from "@/lib/nextAction";
 import { runwayDays } from "@/lib/runway";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
@@ -248,16 +248,21 @@ export default function Home() {
    * touched only when the underlying data can actually have changed — a poll, a
    * star, a stage move — and adjusting a filter is a synchronous array pass.
    */
-  const loadFeed = useCallback(async () => {
+  // Returns what it loaded: quick-add re-searches the fresh list right after
+  // a check, and reading it back out of state would race the render.
+  const loadFeed = useCallback(async (): Promise<FeedListing[]> => {
     try {
       // "everything", not "all": the board's loss column holds no_go rows,
       // which "all" hides. The browse grid re-filters client-side anyway.
       const res = await fetch("/api/feed?stage=everything");
       const body = await res.json();
       if (body.error) toast({ message: body.error, tone: "warn" });
-      setListings(body.listings ?? []);
+      const fresh: FeedListing[] = body.listings ?? [];
+      setListings(fresh);
+      return fresh;
     } catch {
       toast({ message: "Couldn't load your listings. Check your connection.", tone: "warn" });
+      return [];
     } finally {
       setLoading(false);
     }
@@ -429,22 +434,42 @@ export default function Home() {
       .catch(() => {});
   }, [loadChanges, loadApi]);
 
+  /**
+   * One press of "Check for new": run the poll, reload everything it can
+   * change, and hand back the fresh feed so callers can look inside it.
+   * Quick-add re-runs its match against exactly this list.
+   */
+  const checkNow = async (): Promise<{
+    listings: FeedListing[];
+    error?: string;
+    newListings: number;
+    events: number;
+  }> => {
+    const body = await fetch("/api/refresh", { method: "POST" }).then((r) => r.json());
+    const [fresh] = await Promise.all([loadFeed(), loadChanges(), loadApi()]);
+    return {
+      listings: fresh,
+      error: body.error,
+      newListings: body.newListings ?? 0,
+      events: body.events ?? 0,
+    };
+  };
+
   async function refresh() {
     setRefreshing(true);
 
     try {
-      const body = await fetch("/api/refresh", { method: "POST" }).then((r) => r.json());
-      if (body.error) {
-        toast({ message: body.error, tone: "warn" });
-      } else if (body.newListings || body.events) {
+      const res = await checkNow();
+      if (res.error) {
+        toast({ message: res.error, tone: "warn" });
+      } else if (res.newListings || res.events) {
         toast({
-          message: `${body.newListings} new · ${body.events} changes`,
+          message: `${res.newListings} new · ${res.events} changes`,
           tone: "good",
         });
       } else {
         toast({ message: "Nothing new since last check" });
       }
-      await Promise.all([loadFeed(), loadChanges(), loadApi()]);
     } catch (err) {
       toast({
         message: err instanceof Error ? err.message : "Refresh failed",
@@ -508,28 +533,57 @@ export default function Home() {
   );
 
   /**
-   * Add a place by address.
+   * Add a place by address or pasted link.
    *
    * Matches against what's already tracked first. Somebody sending you an
    * address usually means a listing the poll already has, and creating a second
    * copy of it would split its price history and its notes in two.
+   *
+   * A miss used to dead-end at "wait for the next check", which turned pasting
+   * a hot listing into homework. Now it runs the check itself and re-matches
+   * when the fresh feed lands. The person pasting is the person in a hurry.
    */
-  const quickAdd = useCallback(
-    (address: string) => {
-      const hit = applyFilters(listings, { stage: "all", search: address })[0];
-      if (hit) {
-        moveStage(hit, "interested");
-        setOpen(hit);
-        toast({ message: `Found it — ${hit.address} is in your pipeline`, tone: "good" });
-        return;
+  const quickAdd = async (query: string) => {
+    const claim = (hit: FeedListing, message: string) => {
+      moveStage(hit, "interested");
+      setOpen(hit);
+      toast({ message, tone: "good" });
+    };
+
+    const hit = findPasted(listings, query);
+    if (hit) {
+      claim(hit, `Found it. ${hit.address} is in your pipeline`);
+      return;
+    }
+    if (refreshing) {
+      toast({ message: "A check is already running. Paste it again when that finishes." });
+      return;
+    }
+
+    toast({ message: "Not tracked yet. Checking the sources for it now" });
+    setRefreshing(true);
+    try {
+      const res = await checkNow();
+      const fresh = findPasted(res.listings, query);
+      if (fresh) {
+        claim(fresh, `There it is. ${fresh.address} just came in`);
+      } else if (res.error) {
+        toast({ message: res.error, tone: "warn" });
+      } else {
+        toast({
+          message: `Checked just now and the sources don't have it. If it's outside your saved areas or a private tip, it won't turn up on its own.`,
+          tone: "warn",
+        });
       }
+    } catch (err) {
       toast({
-        message: `Nothing matching "${address}" yet. It'll appear after the next check.`,
+        message: err instanceof Error ? err.message : "The check failed. Try again in a minute.",
         tone: "warn",
       });
-    },
-    [listings, moveStage, toast]
-  );
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   /**
    * The optimistic side of a "no". Dismissing something unseen removes it —

@@ -61,8 +61,8 @@ export default function PipelineBoard({
   listings: FeedListing[];
   onOpen: (listing: FeedListing) => void;
   onMove: (listing: FeedListing, stage: Stage) => void;
-  /** Address typed into the quick-add box. Resolved by the page. */
-  onQuickAdd: (address: string) => void;
+  /** Address or listing link pasted into the quick-add box. Resolved by the page. */
+  onQuickAdd: (query: string) => void;
   /** Opens the tour-day route planner. */
   onPlanTours: () => void;
   /**
@@ -207,10 +207,10 @@ export default function PipelineBoard({
   return (
     <>
       {/*
-        Somebody sends you an address. This finds it in what's already tracked
-        and moves it onto the board — everything gets posted somewhere, so a
-        miss means the poll hasn't reached it yet, not that it wants typing in
-        by hand.
+        Somebody sends you an address or a link. This finds it in what's
+        already tracked and moves it onto the board — and on a miss the page
+        runs a check on the spot, because everything gets posted somewhere and
+        the poll just hasn't reached it yet.
       */}
       <form
         className="quickadd"
@@ -224,8 +224,8 @@ export default function PipelineBoard({
         <input
           className="field"
           value={quick}
-          placeholder="Paste an address to pull it in — 91 East Third Street"
-          aria-label="Find a place by address"
+          placeholder="Paste an address or a listing link to pull it in"
+          aria-label="Find a place by address or link"
           onChange={(e) => setQuick(e.target.value)}
         />
         <button className="btn btn-primary" type="submit" disabled={!quick.trim()}>

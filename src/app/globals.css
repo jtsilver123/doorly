@@ -481,6 +481,50 @@ textarea {
 }
 
 /*
+ * The page behind the frame must never scroll on desktop.
+ *
+ * The shell is exactly one viewport tall and `.main` owns the scrolling, but
+ * the body itself stayed scrollable — so any element that poked past the
+ * viewport (a toast, a popover, anything absolutely positioned) handed the
+ * document a scrollbar. Scroll it and the whole frame slides up: the logo
+ * clips off the top, raw ink yawns open underneath, and the fixed drawer
+ * stays put while the content behind it moves, overlapping things it should
+ * never touch. `clip` rather than `hidden` for the same reason as the html
+ * rule above: it forbids scrolling without creating a scroll container.
+ *
+ * Two rules, and both are needed, verified by trying each alone:
+ *
+ * - On html, because the viewport takes its overflow from html (body's value
+ *   only propagates when html is `visible` on both axes, which the
+ *   `overflow-x: clip` above rules out). This stops wheel and touch scrolls.
+ * - On body, because `clip` at the viewport is per spec interpreted as
+ *   `hidden` — still programmatically scrollable, and a stray focus() or
+ *   scrollIntoView() is exactly what scrolled it in the wild. Clipping body
+ *   means overflowing descendants never reach the document at all, so there
+ *   is nothing left to scroll to.
+ *
+ * Body also becomes `position: relative`, without which its clip is
+ * decorative: an absolutely-positioned element inside an unpositioned body
+ * has the viewport as its containing block, sails right past body's overflow,
+ * and hands the document a scroll range anyway. Positioning body makes body
+ * the containing block, so the clip actually catches. The geometry doesn't
+ * change — body is already margin-less and exactly one viewport tall.
+ *
+ * Desktop only. On phones the shell is the page and body scroll IS the app
+ * scroll.
+ */
+@media (min-width: 861px) {
+  html:has(.shell),
+  body:has(.shell) {
+    height: 100dvh;
+    overflow-y: clip;
+  }
+  body:has(.shell) {
+    position: relative;
+  }
+}
+
+/*
  * The rail is ink, and re-themes itself by redefining the tokens rather than
  * restyling its children.
  *

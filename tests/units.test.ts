@@ -46,7 +46,7 @@ import {
   subwayLabel,
   walkMinutes,
 } from "../src/lib/subway.ts";
-import { applyFilters } from "@/lib/filters";
+import { applyFilters, findPasted } from "@/lib/filters";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { withinAreas, nearAreas } from "@/lib/geo";
 import { train } from "@/lib/rank";
@@ -1410,6 +1410,50 @@ test("search still reaches neighborhoods and your own notes", () => {
 test("a search that matches nothing returns nothing, not everything", () => {
   const list = [feed({ id: "a", address: "91 East Third Street" })];
   assert.equal(applyFilters(list, { search: "500 Fifth Avenue" }).length, 0);
+});
+
+// --- quick-add paste matching ----------------------------------------------
+
+test("a pasted listing link matches by pathname, tracking junk and all", () => {
+  const list = [
+    feed({ id: "a", url: "https://streeteasy.com/building/foo/12" }),
+    feed({ id: "b", url: "https://www.zillow.com/homedetails/91-e-3rd/456_zpid/" }),
+  ];
+  assert.equal(
+    findPasted(list, "https://streeteasy.com/building/foo/12?utm_source=txt&featured=1")?.id,
+    "a"
+  );
+  // Trailing slash and host casing are presentation, not identity.
+  assert.equal(
+    findPasted(list, "HTTPS://WWW.ZILLOW.COM/homedetails/91-e-3rd/456_zpid")?.id,
+    "b"
+  );
+});
+
+test("a pasted link also matches the same apartment on another site", () => {
+  const list = [
+    feed({
+      id: "a",
+      url: "https://streeteasy.com/building/foo/12",
+      alsoOn: [{ source: "zillow", url: "https://www.zillow.com/homedetails/foo/9_zpid" }],
+    }),
+  ];
+  assert.equal(
+    findPasted(list, "https://www.zillow.com/homedetails/foo/9_zpid")?.id,
+    "a"
+  );
+});
+
+test("a site's front page is not a listing and matches nothing", () => {
+  const list = [feed({ id: "a", url: "https://streeteasy.com/" })];
+  assert.equal(findPasted(list, "https://streeteasy.com/"), undefined);
+  assert.equal(findPasted(list, "https://streeteasy.com/for-rent"), undefined);
+});
+
+test("non-URL pastes fall through to the address search", () => {
+  const list = [feed({ id: "a", address: "91 East Third Street" })];
+  assert.equal(findPasted(list, "91 E 3rd")?.id, "a");
+  assert.equal(findPasted(list, "500 Fifth Avenue"), undefined);
 });
 
 // --- calendar handoff ------------------------------------------------------
