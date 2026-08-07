@@ -229,7 +229,14 @@ export default function ListingCard({
 
       <div className="card-body">
         <button className="card-headline" onClick={(e) => onOpen(listing, e.shiftKey)}>
-          <span className="card-price">{money(listing.price)}</span>
+          <span className="card-price">
+            {/* A building's "from" price is a starting point, not the unit's
+                rent. Saying so is the difference between a deal and a bait. */}
+            {listing.buildingType === "apartmentComplex" && (
+              <span className="price-from">from </span>
+            )}
+            {money(listing.price)}
+          </span>
           <span className="card-size">{size}</span>
         </button>
 

@@ -29,7 +29,17 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await supabaseServer();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    /*
+     * A failed exchange is not always a failed sign-in. The code is one-time,
+     * and this callback gets hit twice more often than you'd think — a
+     * preloading browser, a link scanner, a double tap. The first hit spends
+     * the code and writes the session; the second fails the exchange while
+     * the browser is already signed in. Telling that user "sign-in didn't
+     * complete" is a lie that costs trust, so signed-in is checked before
+     * anything is called an error.
+     */
+    const authed = !error || Boolean((await supabase.auth.getUser()).data?.user);
+    if (authed) {
       const invite = request.cookies.get("pending_invite")?.value;
       /*
        * Sign-in happens on the marketing host — it's the origin Supabase is

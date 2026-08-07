@@ -214,6 +214,11 @@ export async function fetchZillow(c: SearchCriteria): Promise<Listing[]> {
           listingStatus: "For_Rent",
           bed_min: bedMinParam(c.bedMin),
           bathrooms: bathParam(c.bathMin),
+          /* Probed 2026-08-07: this endpoint ignores every price parameter
+             we've tried (listPriceRange, price_min/max, monthlyPayment_*) —
+             a 0-4000 request returns $14k listings. Kept because it's
+             harmless and may start working; `inBounds` is what actually
+             enforces the budget, at the cost of page slots. */
           listPriceRange: `${c.priceMin}-${c.priceMax}`,
           sortOrder: "Newest",
           page: i + 1,

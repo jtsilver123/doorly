@@ -28,6 +28,7 @@ import Icon from "@/components/Icon";
 
 export interface Filters {
   query: string;
+  priceMin: string;
   priceMax: string;
   beds: string;
   baths: string;
@@ -123,6 +124,7 @@ export default function FilterBar({
    * number on a button that has no control for the thing being counted.
    */
   const filterCount =
+    (filters.priceMin ? 1 : 0) +
     (filters.priceMax ? 1 : 0) +
     (filters.beds !== "any" ? 1 : 0) +
     (filters.baths !== "any" ? 1 : 0) +
@@ -179,6 +181,16 @@ export default function FilterBar({
               <div className="panel-group">
                 <span className="panel-label">Rent and size</span>
                 <div className="panel-row">
+                  <input
+                    className="control control-sm"
+                    inputMode="numeric"
+                    value={filters.priceMin}
+                    placeholder="Min rent"
+                    onChange={(e) =>
+                      onChange({ priceMin: e.target.value.replace(/[^\d]/g, "") })
+                    }
+                    aria-label="Minimum rent"
+                  />
                   <input
                     className="control control-sm"
                     inputMode="numeric"

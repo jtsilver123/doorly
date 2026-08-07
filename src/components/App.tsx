@@ -266,6 +266,7 @@ export default function Home() {
   // filters
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("best");
+  const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [beds, setBeds] = useState("any");
   const [baths, setBaths] = useState("any");
@@ -298,6 +299,7 @@ export default function Home() {
 
   const clearFilters = useCallback(() => {
     setQuery("");
+    setPriceMin("");
     setPriceMax("");
     setBeds("any");
     setBaths("any");
@@ -404,6 +406,7 @@ export default function Home() {
     const filtered = applyFilters(listings, {
       stage: "all",
       search: query,
+      priceMin: priceMin ? Number(priceMin) : undefined,
       priceMax: priceMax ? Number(priceMax) : undefined,
       bedsMin: beds === "any" ? undefined : Number(beds),
       bedsMax: beds === "any" ? undefined : Number(beds),
@@ -428,6 +431,7 @@ export default function Home() {
   }, [
     listings,
     query,
+    priceMin,
     priceMax,
     beds,
     baths,
@@ -1476,6 +1480,7 @@ export default function Home() {
               total={visible.length}
               filters={{
                 query,
+                priceMin,
                 priceMax,
                 beds,
                 baths,
@@ -1492,6 +1497,7 @@ export default function Home() {
               }}
               onChange={(next: Partial<Filters>) => {
                 if (next.query !== undefined) setQuery(next.query);
+                if (next.priceMin !== undefined) setPriceMin(next.priceMin);
                 if (next.priceMax !== undefined) setPriceMax(next.priceMax);
                 if (next.beds !== undefined) setBeds(next.beds);
                 if (next.baths !== undefined) setBaths(next.baths);

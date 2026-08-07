@@ -20,6 +20,7 @@ const BOROUGH_ORDER = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Islan
 export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [areas, setAreas] = useState<string[]>([]);
+  const [priceMin, setPriceMin] = useState("0");
   const [priceMax, setPriceMax] = useState("4000");
   const [bedMin, setBedMin] = useState("0");
   const [bedMax, setBedMax] = useState("1");
@@ -37,6 +38,7 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
         const first = list[0];
         if (first) {
           setAreas(first.criteria.areas);
+          setPriceMin(String(first.criteria.priceMin ?? 0));
           setPriceMax(String(first.criteria.priceMax));
           setBedMin(String(first.criteria.bedMin));
           setBedMax(first.criteria.bedMax == null ? "any" : String(first.criteria.bedMax));
@@ -80,7 +82,7 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
           bedMin: Number(bedMin),
           bedMax: bedMax === "any" ? null : Number(bedMax),
           bathMin: Number(bathMin),
-          priceMin: 0,
+          priceMin: Number(priceMin) || 0,
           priceMax: Number(priceMax) || 4000,
           sources: ["streeteasy", "zillow", "apartments", "hotpads", "craigslist"],
           noFeeOnly: false,
@@ -132,7 +134,10 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
             bedMax: bedMax === "any" ? null : Number(bedMax),
             bathMin: Number(bathMin) || 0,
           })}{" "}
-          · up to ${Number(priceMax).toLocaleString()}
+          ·{" "}
+          {Number(priceMin) > 0
+            ? `$${Number(priceMin).toLocaleString()}–$${Number(priceMax).toLocaleString()}`
+            : `up to $${Number(priceMax).toLocaleString()}`}
         </div>
       </div>
 
@@ -170,15 +175,30 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
             <AreaPicker selected={areas} onChange={setAreas} />
           </div>
 
-          <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-            <span className="muted">Max rent</span>
-            <input
-              className="field"
-              inputMode="numeric"
-              value={priceMax}
-              onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
-            />
-          </label>
+          {/* A floor as well as a ceiling: suspiciously cheap "from" prices
+              on big buildings read as noise to someone hunting at a known
+              budget, and a min rent screens them out at the source. */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <label style={{ display: "grid", gap: 4, fontSize: 12, flex: "1 1 120px" }}>
+              <span className="muted">Min rent</span>
+              <input
+                className="field"
+                inputMode="numeric"
+                value={priceMin}
+                placeholder="0"
+                onChange={(e) => setPriceMin(e.target.value.replace(/[^\d]/g, ""))}
+              />
+            </label>
+            <label style={{ display: "grid", gap: 4, fontSize: 12, flex: "1 1 120px" }}>
+              <span className="muted">Max rent</span>
+              <input
+                className="field"
+                inputMode="numeric"
+                value={priceMax}
+                onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
+              />
+            </label>
+          </div>
 
           <button className="btn btn-primary" onClick={save} disabled={busy}>
             {busy ? "Saving…" : "Save search"}

@@ -537,6 +537,9 @@ export default function ListingDrawer({
           </div>
           <div className="drawer-head-what">
             <div className="drawer-head-price">
+              {listing.buildingType === "apartmentComplex" && (
+                <span className="price-from">from </span>
+              )}
               {money(listing.price)}
               <span>· {listing.ratingHeadline}</span>
             </div>
@@ -665,6 +668,9 @@ export default function ListingDrawer({
               {listing.ratingHeadline}
             </span>
             <b className="drawer-title-m-price">
+              {listing.buildingType === "apartmentComplex" && (
+                <span className="price-from">from </span>
+              )}
               {money(listing.price)}
               <span>/mo</span>
             </b>
