@@ -62,21 +62,21 @@ function activeJobs(listingId?: string): UploadJob[] {
 }
 
 /**
- * How far along everything still in flight is, weighted by size.
- *
- * Weighted, not averaged per file: a 40MB walkthrough queued behind three
- * snapshots would otherwise show 75% while the only part anyone is waiting
- * for hasn't started. The bar has to track the wait, not the file count.
- */
-/**
- * Which file of how many. `done` counts finished files, so the display reads
- * "2 of 3" while the second is in flight rather than after it lands.
+ * Which file of how many. `at` advances while a file is in flight, so the
+ * pill reads "2 of 3" during the second rather than after it.
  */
 export function uploadBatch(): { at: number; total: number } {
   const left = activeJobs().length;
   return { at: Math.min(batchTotal, batchTotal - left + 1), total: batchTotal };
 }
 
+/**
+ * How far along everything still in flight is, weighted by size.
+ *
+ * Weighted, not averaged per file: a 40MB walkthrough queued behind three
+ * snapshots would otherwise show 75% while the only part anyone is waiting
+ * for hasn't started. The bar has to track the wait, not the file count.
+ */
 export function uploadProgress(listingId?: string): { done: number; total: number; ratio: number } {
   const active = activeJobs(listingId);
   const total = active.reduce((sum, j) => sum + j.bytes, 0);
@@ -110,6 +110,17 @@ function guard(e: BeforeUnloadEvent) {
  * reaches for the Cloudflare context, which does not exist in a browser.
  */
 const MAX_BYTES = 200 * 1024 * 1024;
+
+/*
+ * The edge accepts at most 100MB per request, measured empirically: a 105MB
+ * probe got a raw 413 with the Worker never invoked. Whole files go up in one
+ * request below the threshold; above it the file is sliced into parts that
+ * clear the cap with room, and R2 reassembles them server-side. 32MB keeps a
+ * part cheap to retry and small enough that the server's buffering fallback
+ * can never threaten an isolate.
+ */
+const SINGLE_SHOT_BYTES = 90 * 1024 * 1024;
+const PART_BYTES = 32 * 1024 * 1024;
 
 /**
  * How many times one chunk gets to fail before the file does.
@@ -169,48 +180,95 @@ async function doUpload(job: UploadJob): Promise<void> {
       `too big (${Math.round(job.file.size / 1048576)}MB) — 200MB is the ceiling`
     );
   }
+  const type = job.file.type || "application/octet-stream";
+  const track = (fraction: number) => {
+    /*
+     * Held just shy of 1. The last bytes leaving the browser is not the same
+     * event as R2 having stored them and the metadata row landing, and a bar
+     * that sits at 100% for four seconds reads as stuck.
+     */
+    job.progress = Math.min(0.98, fraction);
+    notify();
+  };
+
+  const attempt = async (url: string, body: Blob, onProgress: (f: number) => void) => {
+    let res: { status: number; text: string } | null = null;
+    for (let tries = 1; tries <= TRIES; tries++) {
+      try {
+        res = await send(url, body, type, onProgress);
+      } catch (err) {
+        if (err instanceof Error && /cancelled/i.test(err.message)) throw err;
+        res = null;
+      }
+      if (res && res.status >= 200 && res.status < 300) return res;
+      if (tries === TRIES || !worthRetrying(res)) fail(res ?? { status: 0, text: "" });
+      // Backing off rather than hammering: whatever went wrong upstream needs
+      // a moment more than it needs the same bytes again immediately.
+      await wait(800 * tries);
+    }
+    fail(res ?? { status: 0, text: "" });
+  };
+
+  if (job.file.size <= SINGLE_SHOT_BYTES) {
+    await attempt(
+      `/api/upload?listing=${encodeURIComponent(job.listingId)}&name=${encodeURIComponent(job.file.name)}`,
+      job.file,
+      track
+    );
+    job.progress = 1;
+    notify();
+    return;
+  }
 
   /*
-   * One request, straight through to R2.
-   *
-   * This used to cut the file into parts and push each one through a Next
-   * route, because R2 needs a known body length and Next's request wrapper
-   * loses it — so the app had to buffer, and buffering a video inside a
-   * Worker's 128MB is what was producing 503s and taking the whole isolate
-   * down with it. `/api/upload` is answered by the Worker itself, before Next
-   * sees it, where the body is still the runtime's own stream and goes to the
-   * bucket without ever being assembled. No chunking, no reassembly, one hop
-   * instead of several — which is most of why it was slow, too.
-   *
-   * Retried anyway: a phone losing its radio mid-upload is not a bug, and
-   * re-sending is cheaper than making someone re-shoot a walkthrough.
+   * Past the edge's per-request cap: parts. Each one is an ordinary request
+   * the size the edge is happy with; R2 stitches them back into one object,
+   * and the metadata row is written on complete — so a torn upload can't
+   * leave a card pointing at nothing.
    */
-  const type = job.file.type || "application/octet-stream";
-  const url = `/api/upload?listing=${encodeURIComponent(job.listingId)}&name=${encodeURIComponent(job.file.name)}`;
+  const createRes = await fetch(
+    `/api/upload?action=create&listing=${encodeURIComponent(job.listingId)}&name=${encodeURIComponent(job.file.name)}&type=${encodeURIComponent(type)}`,
+    { method: "POST" }
+  );
+  if (!createRes.ok) fail({ status: createRes.status, text: await createRes.text() });
+  const { key, uploadId } = (await createRes.json()) as { key: string; uploadId: string };
 
-  let res: { status: number; text: string } | null = null;
-  for (let attempt = 1; attempt <= TRIES; attempt++) {
-    try {
-      res = await send(url, job.file, type, (fraction) => {
-        /*
-         * Held just shy of 1. The last bytes leaving the browser is not the
-         * same event as R2 having stored them and the metadata row landing,
-         * and a bar that sits at 100% for four seconds reads as stuck.
-         */
-        job.progress = Math.min(0.98, fraction);
-        notify();
-      });
-    } catch (err) {
-      if (err instanceof Error && /cancelled/i.test(err.message)) throw err;
-      res = null;
+  const total = Math.ceil(job.file.size / PART_BYTES);
+  const parts: { partNumber: number; etag: string }[] = [];
+  try {
+    for (let i = 0; i < total; i++) {
+      const chunk = job.file.slice(i * PART_BYTES, (i + 1) * PART_BYTES);
+      const res = await attempt(
+        `/api/upload?action=part&key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${i + 1}`,
+        chunk,
+        // Whole-file progress: the bar tracks the wait, and the wait is the
+        // file. A retry rewinds to this part's start rather than lying.
+        (f) => track((i * PART_BYTES + f * chunk.size) / job.file.size)
+      );
+      parts.push(JSON.parse(res!.text));
     }
-    if (res && res.status >= 200 && res.status < 300) break;
-    if (attempt === TRIES || !worthRetrying(res)) fail(res ?? { status: 0, text: "" });
-    // Backing off rather than hammering: whatever went wrong upstream needs a
-    // moment more than it needs the same 40MB again immediately.
-    await wait(800 * attempt);
-    job.progress = 0;
-    notify();
+    const done = await fetch(`/api/upload?action=complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        key,
+        uploadId,
+        parts,
+        listingId: job.listingId,
+        contentType: type,
+      }),
+    });
+    if (!done.ok) fail({ status: done.status, text: await done.text() });
+  } catch (err) {
+    // Abandoned parts sit invisibly in the bucket and bill like objects;
+    // aborting is what frees them. keepalive so a closing tab still sends it.
+    void fetch(`/api/upload?action=abort`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key, uploadId }),
+      keepalive: true,
+    }).catch(() => {});
+    throw err;
   }
 
   job.progress = 1;

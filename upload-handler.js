@@ -186,6 +186,109 @@ export async function handleMediaGet(request, env) {
 }
 
 /**
+ * Big files, in parts — because the edge won't take them whole.
+ *
+ * Cloudflare's zone plan caps a request body at 100MB, measured before this
+ * Worker runs, and a thirty-second 4K phone clip is 120 to 200. The probe
+ * that established this got a raw HTML 413 back with our code never invoked.
+ * So the browser slices anything past the single-shot threshold into parts
+ * that fit comfortably under the cap, and R2's own multipart machinery
+ * reassembles them — each part streamed through this Worker the same way a
+ * whole file is, so memory stays flat no matter the total.
+ *
+ * Every action re-verifies the session, and the object key is prefix-checked
+ * against the verified user id, so an uploadId can't be replayed by anyone
+ * who didn't start it.
+ */
+async function handleMultipart(request, env, url, user) {
+  const action = url.searchParams.get("action");
+  const owns = (key) => key.startsWith(`${user.id}/`);
+
+  if (action === "create") {
+    const listingId = url.searchParams.get("listing");
+    const filename = url.searchParams.get("name") || "upload";
+    const contentType = url.searchParams.get("type") || "application/octet-stream";
+    if (!listingId) return json({ error: "no listing" }, 400);
+    if (!contentType.startsWith("video/") && !contentType.startsWith("image/")) {
+      return json({ error: "only photos and video" }, 415);
+    }
+    const key = mediaKey(user.id, listingId, filename);
+    const upload = await env.MEDIA.createMultipartUpload(key, {
+      httpMetadata: { contentType },
+    });
+    return json({ key, uploadId: upload.uploadId });
+  }
+
+  if (action === "part") {
+    const key = url.searchParams.get("key") ?? "";
+    const uploadId = url.searchParams.get("uploadId") ?? "";
+    const partNumber = Number(url.searchParams.get("partNumber") ?? 0);
+    if (!key || !uploadId || !partNumber) return json({ error: "bad part request" }, 400);
+    if (!owns(key)) return json({ error: "not yours" }, 403);
+    if (!request.body) return json({ error: "no bytes" }, 400);
+    const upload = env.MEDIA.resumeMultipartUpload(key, uploadId);
+    /*
+     * Streamed like the single-shot path: at the front door the body still
+     * carries its content-length, which is all R2 asks for. If the runtime
+     * ever refuses the stream, the part is small enough (32MB by client
+     * contract) that buffering it once is a safe fallback rather than the
+     * isolate-killer buffering a whole video was.
+     */
+    let part;
+    try {
+      part = await upload.uploadPart(partNumber, request.body);
+    } catch {
+      const bytes = await request.arrayBuffer().catch(() => null);
+      if (!bytes) return json({ error: "part upload failed" }, 500);
+      part = await upload.uploadPart(partNumber, bytes);
+    }
+    return json({ partNumber: part.partNumber, etag: part.etag });
+  }
+
+  if (action === "complete" || action === "abort") {
+    const body = await request.json().catch(() => null);
+    if (!body?.key || !body?.uploadId) return json({ error: "bad request" }, 400);
+    if (!owns(body.key)) return json({ error: "not yours" }, 403);
+    const upload = env.MEDIA.resumeMultipartUpload(body.key, body.uploadId);
+
+    if (action === "abort") {
+      // Abandoned parts sit invisibly and bill like stored objects; aborting
+      // is the only thing that frees them.
+      await upload.abort().catch(() => {});
+      return json({ ok: true });
+    }
+
+    await upload.complete(
+      [...(body.parts ?? [])].sort((a, b) => a.partNumber - b.partNumber)
+    );
+    // The row only after the object exists, written as the user so RLS
+    // still governs it — same order, same reason as the single-shot path.
+    const insert = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/user_listing_media`, {
+      method: "POST",
+      headers: {
+        apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        authorization: `Bearer ${user.token}`,
+        "content-type": "application/json",
+        prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        listing_id: body.listingId,
+        path: body.key,
+        kind: (body.contentType ?? "").startsWith("video/") ? "video" : "photo",
+      }),
+    });
+    if (!insert.ok) {
+      await env.MEDIA.delete(body.key).catch(() => {});
+      return json({ error: (await insert.text()).slice(0, 200) || "could not save" }, 500);
+    }
+    return json({ path: body.key });
+  }
+
+  return json({ error: "unknown action" }, 400);
+}
+
+/**
  * Handles `POST /api/upload`. Returns null for anything else, so the caller
  * falls through to the app untouched.
  */
@@ -204,6 +307,10 @@ export async function handleUpload(request, env) {
     // forged token has to fail here, not at the database.
     const user = await verifiedUser(request, env);
     if (!user) return json({ error: "session expired, reload and try again" }, 401);
+
+    // Chunked transfers carry an `action`; whole files don't.
+    if (url.searchParams.get("action")) return handleMultipart(request, env, url, user);
+
     const userId = user.id;
     const token = user.token;
 
