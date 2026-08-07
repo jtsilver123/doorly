@@ -55,7 +55,9 @@ interface Props {
   /** Tag-team attribution — "via Emma" — when someone else found it. */
   via?: string | null;
   onHover?: (id: string | null) => void;
-  onOpen: (listing: FeedListing) => void;
+  /** Shift-selecting means "show me everything": the panel here, the
+      listing's own site in a new tab. */
+  onOpen: (listing: FeedListing, visitSource?: boolean) => void;
   onStar: (listing: FeedListing) => void;
   onPass: (listing: FeedListing) => void;
   onReach: (listing: FeedListing) => void;
@@ -98,7 +100,7 @@ export default function ListingCard({
     >
       <button
         className="card-media"
-        onClick={() => onOpen(listing)}
+        onClick={(e) => onOpen(listing, e.shiftKey)}
         aria-label={`Open ${listing.address}`}
       >
         {/* The label sits *under* the photo rather than instead of it. An
@@ -226,7 +228,7 @@ export default function ListingCard({
       </button>
 
       <div className="card-body">
-        <button className="card-headline" onClick={() => onOpen(listing)}>
+        <button className="card-headline" onClick={(e) => onOpen(listing, e.shiftKey)}>
           <span className="card-price">{money(listing.price)}</span>
           <span className="card-size">{size}</span>
         </button>
@@ -236,7 +238,7 @@ export default function ListingCard({
           {listing.sqft ? ` · ${listing.sqft} ft²` : ""}
         </div>
 
-        <button className="card-address" onClick={() => onOpen(listing)}>
+        <button className="card-address" onClick={(e) => onOpen(listing, e.shiftKey)}>
           {listing.address}
           {listing.unit ? ` #${listing.unit}` : ""}
         </button>

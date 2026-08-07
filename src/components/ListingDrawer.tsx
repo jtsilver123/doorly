@@ -681,8 +681,19 @@ export default function ListingDrawer({
 
           {/* Quick tabs: pin to the top once the photo scrolls away, jump on
               tap, light up with the section under the reading line — the
-              long panel's table of contents. */}
-          <div className="drawer-tabs" ref={tabsRef} aria-label="Jump to a section">
+              long panel's table of contents. On phones the pinned bar also
+              carries the actions that matter mid-scroll: back on the left,
+              the listing's own site on the right. The photo's floating
+              buttons leave with the photo; these never do. */}
+          <div className="drawer-pinbar">
+            <button
+              className="pin-act pin-back"
+              onClick={onClose}
+              aria-label="Back to listings"
+            >
+              <Icon name="chevron-left" size={17} />
+            </button>
+            <div className="drawer-tabs" ref={tabsRef} aria-label="Jump to a section">
             {(
               [
                 ["sec-costs", "Costs", true],
@@ -724,6 +735,18 @@ export default function ListingDrawer({
                   {label}
                 </button>
               ))}
+            </div>
+            {listing.url && (
+              <a
+                className="pin-act pin-site"
+                href={listing.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open the original listing"
+              >
+                <SourceMark source={listing.source} size={15} />
+              </a>
+            )}
           </div>
 
           <dl className="drawer-facts" data-sec="sec-costs">

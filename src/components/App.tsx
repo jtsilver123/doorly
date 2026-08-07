@@ -861,6 +861,23 @@ export default function Home() {
     [patch, loadFeed, toast, optimisticPass]
   );
 
+  /**
+   * Shift-select: the panel and the listing's own site together. Triage
+   * often ends at "looks right, now show me the full listing" — one gesture
+   * covers both instead of open-panel-then-hunt-for-the-link.
+   */
+  const openCard = useCallback(
+    (listing: FeedListing, visitSource?: boolean) => {
+      if (visitSource) {
+        const target =
+          orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
+        if (target) window.open(target, "_blank", "noopener");
+      }
+      setOpen(listing);
+    },
+    [profile.preferredSource]
+  );
+
   /** The .ics for a booked tour, shared by the board and the drawer. */
   const downloadIcs = useCallback((listing: FeedListing) => {
     const body = icsFor(listing);
@@ -980,7 +997,8 @@ export default function Home() {
         case "enter":
           if (current) {
             e.preventDefault();
-            setOpen(current);
+            // Shift widens the gesture: the panel plus the source site.
+            openCard(current, e.shiftKey);
           }
           break;
         case "e":
@@ -1013,7 +1031,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, visible, focus, pass, star, reachOut, profile.preferredSource]);
+  }, [tab, open, visible, focus, pass, star, reachOut, openCard, profile.preferredSource]);
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
@@ -1227,6 +1245,47 @@ export default function Home() {
             <strong>{counts.followUp} waiting on a reply</strong>
             <span className="muted">Contacted 2+ days ago. Chase them</span>
           </button>
+        )}
+
+        {/* The triage keys, listed where your eyes rest between cards. Shown
+            only on Listings, the one page they drive; the phone rail is a tab
+            bar and never renders this. */}
+        {tab === "feed" && (
+          <div className="keys" aria-label="Keyboard shortcuts">
+            <span className="keys-title">Keyboard</span>
+            <dl className="keys-grid">
+              <dt>
+                <kbd>J</kbd>
+                <kbd>K</kbd>
+              </dt>
+              <dd>next, previous</dd>
+              <dt>
+                <kbd>↵</kbd>
+              </dt>
+              <dd>open the place</dd>
+              <dt>
+                <kbd>⇧</kbd>
+                <kbd>↵</kbd>
+              </dt>
+              <dd>open it + its site</dd>
+              <dt>
+                <kbd>O</kbd>
+              </dt>
+              <dd>the listing site</dd>
+              <dt>
+                <kbd>E</kbd>
+              </dt>
+              <dd>reach out</dd>
+              <dt>
+                <kbd>S</kbd>
+              </dt>
+              <dd>save</dd>
+              <dt>
+                <kbd>X</kbd>
+              </dt>
+              <dd>pass</dd>
+            </dl>
+          </div>
         )}
 
         {/*
@@ -1515,7 +1574,7 @@ export default function Home() {
                       linked={linkedId === listing.id}
                       preferredSource={profile.preferredSource}
                       onHover={setLinkedId}
-                      onOpen={setOpen}
+                      onOpen={openCard}
                       onStar={star}
                       onPass={pass}
                       onReach={reachOut}
