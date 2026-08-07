@@ -29,33 +29,33 @@ export const dynamic = "force-dynamic";
 const EDGE: { label: string; title: string; body: string }[] = [
   {
     label: "The price",
-    title: "What the line actually rents for",
-    body: "Every listing is measured against its own comps: same building, same line, same bedroom count. You get the number it's over by, and a script that says so without being rude.",
+    title: "What this place should really cost",
+    body: "Every listing gets checked against apartments just like it: same building, same layout, same bedrooms. You see how much too high the rent is, and get a polite script that says so.",
   },
   {
     label: "The building",
     title: "The record nobody puts in the listing",
-    body: "Open HPD violations, bedbug filings, and the block's 311 noise complaints, straight from city data. The photos won't mention that the boiler has been out twice this year.",
+    body: "Open violations, bedbug reports, and noise complaints on the block, straight from city records. The photos won't tell you the boiler broke twice this year.",
   },
   {
     label: "The clock",
     title: "How long it's really been sitting",
-    body: "First seen, every price change since, and the day it quietly relisted under a new ID. A place that has sat for three weeks negotiates very differently from one posted this morning.",
+    body: "When it first showed up, every price cut since, and the day it was quietly posted again as new. A place that has sat for three weeks is much easier to bargain with than one posted this morning.",
   },
   {
     label: "The cost",
     title: "What you'll actually hand over",
-    body: "Concession spread across the lease, broker fee amortized, cash due at signing, and whether your income clears the 40x rule before you fall for the place.",
+    body: "The real monthly rent once free months are counted in, the broker fee, the cash you need on day one, and whether your income passes the 40x rule, all before you fall for the place.",
   },
   {
     label: "The move",
     title: "The message, already written",
-    body: "Named, specific, human, and sent from your own phone. The first reply usually gets the viewing, and most people take four hours to write theirs.",
+    body: "Named, specific, human, and sent from your own phone. The first reply usually gets the tour, and most people take four hours to write theirs.",
   },
   {
     label: "The crew",
     title: "One board, not a group chat",
-    body: "Your roommate sees the same pipeline, the same tour videos, the same notes, and who is on point for which agent. Nothing gets asked twice.",
+    body: "Your roommate sees the same board, the same tour videos, the same notes, and who is talking to which agent. Nobody asks the same question twice.",
   },
 ];
 
@@ -161,11 +161,11 @@ export default async function Home({
             Be <span className="mark">first</span>, not lucky.
           </h1>
           <p className="landing-sub">
-            A good New York apartment is gone in a day, and it goes to
-            whoever replied first. DamnLease checks every listing site every
-            hour, tells you what a place is really worth the minute it shows
-            up, and has your message to the agent already written. You reply
-            while everyone else is still opening tabs.
+            A good New York apartment is gone in a day. It goes to whoever
+            replies first. DamnLease checks every listing site every hour,
+            tells you what a place is really worth the minute it shows up,
+            and writes your message to the agent for you. You reply while
+            everyone else is still opening tabs.
           </p>
           <div className="landing-cta">
             <Link className="landing-go" href={go}>
@@ -244,18 +244,18 @@ export default async function Home({
           <h2 className="display">Made by a frustrated renter.</h2>
           <p className="landing-maker-body">
             I lost an apartment I wanted by four hours, to someone who saw
-            the listing first. Then I did it again. The tools renters get are
-            catalogs built for the people selling. Everything that actually
-            decides it, like the real price, the building&apos;s record, and
-            who replied first, you are left to work out alone, in twelve tabs,
-            at midnight.
+            the listing first. Then it happened again. The tools renters get
+            are catalogs built for the people selling. Everything that really
+            decides it, the true price, the building&apos;s record, who
+            replied first, you have to figure out alone, in twelve tabs, at
+            midnight.
           </p>
           <p className="landing-maker-body">
             So I built the thing I wanted. It is{" "}
             <span className="mark">completely free</span>. There is no paid
-            tier hiding behind a feature, and nothing about you is sold to
-            anyone, because there is no business model here to make that
-            tempting. One person builds it, in New York, mostly at night.
+            version hiding the good parts, and nothing about you gets sold,
+            because there is no business here to sell it for. One person
+            builds it, in New York, mostly at night.
           </p>
         </Reveal>
 
@@ -263,20 +263,20 @@ export default async function Home({
           <h3 className="landing-honest-h">What it can&apos;t do, so you hear it from me</h3>
           <ul className="landing-honest">
             <li>
-              <b>New York only.</b> The building records, the comps, and the
-              commute times are all specific to this city. Anywhere else it
-              would just be a worse spreadsheet.
+              <b>New York only.</b> The building records, the price checks,
+              and the commute times all come from this city&apos;s data.
+              Anywhere else it would just be a worse spreadsheet.
             </li>
             <li>
               <b>It doesn&apos;t see every apartment.</b> Five listing sites,
-              refreshed hourly. Buildings that only post on their own website,
-              and the ones that never get listed at all, are invisible to it.
-              They are invisible to Zillow too.
+              checked every hour. Buildings that only post on their own
+              website, and the ones that never get listed at all, are
+              invisible to it. They are invisible to Zillow too.
             </li>
             <li>
-              <b>The numbers are estimates.</b> Comps, true monthly cost, and
-              scores come from third-party data that can be stale or wrong.
-              Use them to ask sharper questions at the viewing, not to sign
+              <b>The numbers are estimates.</b> Price checks, monthly costs,
+              and scores come from outside data that can be old or wrong. Use
+              them to ask sharper questions at the viewing, not to sign
               anything.
             </li>
             <li>
@@ -302,36 +302,36 @@ export default async function Home({
         <h2 className="display">&ldquo;Why not just use Zillow?&rdquo;</h2>
         <p className="landing-vs-lede">
           Because a listing site is a catalog, and hunting is not browsing.
-          It is texting agents, booking tours, comparing finalists, and
-          beating four other applications to the same apartment. Right now
-          that part lives in twelve tabs, a group chat, and a spreadsheet.
+          Hunting is texting agents, booking tours, comparing your finalists,
+          and beating four other people to the same apartment. Right now that
+          part lives in twelve tabs, a group chat, and a spreadsheet.
         </p>
         <ul className="landing-vs-rows">
           {(
             [
               [
                 "Every site at once",
-                "StreetEasy, Zillow, Apartments.com, HotPads, and Craigslist, deduplicated. No single site has all of New York's inventory.",
+                "StreetEasy, Zillow, Apartments.com, HotPads, and Craigslist, with the copies merged into one. No single site has all of New York.",
                 "One site's slice of the market",
               ],
               [
                 "What it really costs",
-                "Concessions spread over the lease, fees amortized, cash to move in, and whether your income clears the 40x rule.",
+                "The real rent once free months are counted in, the fees, the cash to move in, and whether your income passes the 40x rule.",
                 "The asking rent",
               ],
               [
                 "A price check with teeth",
-                "Every listing measured against its own comps, with a negotiation script ready to send, or a warning to move fast instead.",
+                "Every listing checked against places just like it, with a bargaining script ready to send, or a warning to move fast instead.",
                 "“Contact agent”",
               ],
               [
                 "The building's record",
-                "Open HPD violations, bedbug filings and the block's 311 noise complaints, from city data.",
+                "Open violations, bedbug reports, and the block's noise complaints, from city records.",
                 "The listing's own photos",
               ],
               [
                 "A pipeline that chases",
-                "Every place you chase, tracked from first text to signed lease. Silence gets flagged and follow-ups write themselves.",
+                "Every place you chase, tracked from first text to signed lease. Silence gets flagged, and follow-ups write themselves.",
                 "Browser tabs and memory",
               ],
               [

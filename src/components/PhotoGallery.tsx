@@ -71,7 +71,7 @@ export default function PhotoGallery({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
-                alt={i === 0 ? alt : `${alt} — photo ${i + 1}`}
+                alt={i === 0 ? alt : `${alt}, photo ${i + 1}`}
                 loading={i === 0 ? "eager" : "lazy"}
                 onError={() => setUrls((list) => list.filter((u) => u !== url))}
               />
@@ -107,7 +107,7 @@ export default function PhotoGallery({
       {/* One photo is data, not breakage — say so, or the missing arrows read
           as the gallery being broken. The site link has the rest. */}
       {urls.length === 1 && (
-        <span className="gallery-count">1 photo — more on the listing site</span>
+        <span className="gallery-count">1 photo. More on the listing site</span>
       )}
 
       {full !== null && (

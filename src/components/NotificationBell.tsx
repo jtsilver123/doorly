@@ -112,7 +112,7 @@ export default function NotificationBell({
           {items.length === 0 && (
             <p className="bellpanel-empty muted">
               Nothing yet. Price changes on places you&apos;re pursuing, big
-              drops, and crew activity land here — and on your phone, if you
+              drops, and crew activity land here, and on your phone, if you
               turn that on in settings.
             </p>
           )}

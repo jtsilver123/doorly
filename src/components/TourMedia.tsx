@@ -106,7 +106,7 @@ export default function TourMedia({ listingId }: { listingId: string }) {
       <div className="tourmedia-head">
         <button className="btn" onClick={() => fileRef.current?.click()}>
           <Icon name="plus" size={14} />
-          {pending > 0 ? `Uploading ${pending} — add more` : "Add video or photos"}
+          {pending > 0 ? `Uploading ${pending}. Add more` : "Add video or photos"}
         </button>
         <input
           ref={fileRef}
@@ -124,7 +124,7 @@ export default function TourMedia({ listingId }: { listingId: string }) {
         />
         {items.length === 0 && pending === 0 && (
           <span className="muted tourmedia-hint">
-            What you film at the viewing lives here — or drop files anywhere
+            What you film at the viewing lives here, or drop files anywhere
             in this box. Up to 200MB each; uploads keep going if you close the
             panel.
           </span>

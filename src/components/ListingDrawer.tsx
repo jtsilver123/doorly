@@ -882,7 +882,7 @@ export default function ListingDrawer({
 
                 <p className="muted drawer-fineprint">
                   Straight-line distance at walking pace, from the MTA&apos;s own
-                  station list — a couple of blocks either way
+                  station list, a couple of blocks either way
                   {(profile.anchors ?? []).length > 0
                     ? "; commute estimates assume average subway pace, not a route plan"
                     : ""}
@@ -949,7 +949,7 @@ export default function ListingDrawer({
                 </p>
               ) : (
                 <p className="qualify is-short">
-                  The 40× rule wants {money(q.needed)}/yr — you&apos;re{" "}
+                  The 40× rule wants {money(q.needed)}/yr. You&apos;re{" "}
                   {money(q.gap)} short, so plan on a guarantor. A guarantor
                   service runs about one month&apos;s rent.
                 </p>
@@ -981,7 +981,7 @@ export default function ListingDrawer({
                       <>
                         <b>{intel.violations.open} open HPD violation{intel.violations.open === 1 ? "" : "s"}</b>
                         {intel.violations.openC > 0 &&
-                          ` — ${intel.violations.openC} class C (immediately hazardous)`}
+                          `, ${intel.violations.openC} class C (immediately hazardous)`}
                         . Ask what&apos;s being done about them.
                       </>
                     ) : (
@@ -1000,7 +1000,7 @@ export default function ListingDrawer({
                   <li className={intel.noise.count >= 20 ? "is-warn" : undefined}>
                     {intel.noise.count === 0
                       ? "No 311 noise complaints on this block in six months."
-                      : `${intel.noise.count} noise complaint${intel.noise.count === 1 ? "" : "s"} to 311 on this block in six months${intel.noise.top.length ? ` — mostly ${intel.noise.top.join(" and ").toLowerCase()}` : ""}.`}
+                      : `${intel.noise.count} noise complaint${intel.noise.count === 1 ? "" : "s"} to 311 on this block in six months${intel.noise.top.length ? `, mostly ${intel.noise.top.join(" and ").toLowerCase()}` : ""}.`}
                   </li>
                 )}
               </ul>
@@ -1072,7 +1072,7 @@ export default function ListingDrawer({
 
                 {tourKind === "open_house" && (
                   <span className="muted" style={{ fontSize: 11 }}>
-                    A window, not an appointment — show up any time inside it.
+                    A window, not an appointment. Show up any time inside it.
                   </span>
                 )}
 
@@ -1218,7 +1218,7 @@ export default function ListingDrawer({
                     </>
                   ) : (
                     <span className="muted">
-                      Nothing published — the message button copies your draft
+                      Nothing published. The message button copies your draft
                       and opens the listing's contact form.
                     </span>
                   )}
@@ -1392,7 +1392,7 @@ export default function ListingDrawer({
 
           {/* --- the application ----------------------------------------- */}
           {/* Landlords send portal links that die in text threads. Pinned
-              here, the link is where you'll look when it's time to apply —
+              here, the link is where you'll look when it's time to apply,
               and one click away once pasted. Saves on blur, like notes. */}
           <section className="dsec" data-sec="sec-apply">
             <h3 className="dsec-label">The application</h3>
@@ -1402,7 +1402,7 @@ export default function ListingDrawer({
                 type="url"
                 inputMode="url"
                 value={appUrl}
-                placeholder="Paste the application link — RentSpree, portal, form…"
+                placeholder="Paste the application link. RentSpree, portal, form…"
                 aria-label="Application link"
                 onChange={(e) => setAppUrl(e.target.value)}
                 onBlur={() => {
@@ -1496,7 +1496,7 @@ export default function ListingDrawer({
               Details come from the listing sites, not from us. Last confirmed
               live {when(listing.lastSeenAt)}; first seen {when(listing.firstSeenAt)}.
               Prices and availability can change without the listing being
-              updated — confirm both before you travel.
+              updated. Confirm both before you travel.
             </p>
           </section>
         </div>

@@ -215,7 +215,7 @@ export function dealSentence(
   const gap = Math.abs(percentVsMedian);
 
   if (cheap && (tier === "loaded" || tier === "well_equipped")) {
-    return `${gap}% under market and it has ${top.join(" and ")} — this is the kind that goes in a day.`;
+    return `${gap}% under market and it has ${top.join(" and ")}. This is the kind that goes in a day.`;
   }
   if (cheap && tier === "bare") {
     return `${gap}% under market, but no washer, dishwasher or elevator listed. Cheap for a reason, possibly a walk-up.`;
@@ -224,7 +224,7 @@ export function dealSentence(
     return `${gap}% under market${top.length ? `, with ${top.join(" and ")}` : ""}.`;
   }
   if (dear && tier === "bare") {
-    return `${gap}% over market with few amenities listed — hard to justify unless the photos win you over.`;
+    return `${gap}% over market with few amenities listed. Hard to justify unless the photos win you over.`;
   }
   if (dear) {
     return `${gap}% over market, though it does have ${top.join(" and ")}.`;

@@ -38,9 +38,18 @@ function packetType(contentType) {
   );
 }
 
-/** The packet uses the reserved listing id "packet"; keys carry it too. */
+/*
+ * The packet uses the reserved listing id "packet", optionally suffixed with
+ * the checklist slot the file satisfies: "packet:photo_id". The whole token
+ * rides in the key's second segment, so the slot survives into storage.
+ */
 function isPacket(listingId) {
-  return listingId === "packet";
+  return listingId === "packet" || String(listingId).startsWith("packet:");
+}
+
+function packetSlot(listingId) {
+  const at = String(listingId).indexOf(":");
+  return at >= 0 ? String(listingId).slice(at + 1).slice(0, 40) : "";
 }
 
 /**
@@ -49,10 +58,17 @@ function isPacket(listingId) {
  * Both written as the user, so RLS governs each the same way.
  */
 async function recordUpload(env, user, { listingId, key, contentType, filename, size }) {
-  const packet = key.split("/")[1] === "packet";
+  const packet = isPacket(key.split("/")[1] ?? "");
   const target = packet ? "user_documents" : "user_listing_media";
   const row = packet
-    ? { user_id: user.id, path: key, name: filename, kind: contentType, size: size ?? null }
+    ? {
+        user_id: user.id,
+        path: key,
+        name: filename,
+        kind: contentType,
+        size: size ?? null,
+        slot: packetSlot(key.split("/")[1] ?? ""),
+      }
     : {
         user_id: user.id,
         listing_id: listingId,
@@ -176,7 +192,7 @@ export async function handleMediaGet(request, env) {
     // Packet documents check their own table; everything else stays with
     // listing media. Either way the read is as the viewer, and a miss is a
     // 404 that looks the same whether the file is absent or someone else's.
-    const table = key.split("/")[1] === "packet" ? "user_documents" : "user_listing_media";
+    const table = isPacket(key.split("/")[1] ?? "") ? "user_documents" : "user_listing_media";
     const row = await fetch(
       `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${table}?path=eq.${encodeURIComponent(key)}&select=id&limit=1`,
       {

@@ -7,7 +7,6 @@ import type { Stage } from "@/types";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
 import {
   DEFAULT_PROFILE,
-  PROOF_OPTIONS,
   bestChannel,
   draftTourMessage,
   draftFollowUp,
@@ -31,6 +30,9 @@ import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
 import RailStatus from "@/components/RailStatus";
+import ChaseAll from "@/components/ChaseAll";
+import ReviewTours from "@/components/ReviewTours";
+import MoveInCosts from "@/components/MoveInCosts";
 import FilterBar, { type Filters } from "@/components/FilterBar";
 import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
@@ -146,6 +148,8 @@ export default function Home() {
   // they don't have is your board. The order mirrors the process: work the
   // pipeline, find more, compare and choose.
   const [tab, setTab] = useState<Tab>("pipeline");
+  /** Which account panel is showing; rides in /you's hash so reloads keep it. */
+  const [section, setSection] = useState<ProfileSection>("details");
   /** The Activity list, folded into Listings as a panel rather than a tab. */
   const [activityOpen, setActivityOpen] = useState(false);
   /** Section the drawer should open scrolled to, from a board next-action. */
@@ -186,6 +190,14 @@ export default function Home() {
     };
     const initial = read();
     if (initial) setTab(initial);
+    // /you carries its section in the hash, so a reload keeps the panel.
+    const sec = window.location.hash.replace(/^#/, "");
+    if (
+      window.location.pathname === "/you" &&
+      ["details", "search", "crew", "packet", "api"].includes(sec)
+    ) {
+      setSection(sec as ProfileSection);
+    }
     const onPop = () => {
       const next = read();
       if (next) setTab(next);
@@ -203,20 +215,24 @@ export default function Home() {
   useEffect(() => {
     // Clean paths only where the middleware serves them — everywhere the
     // shell answers at /app (local dev), the hash keeps doing the job.
+    // The account page carries its section as a hash (/you#packet), so a
+    // reload lands on the same panel instead of the first one.
     const cleanUrls = window.location.pathname !== "/app";
-    const want = cleanUrls ? `/${TAB_PATHS[tab]}` : `#${tab}`;
+    const want = cleanUrls
+      ? `/${TAB_PATHS[tab]}${tab === "profile" ? `#${section}` : ""}`
+      : `#${tab}`;
     const have = cleanUrls
-      ? window.location.pathname
+      ? window.location.pathname + (tab === "profile" ? window.location.hash : "")
       : `#${window.location.hash.replace(/^#/, "")}`;
     if (have !== want) {
-      window.history.replaceState(null, "", want + (cleanUrls ? "" : ""));
+      window.history.replaceState(null, "", want);
     }
     // A new tab starts at its top. Carrying the last tab's scroll position
     // over opened Pipeline mid-page on a phone, with the view toggle clipped
     // above the fold.
     window.scrollTo({ top: 0 });
     document.querySelector(".main")?.scrollTo?.({ top: 0 });
-  }, [tab]);
+  }, [tab, section]);
   const [listings, setListings] = useState<FeedListing[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
   /** Personal notices: crew adds, watched changes, good drops. */
@@ -231,6 +247,10 @@ export default function Home() {
   const [planning, setPlanning] = useState(false);
   /** The listing whose pass dialog is open. */
   const [passing, setPassing] = useState<FeedListing | null>(null);
+  /** The bulk-outreach run: opening pitches or follow-ups, or closed. */
+  const [bulkMode, setBulkMode] = useState<"first" | "chase" | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
   const [email, setEmail] = useState("");
@@ -258,7 +278,6 @@ export default function Home() {
   /** Must-have amenities: w/d, elevator, dishwasher and friends. */
   const [perkFilter, setPerkFilter] = useState<AmenityKey[]>([]);
   /** Which panel the profile area opens on, so the menu can deep-link. */
-  const [section, setSection] = useState<ProfileSection>("details");
   /**
    * How many cards are mounted.
    *
@@ -1312,7 +1331,7 @@ export default function Home() {
               "DamnLease feedback"
             )}&body=${encodeURIComponent(
               [
-                "Hey Jake —",
+                "Hey Jake,",
                 "",
                 "What I was doing:",
                 "",
@@ -1320,7 +1339,7 @@ export default function Home() {
                 "",
                 "What I expected instead:",
                 "",
-                "— sent from DamnLease",
+                "Sent from DamnLease",
               ].join("\n")
             )}`}
           >
@@ -1530,6 +1549,9 @@ export default function Home() {
               onQuickAdd={quickAdd}
               onPlanTours={() => setPlanning(true)}
               onPass={(l) => setPassing(l)}
+              onChaseAll={() => setBulkMode("chase")}
+              onReachAll={() => setBulkMode("first")}
+              onReviewTours={() => setReviewing(true)}
               onLean={setLean}
               onAppResult={setAppResult}
               onSecured={setSecured}
@@ -1560,6 +1582,7 @@ export default function Home() {
               onMove={moveStage}
               onLean={setLean}
               onMark={markAmenity}
+              preferredSource={profile.preferredSource}
               onNotes={async (id, notes) => {
                 await patch(id, { action: "notes", notes });
                 loadFeed();
@@ -1594,8 +1617,21 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            {section === "details" && <ProfileForm profile={profile} onSave={saveProfile} />}
-            {section === "search" && <SearchEditor onSaved={loadFeed} />}
+            {section === "details" && (
+              <ProfileForm
+                profile={profile}
+                onSave={saveProfile}
+                onGoPacket={() => setSection("packet")}
+              />
+            )}
+            {section === "search" && (
+              <div className="page-panels" style={{ display: "grid", gap: 16 }}>
+                <SearchEditor onSaved={loadFeed} />
+                {/* Costs shape every card's move-in figure, so they live with
+                    the search rather than with the application papers. */}
+                <MoveInCosts profile={profile} onSave={saveProfile} />
+              </div>
+            )}
             {section === "crew" && (
               <CrewPanel
                 onChanged={() => {
@@ -1635,6 +1671,55 @@ export default function Home() {
           onChanged={loadFeed}
           crew={crew}
           all={listings}
+        />
+      )}
+
+      {/* The chase run: follow up with the whole Contacted column in one
+          sitting, one pre-written tap per place. */}
+      {bulkMode && (
+        <ChaseAll
+          mode={bulkMode}
+          listings={listings.filter(
+            (l) => l.stage === (bulkMode === "chase" ? "contacted" : "interested")
+          )}
+          all={listings}
+          profile={profile}
+          onLog={async (l, channel) => {
+            await patch(
+              l.id,
+              {
+                action: "contact",
+                channel,
+                direction: "out",
+                who: l.contactName,
+                note: bulkMode === "chase" ? "Follow-up" : "Tour request",
+              },
+              false
+            );
+            // A first contact moves the card forward, same as the card button.
+            if (bulkMode === "first") {
+              await patch(l.id, { action: "stage", stage: "contacted" }, false);
+            }
+          }}
+          onClose={() => {
+            setBulkMode(null);
+            loadFeed();
+            loadChanges();
+          }}
+        />
+      )}
+
+      {/* Review mode: the toured places replayed one at a time, footage on
+          screen, a thumb per place. The whole day judged in a minute. */}
+      {reviewing && (
+        <ReviewTours
+          listings={listings.filter((l) => l.stage === "toured")}
+          onLean={setLean}
+          onOpen={(l) => {
+            setReviewing(false);
+            setOpen(l);
+          }}
+          onClose={() => setReviewing(false)}
         />
       )}
 
@@ -1859,7 +1944,7 @@ function ApiSettings({
             </div>
           ) : (
             <div className="muted" style={{ fontSize: 12 }}>
-              {status.usage.remaining} left — about {polls} more checks at {perPoll}{" "}
+              {status.usage.remaining} left. About {polls} more checks at {perPoll}{" "}
               requests each. Usage resets when you paste a new key.
             </div>
           )}
@@ -1887,7 +1972,7 @@ function ApiSettings({
           {days == null
             ? "Nothing runs on its own. The key only spends when you press the button, so it never expires on a schedule."
             : days <= 3
-              ? `⚠ At this pace you'd need a fresh key by ${replaceBy} — ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}. Consider checking less often.`
+              ? `⚠ At this pace you'd need a fresh key by ${replaceBy}, ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}. Consider checking less often.`
               : `At ${Number(checks) * perPoll} requests a day you'll need a fresh key around ${replaceBy} (${days} days).`}
           {status?.lastCheckedAt
             ? ` Last checked ${new Date(status.lastCheckedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
@@ -1911,7 +1996,7 @@ function ApiSettings({
                 : `About ${status.usage.remaining} requests left on this key.`}
             </b>
             <span>
-              A fresh one takes a minute and resets the meter — same account,
+              A fresh one takes a minute and resets the meter. Same account,
               new key.
             </span>
           </div>
@@ -1989,7 +2074,7 @@ function PushToggle() {
     return (
       <span className="muted" style={{ fontSize: 11 }}>
         This browser can&apos;t do device notifications. On iPhone, add DamnLease
-        to your Home Screen first — Safari only allows push for installed apps.
+        to your Home Screen first. Safari only allows push for installed apps.
       </span>
     );
   }
@@ -2058,7 +2143,7 @@ function AnchorsEditor({
   return (
     <div style={{ display: "grid", gap: 6 }}>
       <span className="muted" style={{ fontSize: 12 }}>
-        Commute anchors — work, the gym, wherever your week goes
+        Commute anchors: work, the gym, wherever your week goes
       </span>
       {anchors.map((anchor) => (
         <div key={anchor.label} className="anchorrow">
@@ -2096,7 +2181,7 @@ function AnchorsEditor({
       )}
       {state === "error" && (
         <span className="warn-text" style={{ fontSize: 12 }}>
-          Couldn&apos;t place that address — try adding the borough.
+          Couldn&apos;t place that address. Try adding the borough.
         </span>
       )}
       <span className="muted" style={{ fontSize: 11 }}>
@@ -2110,9 +2195,12 @@ function AnchorsEditor({
 function ProfileForm({
   profile,
   onSave,
+  onGoPacket,
 }: {
   profile: Profile;
   onSave: (p: Profile) => void;
+  /** Jump to the packet tab, where the docs and situation now live. */
+  onGoPacket: () => void;
 }) {
   const [draft, setDraft] = useState(profile);
   useEffect(() => setDraft(profile), [profile]);
@@ -2120,15 +2208,13 @@ function ProfileForm({
 
   const owner = draft.employment === "self_employed";
 
-  function toggleProof(proof: string) {
-    setDraft({
-      ...draft,
-      proofs: draft.proofs.includes(proof)
-        ? draft.proofs.filter((p) => p !== proof)
-        : [...draft.proofs, proof],
-    });
-  }
-
+  /*
+   * This tab shrank on purpose. How you earn, the guarantor, and what you
+   * can document all migrated to the Application packet (where the files
+   * are), and the move-in date and cost levers to the search preferences
+   * (where they shape the feed). What's left is the part only this tab
+   * knows: who you are in a message.
+   */
   const text: [keyof Profile, string, string][] = [
     ["name", "Your name", "Jake Silver"],
     ["employer", owner ? "Your business" : "Where you work", "BetterCampus"],
@@ -2137,7 +2223,6 @@ function ProfileForm({
       owner ? "Income shown on your 2025 return" : "Your income",
       "$240,000",
     ],
-    ["moveInDate", "Target move-in", "2026-09-01"],
     ["phone", "Your phone", "(212) 555-0134"],
     ["email", "Your email", "you@example.com"],
     ["creditNote", "Anything else worth saying", "credit in the 700s, no pets"],
@@ -2148,38 +2233,13 @@ function ProfileForm({
       <div>
         <div style={{ fontWeight: 600 }}>Your details</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          These fill in every tour request, so you only write them once.
+          These fill in every tour request, so you only write them once. How
+          you earn and your documents live in the{" "}
+          <button className="linkish" onClick={onGoPacket}>
+            application packet
+          </button>
+          ; move-in date and costs sit with your search preferences.
         </div>
-      </div>
-
-      <div style={{ display: "grid", gap: 4 }}>
-        <span className="muted" style={{ fontSize: 12 }}>
-          How you earn
-        </span>
-        <div style={{ display: "flex", gap: 6 }}>
-          {(
-            [
-              ["self_employed", "I own a business"],
-              ["employed", "I'm employed"],
-              ["other", "Other"],
-            ] as [Profile["employment"], string][]
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              className={draft.employment === value ? "btn btn-primary" : "btn"}
-              style={{ fontSize: 12 }}
-              onClick={() => setDraft({ ...draft, employment: value })}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {owner && (
-          <div className="muted" style={{ fontSize: 11 }}>
-            No salary to quote is the usual objection. Put the figure from your
-            return above and the message cites it as documented income.
-          </div>
-        )}
       </div>
 
       <div className="fieldgrid">
@@ -2235,27 +2295,9 @@ function ProfileForm({
         </div>
         <span className="muted" style={{ fontSize: 11 }}>
           The same apartment is often listed three or four times. This decides
-          which one the buttons open — the badges on each card still show every
+          which one the buttons open. The badges on each card still show every
           site carrying it.
         </span>
-      </div>
-
-      <div style={{ display: "grid", gap: 6 }}>
-        <span className="muted" style={{ fontSize: 12 }}>
-          What you can show
-        </span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {PROOF_OPTIONS.map((proof) => (
-            <button
-              key={proof}
-              className={draft.proofs.includes(proof) ? "btn btn-primary" : "btn"}
-              style={{ fontSize: 12, padding: "4px 9px" }}
-              onClick={() => toggleProof(proof)}
-            >
-              {proof}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/*

@@ -146,7 +146,7 @@ export function flagsFor(listing: FeedListing, deal: DealRead): Flag[] {
   if (deal.stats && deal.percentVsMedian <= -35) {
     flags.push({
       kind: "too-cheap",
-      message: `Priced ${Math.abs(deal.percentVsMedian)}% below similar listings. Sometimes real, often bait — see it in person and never wire a deposit before signing.`,
+      message: `Priced ${Math.abs(deal.percentVsMedian)}% below similar listings. Sometimes real, often bait. See it in person and never wire a deposit before signing.`,
       severity: "warn",
     });
   }

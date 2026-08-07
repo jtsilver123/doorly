@@ -107,7 +107,7 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
     }
 
     setBusy(false);
-    setNote(body.error ? body.error : "Saved — press Check for new to pull fresh listings.");
+    setNote(body.error ? body.error : "Saved. Press Check for new to pull fresh listings.");
     if (!body.error) {
       const refreshed = await fetch("/api/searches").then((r) => r.json());
       setSearches(refreshed.searches ?? []);
@@ -136,9 +136,13 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
         </div>
       </div>
 
-      <button className="btn" onClick={() => setOpen((v) => !v)}>
-        {open ? "Hide the controls" : "Change search"}
-      </button>
+      {/* Opens one way only. A visible "hide" button was a control for
+          managing controls; saving is the natural end of editing. */}
+      {!open && (
+        <button className="btn" onClick={() => setOpen(true)}>
+          Change search
+        </button>
+      )}
 
       {open && (
         <>

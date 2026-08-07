@@ -12,7 +12,7 @@ import { DEFAULT_COSTS, type CostAssumptions } from "@/lib/cost";
  */
 
 /** How you earn, which decides how the qualification line has to be written. */
-export type Employment = "self_employed" | "employed" | "other";
+export type Employment = "self_employed" | "employed" | "student" | "other";
 
 export interface Profile {
   name: string;
@@ -31,6 +31,12 @@ export interface Profile {
   extra: string;
   /** Which documents you actually have to hand, for the application packet. */
   documents: string[];
+  /** Someone signs with you. Their papers join the checklist when true. */
+  hasGuarantor?: boolean;
+  /** How the guarantor earns, which shapes which of their papers are needed. */
+  guarantorEmployment?: Employment;
+  /** Foreign national: landlords ask for passport and visa pages too. */
+  foreignNational?: boolean;
   /** What you assume it costs to move in. Tunable — the rules vary. */
   costs: CostAssumptions;
   /**

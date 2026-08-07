@@ -39,8 +39,8 @@ export function negotiationScript(listing: {
   if (listing.dealVerdict === "unknown") {
     return {
       stance: "nudge",
-      note: "Not enough similar listings to argue from — ask for a free month anyway; the worst answer is no.",
-      message: `Hi — very interested in ${listing.address}. Is there any flexibility on a free month or fees for a quick, complete application? I can move fast.`,
+      note: "Not enough similar listings to argue from. Ask for a free month anyway; the worst answer is no.",
+      message: `Hi, very interested in ${listing.address}. Is there any flexibility on a free month or fees for a quick, complete application? I can move fast.`,
     };
   }
 
@@ -49,8 +49,8 @@ export function negotiationScript(listing: {
     const ask = askable(median * 1.02);
     return {
       stance: "push",
-      note: `Listed ${listing.dealDelta}% over comparable ${size} — the comps are your leverage.`,
-      message: `Hi — I'm seriously interested in ${listing.address}. Comparable ${size} nearby are listing around ${money(median)}, so the asking rent reads high. Would the owner consider ${money(ask)}, or one month free at the current rent? I have my documents ready and can sign quickly.`,
+      note: `Listed ${listing.dealDelta}% over comparable ${size}. The comps are your leverage.`,
+      message: `Hi, I'm seriously interested in ${listing.address}. Comparable ${size} nearby are listing around ${money(median)}, so the asking rent reads high. Would the owner consider ${money(ask)}, or one month free at the current rent? I have my documents ready and can sign quickly.`,
     };
   }
 
@@ -58,14 +58,14 @@ export function negotiationScript(listing: {
   if (listing.dealDelta <= -8) {
     return {
       stance: "move-fast",
-      note: `Already ${Math.abs(listing.dealDelta)}% under the comps — negotiating risks losing it to a faster application. Spend your energy on speed.`,
+      note: `Already ${Math.abs(listing.dealDelta)}% under the comps. Negotiating risks losing it to a faster application. Spend your energy on speed.`,
     };
   }
 
   return {
     stance: "nudge",
-    note: "Priced about at market — no comp leverage, but a clean fast application is worth a free month to many owners.",
-    message: `Hi — very interested in ${listing.address}. The rent looks in line with the market; would the owner consider one free month or waiving fees for a complete application this week?`,
+    note: "Priced about at market. No comp leverage, but a clean fast application is worth a free month to many owners.",
+    message: `Hi, very interested in ${listing.address}. The rent looks in line with the market; would the owner consider one free month or waiving fees for a complete application this week?`,
   };
 }
 

@@ -188,7 +188,7 @@ export default function TourPlanner({
                         {stop.tight && (
                           <>
                             <Icon name="alert" size={12} />
-                            tight — {stop.gapMinutes} min gap
+                            tight: {stop.gapMinutes} min gap
                           </>
                         )}
                       </div>
@@ -212,7 +212,7 @@ export default function TourPlanner({
               </ol>
 
               <p className="planner-note muted">
-                Walking times are straight-line estimates at city pace — check
+                Walking times are straight-line estimates at city pace. Check
                 transit for anything flagged tight.
               </p>
             </div>

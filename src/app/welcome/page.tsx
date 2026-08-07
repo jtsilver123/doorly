@@ -168,7 +168,7 @@ export default function Welcome() {
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
             {step === 0 &&
-              "Neighborhoods are the one thing nobody can guess for you — everything else has a sensible default."}
+              "Neighborhoods are the one thing nobody can guess for you. Everything else has a sensible default."}
             {step === 1 &&
               "One key covers the big four. Craigslist is free and always on."}
             {step === 2 && "About a minute, and it's what fills your first screen."}
@@ -290,7 +290,7 @@ export default function Welcome() {
                 </div>
                 <span className="muted welcome-hint">
                   The same apartment is usually listed three or four times. This
-                  picks the one the buttons open — every card still shows all of
+                  picks the one the buttons open. Every card still shows all of
                   them.
                 </span>
               </div>
@@ -310,7 +310,7 @@ export default function Welcome() {
                 and sign up. The free tier is 250 requests a month.
               </li>
               <li>
-                Copy the key from your dashboard — it starts with <code>rt_</code>.
+                Copy the key from your dashboard. It starts with <code>rt_</code>.
               </li>
               <li>Paste it here.</li>
             </ol>
@@ -324,7 +324,7 @@ export default function Welcome() {
             />
             <span className="muted welcome-hint">
               One key covers StreetEasy, Zillow, Apartments.com and HotPads.
-              Craigslist needs none, so you&apos;ll see listings either way — just
+              Craigslist needs none, so you&apos;ll see listings either way, just
               fewer. You can add or change this any time under your account.
             </span>
           </div>
@@ -395,7 +395,7 @@ export default function Welcome() {
                     {copied ? "Copied" : "Copy invite link"}
                   </button>
                   <span className="muted" style={{ fontSize: 11 }}>
-                    Paste it in your group chat — whoever opens it joins as a{" "}
+                    Paste it in your group chat. Whoever opens it joins as a{" "}
                     {crewMode === "partner" ? "partner" : "scout"}. You can make
                     more links later.
                   </span>

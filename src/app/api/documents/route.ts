@@ -10,7 +10,7 @@ export async function GET() {
     const supabase = await db();
     const { data, error } = await supabase
       .from("user_documents")
-      .select("id, path, name, kind, size, created_at")
+      .select("id, path, name, kind, size, slot, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return NextResponse.json({

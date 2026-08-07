@@ -164,9 +164,9 @@ export async function acceptInvite(token: string): Promise<{ crewName: string }>
     .select("token, crew_id, role, accepted_by, crews (name, owner)")
     .eq("token", token)
     .maybeSingle();
-  if (!invite) throw new Error("This invite doesn't exist — ask for a fresh link.");
+  if (!invite) throw new Error("This invite doesn't exist. Ask for a fresh link.");
   if (invite.accepted_by && invite.accepted_by !== uid) {
-    throw new Error("This invite was already used — ask for a fresh link.");
+    throw new Error("This invite was already used. Ask for a fresh link.");
   }
   const crewMeta = invite.crews as unknown as { name: string; owner: string };
   if (crewMeta.owner === uid) return { crewName: crewMeta.name };
@@ -176,7 +176,7 @@ export async function acceptInvite(token: string): Promise<{ crewName: string }>
   const already = await crewOf(uid);
   if (already && already.id !== invite.crew_id) {
     throw new Error(
-      `You're already searching with "${already.name}" — leave that crew first, then use this link again.`
+      `You're already searching with "${already.name}". Leave that crew first, then use this link again.`
     );
   }
 

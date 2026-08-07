@@ -117,13 +117,13 @@ export default function CrewPanel({ onChanged }: { onChanged: () => void }) {
 
         <ul className="crew-pitch">
           <li>
-            <b>Moving in with someone?</b> Invite them as a partner — one shared
+            <b>Moving in with someone?</b> Invite them as a partner: one shared
             pipeline you both fill and work, with a point person on every place
             so you never both text the same agent.
           </li>
           <li>
             <b>Living alone?</b> Invite friends or family as scouts. They drop
-            places into your pipeline, tagged with who found them — you keep
+            places into your pipeline, tagged with who found them. You keep
             the final say.
           </li>
         </ul>
@@ -133,7 +133,7 @@ export default function CrewPanel({ onChanged }: { onChanged: () => void }) {
             className="field"
             style={{ flex: "1 1 180px" }}
             value={name}
-            placeholder="Name it — Winter and Jake's place"
+            placeholder="Name it: Winter and Jake's place"
             onChange={(e) => setName(e.target.value)}
           />
           <button
@@ -163,10 +163,10 @@ export default function CrewPanel({ onChanged }: { onChanged: () => void }) {
         <div style={{ fontWeight: 600 }}>{crew.name}</div>
         <div className="muted" style={{ fontSize: 12 }}>
           {owner
-            ? "Your pipeline is the shared one — everyone here works it with you."
+            ? "Your pipeline is the shared one. Everyone here works it with you."
             : crew.role === "partner"
               ? "You share this pipeline fully: add places, move them, take point on agents."
-              : "You're scouting: drop places in — they'll carry your name — and watch it move."}
+              : "You're scouting: drop places in, they'll carry your name, and watch it move."}
         </div>
       </div>
 
@@ -208,14 +208,14 @@ export default function CrewPanel({ onChanged }: { onChanged: () => void }) {
       {owner && (
         <div style={{ display: "grid", gap: 8 }}>
           <span className="muted" style={{ fontSize: 12 }}>
-            Invite someone — each link works once
+            Invite someone. Each link works once
           </span>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <button className="btn" disabled={busy} onClick={() => invite("partner")}>
-              Partner link — we're moving in together
+              Partner link: we're moving in together
             </button>
             <button className="btn" disabled={busy} onClick={() => invite("scout")}>
-              Scout link — help me look
+              Scout link: help me look
             </button>
           </div>
           {inviteUrl && (
@@ -225,7 +225,7 @@ export default function CrewPanel({ onChanged }: { onChanged: () => void }) {
                 {copied ? "Copied" : "Copy link"}
               </button>
               <span className="muted" style={{ fontSize: 11 }}>
-                Paste it in your group chat — whoever opens it joins as a{" "}
+                Paste it in your group chat. Whoever opens it joins as a{" "}
                 {inviteRole === "partner" ? "partner" : "scout"}.
               </span>
             </div>

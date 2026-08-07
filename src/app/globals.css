@@ -1444,6 +1444,17 @@ kbd {
   padding: clamp(var(--s6), 7vw, var(--s8)) clamp(var(--s5), 6vw, var(--s8));
   border-top: 1px solid var(--border);
 }
+/* Two columns once there's room: the story on the left, the honest list on
+   the right. One narrow column in a wide section read as a page half-built. */
+@media (min-width: 900px) {
+  .landing-maker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(var(--s6), 5vw, var(--s8));
+    align-items: start;
+  }
+  .landing-maker .landing-honest-h { margin-top: 0; }
+}
 .landing-maker-body {
   margin: var(--s4) 0 0;
   max-width: 58ch;

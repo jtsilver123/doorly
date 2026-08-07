@@ -33,25 +33,23 @@ import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
 import { amenitiesOf, qualityScore, amenityFacts } from "@/lib/amenities";
 import { verdictFor, gradeOf } from "@/lib/verdict";
-import { icsFor, googleCalendarUrl, eventDescription } from "../src/lib/calendar.ts";
-import { tourDays } from "../src/lib/tourday.ts";
-import { normalizeApartments } from "../src/lib/sources/apartments.ts";
-import { amenityRowsFor } from "../src/components/Compare.tsx";
-import { sweepPlan } from "../src/lib/sweep.ts";
-import { nextBedRange } from "../src/components/BedBathPicker.tsx";
+import { icsFor, googleCalendarUrl, eventDescription } from "@/lib/calendar";
+import { tourDays } from "@/lib/tourday";
+import { normalizeApartments } from "@/lib/sources/apartments";
+import { amenityRowsFor } from "@/components/Compare";
+import { sweepPlan } from "@/lib/sweep";
+import { nextBedRange } from "@/components/BedBathPicker";
 import {
   nearestStation,
   stationsWithin,
   routesWithin,
   subwayLabel,
   walkMinutes,
-} from "../src/lib/subway.ts";
+} from "@/lib/subway";
 import { applyFilters, findPasted, addressFromListingUrl } from "@/lib/filters";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
-import { withinAreas, nearAreas } from "@/lib/geo";
-import { train } from "@/lib/rank";
+import { nearAreas } from "@/lib/geo";
 import { safeNext } from "@/lib/nextPath";
-import type { Listing } from "@/types";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
 import { hpdAddress } from "@/lib/nycdata";
 import {

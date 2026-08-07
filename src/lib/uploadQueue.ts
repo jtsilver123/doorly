@@ -417,10 +417,9 @@ export function enqueueUploads(listingId: string, files: File[] | FileList): voi
   if (!running) batchTotal = 0;
   for (const file of [...files]) {
     const type = sniffType(file);
-    const ok =
-      listingId === "packet"
-        ? packetAccepts(type)
-        : type.startsWith("image/") || type.startsWith("video/");
+    const ok = listingId.startsWith("packet")
+      ? packetAccepts(type)
+      : type.startsWith("image/") || type.startsWith("video/");
     if (!ok) continue;
     jobs.push({
       id: ++seq,

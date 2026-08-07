@@ -71,7 +71,7 @@ export async function DELETE(
     const supabase = await db();
     // Packet documents live in their own table; the delete policy on each
     // means a vanished row is proof of ownership either way.
-    const table = key.split("/")[1] === "packet" ? "user_documents" : "user_listing_media";
+    const table = (key.split("/")[1] ?? "").startsWith("packet") ? "user_documents" : "user_listing_media";
     const { data: removed, error } = await supabase
       .from(table)
       .delete()

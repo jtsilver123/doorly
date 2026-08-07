@@ -30,7 +30,7 @@ export function RatingDisc({
       className="ratedisc"
       data-grade={grade}
       data-size={size}
-      title={title ?? `${rating} out of 100 — ${GRADE_LABEL[grade]} match for your search`}
+      title={title ?? `${rating} out of 100. ${GRADE_LABEL[grade]} match for your search`}
       aria-label={`Rated ${rating} out of 100, ${GRADE_LABEL[grade]}`}
       role="img"
     >
@@ -131,7 +131,7 @@ export function MyScoreField({
       <div className="myscore-foot">
         <span className="muted">
           {score == null
-            ? "Not scored — drag to set yours"
+            ? "Not scored. Drag to set yours"
             : "Sorts and compares on your number, not ours"}
         </span>
         {score != null && (

@@ -44,7 +44,7 @@ export default function UploadStatus() {
           {state.batch > 1
             ? `Uploading file ${state.at} of ${state.batch}`
             : "Uploading 1 file"}{" "}
-          — safe to keep browsing
+          safe to keep browsing
         </span>
         <b>{pct}%</b>
       </div>

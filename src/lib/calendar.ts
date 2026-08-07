@@ -44,7 +44,7 @@ function windowFor(listing: FeedListing): { start: Date; end: Date } | null {
 export function eventTitle(listing: FeedListing): string {
   const unit = listing.unit ? ` #${listing.unit}` : "";
   const what = listing.tourKind === "open_house" ? "Open house" : "Tour";
-  return `${what} — ${listing.address}${unit}`;
+  return `${what}: ${listing.address}${unit}`;
 }
 
 export function eventLocation(listing: FeedListing): string {

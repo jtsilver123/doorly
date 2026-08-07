@@ -306,7 +306,7 @@ export default function FilterBar({
                       onReset();
                     }}
                   >
-                    Nothing matches — clear filters
+                    Nothing matches. Clear filters
                   </button>
                 ) : (
                   <button className="btn btn-primary" onClick={() => setOpenPanel(false)}>

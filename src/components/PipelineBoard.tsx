@@ -54,6 +54,9 @@ export default function PipelineBoard({
   onMove,
   onQuickAdd,
   onPlanTours,
+  onChaseAll,
+  onReachAll,
+  onReviewTours,
   crewTag,
   onPass,
   onLean,
@@ -77,6 +80,12 @@ export default function PipelineBoard({
   onOpenAt: (listing: FeedListing, section: string) => void;
   /** Opens the tour-day route planner. */
   onPlanTours: () => void;
+  /** Opens the follow-up run over the whole Contacted column. */
+  onChaseAll: () => void;
+  /** Opens the first-contact run over the whole Interested column. */
+  onReachAll: () => void;
+  /** Opens review mode: each toured place's footage, one thumb at a time. */
+  onReviewTours: () => void;
   /**
    * Tag-team line for a card — "Emma has point", "via Dad" — or null when
    * solo. Computed by the page, which holds the roster.
@@ -307,11 +316,51 @@ export default function PipelineBoard({
                   <button
                     className="board-plan"
                     onClick={onPlanTours}
-                    title="Map your tour days — order, route and walking time"
+                    title="Map your tour days: order, route and walking time"
                     aria-label="Plan your tour route"
                   >
                     <Icon name="calendar" size={13} />
                     Plan
+                  </button>
+                )}
+                {/* Mass outreach is the game: reach the whole Interested
+                    column with opening pitches, then chase the whole
+                    Contacted column with follow-ups, one pre-written tap
+                    per place. */}
+                {stage === "interested" && column.length > 0 && (
+                  <button
+                    className="board-plan"
+                    onClick={onReachAll}
+                    title="Send the opening message to everyone here, one tap each"
+                    aria-label="Reach out to everyone in Interested"
+                  >
+                    <Icon name="send" size={13} />
+                    Text all
+                  </button>
+                )}
+                {stage === "contacted" && column.length > 0 && (
+                  <button
+                    className="board-plan"
+                    onClick={onChaseAll}
+                    title="Send a follow-up to everyone here, one tap each"
+                    aria-label="Follow up with everyone in Contacted"
+                  >
+                    <Icon name="send" size={13} />
+                    Chase all
+                  </button>
+                )}
+                {/* After a day of viewings the places blur together. Review
+                    replays each toured place with its own footage and takes
+                    a thumb, one place at a time. */}
+                {stage === "toured" && column.length > 0 && (
+                  <button
+                    className="board-plan"
+                    onClick={onReviewTours}
+                    title="Replay your footage place by place and thumb each one"
+                    aria-label="Review your toured places"
+                  >
+                    <Icon name="video" size={13} />
+                    Review
                   </button>
                 )}
                 <span className="muted">{column.length}</span>

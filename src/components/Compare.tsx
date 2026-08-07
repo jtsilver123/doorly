@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { FeedListing, Stage } from "@/types";
+import { createPortal } from "react-dom";
+import type { FeedListing, Source, Stage } from "@/types";
 import { STAGE_LABEL, PIPELINE_STAGES } from "@/types";
+import { orderedSources } from "@/components/ListingCard";
 import { CONTACT_LABEL } from "@/lib/outreach";
 import { AMENITIES, AMENITY_ORDER, amenityFacts, type AmenityKey } from "@/lib/amenities";
 import { nearestStation, routesWithin } from "@/lib/subway";
@@ -82,6 +84,135 @@ function NoteCell({
 }
 
 const money = (n: number) => `$${n.toLocaleString()}`;
+
+/**
+ * The photos, big. The header thumbnail jogs the memory; clicking it opens
+ * this — the full set at real size, arrow keys or clicks to walk it, and a
+ * jump to the listing on its own site for the shots the feed never carried.
+ */
+function PhotoLightbox({
+  listing,
+  photos,
+  siteUrl,
+  onClose,
+}: {
+  listing: FeedListing;
+  photos: string[];
+  /** The listing on its own site, preference-ordered upstream. */
+  siteUrl: string | null;
+  onClose: () => void;
+}) {
+  const [at, setAt] = useState(0);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") setAt((a) => (a + 1) % photos.length);
+      else if (e.key === "ArrowLeft") setAt((a) => (a - 1 + photos.length) % photos.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, photos.length]);
+  // Portalled: this opens from inside a sticky <th>, whose stacking context
+  // would otherwise let the table's corner cell paint on top of the overlay.
+  return createPortal(
+    <div
+      className="compare-modal"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="compare-modal-panel lightbox"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Photos of ${listing.address}`}
+      >
+        <div className="compare-modal-head">
+          <div>
+            <b>
+              {listing.address}
+              {listing.unit ? ` #${listing.unit}` : ""}
+            </b>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {at + 1} of {photos.length}
+            </div>
+          </div>
+          <div className="lightbox-actions">
+            {siteUrl && (
+              <a className="btn" href={siteUrl} target="_blank" rel="noreferrer">
+                <Icon name="external" size={13} /> Open the listing
+              </a>
+            )}
+            <button className="btn" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </div>
+        <button
+          className="lightbox-shot"
+          title="Click for the next photo"
+          aria-label={`Photo ${at + 1} of ${photos.length}. Click for the next.`}
+          onClick={() => setAt((a) => (a + 1) % photos.length)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photos[at]} alt="" />
+        </button>
+        {photos.length > 1 && (
+          <div className="lightbox-nav">
+            <button className="btn" onClick={() => setAt((a) => (a - 1 + photos.length) % photos.length)}>
+              <Icon name="chevron-left" size={14} /> Prev
+            </button>
+            <button className="btn" onClick={() => setAt((a) => (a + 1) % photos.length)}>
+              Next <Icon name="chevron-right" size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/**
+ * The memory jogger. By decision night the finalists have blurred together,
+ * and "the one with the deep kitchen" is a photo, not a row. Clicking opens
+ * the lightbox — the shots at real size, with a jump to the listing site.
+ */
+function HeaderPhotos({ listing, siteUrl }: { listing: FeedListing; siteUrl: string | null }) {
+  const [viewing, setViewing] = useState(false);
+  const photos = listing.images?.length
+    ? listing.images
+    : listing.imageUrl
+      ? [listing.imageUrl]
+      : [];
+  if (!photos.length) return null;
+  return (
+    <>
+      <button
+        className="compare-photo"
+        title="See the photos big"
+        aria-label={`Photos of ${listing.address}, ${photos.length} in all. Click to view.`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setViewing(true);
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photos[0]} alt="" loading="lazy" />
+        {photos.length > 1 && <span className="compare-photo-count">{photos.length}</span>}
+      </button>
+      {viewing && (
+        <PhotoLightbox
+          listing={listing}
+          photos={photos}
+          siteUrl={siteUrl}
+          onClose={() => setViewing(false)}
+        />
+      )}
+    </>
+  );
+}
 
 type Row = {
   label: string;
@@ -289,6 +420,7 @@ export default function Compare({
   onLean,
   onMark,
   onNotes,
+  preferredSource,
 }: {
   listings: FeedListing[];
   onOpen: (l: FeedListing) => void;
@@ -299,10 +431,21 @@ export default function Compare({
   /** Your own amenity answer: yes, no, or null to defer to the listing. */
   onMark: (l: FeedListing, key: string, fact: "yes" | "no" | null) => void;
   onNotes: (id: string, notes: string) => Promise<void> | void;
+  /** Which site the lightbox's "open the listing" link favours. */
+  preferredSource?: Source;
 }) {
   const [order, setOrder] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
+  // Escape closes the picker from anywhere; an overlay div can't hear keys.
+  useEffect(() => {
+    if (!picking) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPicking(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [picking]);
   const [dragging, setDragging] = useState<string | null>(null);
   /** Tour footage per finalist, signed URLs from the media route. */
   const [media, setMedia] = useState<
@@ -504,9 +647,6 @@ export default function Compare({
           onClick={(e) => {
             if (e.target === e.currentTarget) setPicking(false);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setPicking(false);
-          }}
         >
         <div className="compare-modal-panel" role="dialog" aria-label="Choose places to compare" aria-modal="true">
         <div className="compare-modal-head">
@@ -548,7 +688,7 @@ export default function Compare({
                         onClick={() => (queued ? promote(l.id) : toggle(l.id))}
                         title={
                           queued
-                            ? "Not in the table — the table shows five. Click to bring it in."
+                            ? "Not in the table. It shows five. Click to bring it in."
                             : inTable
                               ? "Shown. Click to take it out."
                               : "Click to put it back."
@@ -591,7 +731,7 @@ export default function Compare({
                 className="btn compare-editbtn"
                 onClick={() => setPicking(true)}
                 aria-haspopup="dialog"
-                title={`${finalists.length} of ${candidates.length} places shown. Add, remove, or reorder — or drag a column heading.`}
+                title={`${finalists.length} of ${candidates.length} places shown. Add, remove, or reorder, or drag a column heading.`}
               >
                 <Icon name="filter" size={14} />
                 Edit
@@ -641,6 +781,10 @@ export default function Compare({
                   </span>
                   <span className="muted">{l.neighborhood}</span>
                 </button>
+                <HeaderPhotos
+                  listing={l}
+                  siteUrl={orderedSources(l, preferredSource)[0]?.url ?? l.url ?? null}
+                />
                 {/* The stage, where it can be changed rather than merely
                     read. Decision night IS stage changes — "we're applying
                     to this one, that one's out" — and bouncing back to the
@@ -767,7 +911,7 @@ export default function Compare({
       </div>
       {agreed.length > 0 && (
         <p className="compare-same">
-          Identical on all {finalists.length} — {agreed.join(" · ")}
+          Identical on all {finalists.length}: {agreed.join(" · ")}
         </p>
       )}
     </div>

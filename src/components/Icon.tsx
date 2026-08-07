@@ -37,6 +37,7 @@ export type IconName =
   | "check"
   | "thumbup"
   | "thumbdown"
+  | "send"
   | "alert"
   | "chevron"
   | "chevron-left"
@@ -152,6 +153,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7" />,
+  send: <path d="M20.5 3.5 3.8 10.1c-.9.35-.85 1.6.07 1.9l6.4 2.05 2.05 6.4c.3.92 1.55.97 1.9.07L20.8 3.9c.3-.77-.45-1.52-1.22-1.22ZM10.3 14.1l9.4-9.9" />,
   thumbup: (
     <path d="M7 10.5v9.5M7 11l4-7c1.2 0 2 .9 2 2.2 0 .9-.5 2.8-.5 2.8h5c1 0 1.8.9 1.6 1.9l-1.2 6.6c-.15.9-.9 1.5-1.8 1.5H7" />
   ),
