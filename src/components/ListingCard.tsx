@@ -260,6 +260,9 @@ export default function ListingCard({
               (Date.now() - new Date(listing.lastSeenAt).getTime()) / 86_400_000
             );
             if (quiet < 2 || !listing.isActive) return null;
+            // A hand-added tip has no site re-confirming it; silence is
+            // expected, not a warning sign.
+            if (listing.source === "manual" || listing.source === "facebook") return null;
             return (
               <span className="card-stale" title="No listing site has confirmed this recently. Check it's still up before reaching out.">
                 {" · "}unverified {quiet}d

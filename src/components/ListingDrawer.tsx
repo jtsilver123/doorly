@@ -764,6 +764,7 @@ export default function ListingDrawer({
               (Date.now() - new Date(listing.lastSeenAt).getTime()) / 86_400_000
             );
             if (quiet < 2 || !listing.isActive) return null;
+            if (listing.source === "manual" || listing.source === "facebook") return null;
             return (
               <div className="stale-warn" role="note">
                 <Icon name="alert" size={14} />

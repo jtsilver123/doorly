@@ -7,6 +7,7 @@ export type Source =
   | "hotpads"
   | "apartments"
   | "email"
+  | "facebook"
   | "manual";
 
 export const ALL_SOURCES: Source[] = [
@@ -24,6 +25,7 @@ export const SOURCE_LABEL: Record<Source, string> = {
   hotpads: "HotPads",
   apartments: "Apartments.com",
   email: "Email alert",
+  facebook: "Facebook group",
   manual: "Added by me",
 };
 

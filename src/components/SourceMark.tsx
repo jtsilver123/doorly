@@ -20,6 +20,18 @@ import { SOURCE_LABEL } from "@/types";
 /** 24×24 viewBox for all of them, so they line up at any size. */
 function Glyph({ source }: { source: Source }) {
   switch (source) {
+    case "facebook":
+      // The f in its circle — nominative use, same as the rest.
+      return (
+        <svg viewBox="0 0 24 24" className="srcglyph" aria-hidden="true">
+          <circle cx="12" cy="12" r="12" fill="#0866ff" />
+          <path
+            d="M15.9 15.2l.5-3.2h-3.1V9.9c0-.9.4-1.7 1.8-1.7h1.4V5.4S15.2 5.2 14 5.2c-2.6 0-4.3 1.6-4.3 4.4V12H6.9v3.2h2.8V23a11 11 0 0 0 3.6 0v-7.8Z"
+            fill="#fff"
+          />
+        </svg>
+      );
+
     case "zillow":
       // Roofline over a house with the lightning-Z cut through it.
       return (

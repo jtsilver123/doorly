@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import type { FeedListing, SearchCriteria, Source } from "@/types";
 import type { Stage } from "@/types";
 import { siteJumps } from "@/lib/siteLinks";
+import { isFacebookUrl, parseFreePost, type FreePost } from "@/lib/freepost";
+import PasteIn from "@/components/PasteIn";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
 import {
   DEFAULT_PROFILE,
@@ -413,6 +415,12 @@ export default function Home() {
   const anchor = (profile.anchors ?? [])[0];
   /** Late listings shown anyway, by explicit request. */
   const [showLate, setShowLate] = useState(false);
+  /** A pasted Facebook post (or any free-text tip) awaiting the form. */
+  const [pasteDraft, setPasteDraft] = useState<null | {
+    text: string;
+    url: string;
+    parsed: FreePost;
+  }>(null);
   /** Phones: which of the two views the toggle is showing. */
   const [mobileMap, setMobileMap] = useState(false);
   /*
@@ -755,6 +763,23 @@ export default function Home() {
    * when the fresh feed lands. The person pasting is the person in a hurry.
    */
   const quickAdd = async (query: string) => {
+    /*
+     * A Facebook link or a pasted post can't be looked up — the group boards
+     * have no API and their terms bar scraping — so they open the paste-in
+     * form instead: parse what the text says, let the person fix the rest.
+     */
+    if (isFacebookUrl(query)) {
+      setPasteDraft({ text: "", url: query.trim(), parsed: parseFreePost("") });
+      return;
+    }
+    const freeform = !/^https?:\/\//i.test(query.trim()) && query.trim().length > 60;
+    if (freeform) {
+      const parsed = parseFreePost(query);
+      if (parsed.looksLikeListing) {
+        setPasteDraft({ text: query, url: "", parsed });
+        return;
+      }
+    }
     const claim = (hit: FeedListing, message: string) => {
       moveStage(hit, "interested");
       setOpen(hit);
@@ -1974,6 +1999,26 @@ export default function Home() {
             setOpen(l);
           }}
           onClose={() => setReviewing(false)}
+        />
+      )}
+
+      {/* A pasted post becoming a card. Lands as Interested, same as any
+          manual add: your paste outranks the criteria. */}
+      {pasteDraft && (
+        <PasteIn
+          text={pasteDraft.text}
+          url={pasteDraft.url}
+          parsed={pasteDraft.parsed}
+          onClose={() => setPasteDraft(null)}
+          onDone={async (id) => {
+            setPasteDraft(null);
+            await patch(id, { action: "stage", stage: "interested" }, false);
+            const fresh = await loadFeed();
+            const hit = fresh.find((l) => l.id === id);
+            if (hit) setOpen(hit);
+            toast({ message: "On the board. Reach out while it's fresh", tone: "good" });
+            burstConfetti();
+          }}
         />
       )}
 

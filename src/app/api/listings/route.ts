@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { addManualListing } from "@/lib/feed";
+import { currentUserId } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  // The add writes with the service role, so the person has to be real.
+  try {
+    await currentUserId();
+  } catch {
+    return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  }
   const body = await request.json();
   // Only the address is required. Somebody pasting one from a text message
   // rarely has the rent to hand, and refusing the add until they do is how a
@@ -14,6 +21,7 @@ export async function POST(request: Request) {
   try {
     const id = await addManualListing({
       url: String(body.url ?? ""),
+      source: body.source === "facebook" ? "facebook" : "manual",
       address: String(body.address),
       price: Number(body.price),
       bedrooms: body.bedrooms == null ? undefined : Number(body.bedrooms),

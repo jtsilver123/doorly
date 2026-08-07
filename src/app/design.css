@@ -5438,3 +5438,17 @@ button.fact:hover .fact-label { color: var(--accent); }
   .radar { flex-direction: column; align-items: stretch; }
   .radar-paste { flex-basis: auto; }
 }
+
+/* The paste-in form: two columns of guesses, every one editable. */
+.pastein-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+}
+.pastein-grid label { display: grid; gap: 4px; font-size: 12px; }
+.pastein-grid .pastein-wide { grid-column: 1 / -1; }
+.pastein-note { margin: 0; font-size: var(--t-xs); }
+.pastein-error { margin: 0; font-size: var(--t-sm); color: var(--warn); }
+@media (max-width: 560px) {
+  .pastein-grid { grid-template-columns: 1fr; }
+}

@@ -982,6 +982,8 @@ export async function findInCorpus(query: string): Promise<string | null> {
 
 export interface ManualListing {
   url: string;
+  /** Where the tip came from; "facebook" keeps its badge and back-link. */
+  source?: "manual" | "facebook";
   address: string;
   price: number;
   bedrooms?: number;
@@ -1003,13 +1005,19 @@ export interface ManualListing {
  * disappearance sweep in ingest.ts can never mark them off-market.
  */
 export async function addManualListing(input: ManualListing): Promise<string> {
-  const supabase = await db();
+  // The corpus tables only accept the service role — the same door the
+  // pollers use. The API route above this checks for a signed-in user
+  // before calling; this function must never be reachable unauthenticated.
+  const supabase = adminDb();
   const now = new Date().toISOString();
-  const id = `manual-${Date.now().toString(36)}`;
+  // Facebook-group pastes keep their provenance: the badge says where the
+  // tip came from, and the url points back at the post.
+  const src = input.source === "facebook" ? "facebook" : "manual";
+  const id = `${src}-${Date.now().toString(36)}`;
 
   const listing: Listing = {
     id,
-    source: "manual",
+    source: src,
     sourceId: id,
     url: input.url,
     price: Math.round(input.price),
@@ -1018,7 +1026,16 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     sqft: null,
     neighborhood: input.neighborhood ?? "",
     borough: boroughFor(`${input.neighborhood ?? ""} ${input.address}`),
-    address: input.address,
+    // The unit leaves the address once extracted, or every renderer that
+    // prints "address #unit" would say the unit twice.
+    address: (() => {
+      const u = input.unit ?? extractUnit(input.address);
+      return u
+        ? input.address
+            .replace(new RegExp(`\\s*(?:#|Apt\\.?|Unit)\\s*${u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "")
+            .trim()
+        : input.address;
+    })(),
     unit: input.unit ?? extractUnit(input.address),
     lat: null,
     lon: null,
@@ -1062,7 +1079,7 @@ export async function addManualListing(input: ManualListing): Promise<string> {
   if (error) throw new Error(`addManualListing: ${error.message}`);
 
   await supabase.from("listing_sources").insert({
-    source: "manual",
+    source: src,
     source_id: id,
     listing_id: id,
     url: listing.url,
@@ -1075,7 +1092,7 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     listing_id: id,
     kind: "new",
     new_value: String(listing.price),
-    detail: "Added by hand",
+    detail: src === "facebook" ? "From a Facebook group" : "Added by hand",
     occurred_at: now,
   });
 

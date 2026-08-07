@@ -48,6 +48,7 @@ import {
 } from "@/lib/subway";
 import { applyFilters, findPasted, addressFromListingUrl } from "@/lib/filters";
 import { streeteasySearchUrl, zillowSearchUrl, siteJumps } from "@/lib/siteLinks";
+import { parseFreePost, isFacebookUrl } from "@/lib/freepost";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { nearAreas } from "@/lib/geo";
 import { safeNext } from "@/lib/nextPath";
@@ -2139,4 +2140,43 @@ test("the jump row carries both sites in cross-check order", () => {
     jumps.map((j) => j.source),
     ["streeteasy", "zillow"]
   );
+});
+
+/* --- the facebook paste: prose becoming a listing ------------------------ */
+
+test("a group post yields its rent, size, neighborhood and phone", () => {
+  const post = parseFreePost(
+    "GYPSY HOUSING FIND! Sunny 2br in Bushwick, $2,850/month, no fee!! " +
+      "Available Sept 1. Text Maria at (917) 555-0182. Deposit $5,700."
+  );
+  assert.equal(post.price, 2850);
+  assert.equal(post.bedrooms, 2);
+  assert.equal(post.neighborhood, "Bushwick");
+  assert.equal(post.phone, "(917) 555-0182");
+  assert.equal(post.noFee, true);
+  assert.equal(post.looksLikeListing, true);
+});
+
+test("the rent beats the deposit when both are named", () => {
+  const post = parseFreePost("Asking $3,200. First, last and deposit due: $9,600 total to move in.");
+  assert.equal(post.price, 3200);
+});
+
+test("a studio is zero bedrooms, and a street line is captured when present", () => {
+  const post = parseFreePost(
+    "Studio at 184 Ludlow St #4F, $2,400, email sublet@example.com to see it this week"
+  );
+  assert.equal(post.bedrooms, 0);
+  assert.equal(post.address, "184 Ludlow St #4F");
+  assert.equal(post.email, "sublet@example.com");
+});
+
+test("a bare address is a lookup, not a listing", () => {
+  assert.equal(parseFreePost("417 East 9th Street #3").looksLikeListing, false);
+});
+
+test("facebook doors are recognised in their many spellings", () => {
+  assert.ok(isFacebookUrl("https://www.facebook.com/groups/gypsyhousing/posts/12345"));
+  assert.ok(isFacebookUrl("https://fb.com/share/abc"));
+  assert.ok(!isFacebookUrl("https://streeteasy.com/building/x"));
 });
