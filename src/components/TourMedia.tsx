@@ -111,7 +111,10 @@ export default function TourMedia({ listingId }: { listingId: string }) {
         <input
           ref={fileRef}
           type="file"
-          accept="image/*,video/*"
+          // Extensions spelled out alongside the wildcards: some pickers
+          // filter by MIME type and hide files the OS never typed, which is
+          // exactly how a .MOV can vanish from its own upload dialog.
+          accept="image/*,video/*,.mov,.mp4,.m4v,.webm,.3gp,.3g2,.mkv,.avi,.wmv,.mpg,.mpeg,.mts,.m2ts,.ogv,.jpg,.jpeg,.jfif,.png,.gif,.webp,.heic,.heif,.avif,.bmp,.tif,.tiff"
           multiple
           hidden
           onChange={(e) => {

@@ -190,6 +190,16 @@ export async function handleMediaGet(request, env) {
       "accept-ranges": "bytes",
       "cache-control": "private, max-age=3600",
       etag: object.httpEtag ?? "",
+      /*
+       * These bytes are whatever a crew member uploaded, served from the app's
+       * own origin. nosniff stops a browser second-guessing the stored type,
+       * and the sandboxing CSP means a file that turns out to be active
+       * content (an SVG with a script in it, say) runs nothing when opened
+       * directly. <img> and <video> embeds are untouched — a response's CSP
+       * only governs the document a navigation makes of it.
+       */
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "default-src 'none'; sandbox",
     });
 
     if (range) {

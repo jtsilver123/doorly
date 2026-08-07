@@ -145,19 +145,34 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * content-type so playback gets a real one instead of octet-stream.
  */
 const EXT_TYPES: Record<string, string> = {
+  // Video: what phones record, plus what people export from editors.
   mov: "video/quicktime",
   mp4: "video/mp4",
   m4v: "video/x-m4v",
   webm: "video/webm",
   "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  mkv: "video/x-matroska",
+  avi: "video/x-msvideo",
+  wmv: "video/x-ms-wmv",
+  mpg: "video/mpeg",
+  mpeg: "video/mpeg",
+  mts: "video/mp2t",
+  m2ts: "video/mp2t",
+  ogv: "video/ogg",
+  // Photos: camera formats and everything screenshots come out as.
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
+  jfif: "image/jpeg",
   png: "image/png",
   gif: "image/gif",
   webp: "image/webp",
   heic: "image/heic",
   heif: "image/heif",
   avif: "image/avif",
+  bmp: "image/bmp",
+  tif: "image/tiff",
+  tiff: "image/tiff",
 };
 
 function sniffType(file: File): string {
