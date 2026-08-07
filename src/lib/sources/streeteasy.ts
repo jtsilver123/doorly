@@ -98,10 +98,17 @@ export function normalizeStreetEasy(raw: StreetEasyListing[]): Listing[] {
 export async function fetchStreetEasy(c: SearchCriteria): Promise<Listing[]> {
   // Pages per source is the main lever on the monthly request budget;
   // sorted by newest, one page already catches everything fresh.
-  const PAGES_PER_BED = Math.min((await loadConfig()).pagesPerSource, POLL_PAGE_CAP);
+  const locations = seLocations(c.areas);
+  // Several neighborhoods share the poll's request ledger, so each gets one
+  // page — page one of a neighborhood reaches days deeper than page two of a
+  // borough ever did, so this trades away nothing that was being caught.
+  const PAGES_PER_BED =
+    locations.length > 1
+      ? 1
+      : Math.min((await loadConfig()).pagesPerSource, POLL_PAGE_CAP);
   const byId = new Map<string, Listing>();
 
-  const requests = seLocations(c.areas).flatMap((location) =>
+  const requests = locations.flatMap((location) =>
     bedValues(c).flatMap((beds) =>
       Array.from({ length: PAGES_PER_BED }, (_, i) => ({
         location,

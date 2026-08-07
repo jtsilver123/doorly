@@ -35,6 +35,8 @@ export type IconName =
   | "star"
   | "close"
   | "check"
+  | "thumbup"
+  | "thumbdown"
   | "alert"
   | "chevron"
   | "chevron-left"
@@ -150,6 +152,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7" />,
+  thumbup: (
+    <path d="M7 10.5v9.5M7 11l4-7c1.2 0 2 .9 2 2.2 0 .9-.5 2.8-.5 2.8h5c1 0 1.8.9 1.6 1.9l-1.2 6.6c-.15.9-.9 1.5-1.8 1.5H7" />
+  ),
+  thumbdown: (
+    <path d="M17 13.5V4M17 13l-4 7c-1.2 0-2-.9-2-2.2 0-.9.5-2.8.5-2.8H6.5c-1 0-1.8-.9-1.6-1.9l1.2-6.6C6.25 5.6 7 5 7.9 5H17" />
+  ),
   alert: (
     <>
       <path d="M12 4.5 21 20H3Z" />

@@ -62,6 +62,27 @@ export async function PATCH(request: Request, { params }: Params) {
       case "visit":
         await setListingFields(id, { visited_at: new Date().toISOString() });
         break;
+      case "lean": {
+        // Thumbs after a tour: 1, -1, or 0 to clear. A gut read, not a
+        // verdict — it never moves the stage and never trains the ranker.
+        const lean = Number(body.lean);
+        await setListingFields(id, { lean: lean === 1 ? 1 : lean === -1 ? -1 : 0 });
+        break;
+      }
+      case "appResult": {
+        // The landlord's answer: 1 accepted, -1 denied, 0 back to waiting.
+        // A denial also clears secured, which can't survive it.
+        const result = Number(body.result);
+        const app_result = result === 1 ? 1 : result === -1 ? -1 : 0;
+        await setListingFields(
+          id,
+          app_result === 1 ? { app_result } : { app_result, secured: false }
+        );
+        break;
+      }
+      case "secured":
+        await setListingFields(id, { secured: Boolean(body.secured) });
+        break;
       case "seen":
         await setListingFields(id, { events_seen_at: new Date().toISOString() });
         break;

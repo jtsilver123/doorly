@@ -30,10 +30,20 @@ export interface Area {
 }
 
 /**
- * StreetEasy's search only accepts borough-level locations. Every neighborhood
- * form — slug, underscore, or the numeric id from its own /all_locations
- * endpoint — returns zero results, so we query the borough and narrow using the
- * `areaName` it returns on each listing (which is accurate and well-formed).
+ * StreetEasy's location forms, which changed under us once already.
+ *
+ * When this adapter was written, only borough-level locations matched —
+ * every neighborhood form (slug, underscore, numeric id) returned zero rows,
+ * so neighborhoods queried their borough and narrowed locally. Verified
+ * 2026-08-07: display names ("East Village") now return full neighborhood
+ * inventories, while the old slug form gets "404: Location not matched" with
+ * the display names offered back as close matches. Neighborhoods now carry
+ * their label; boroughs keep these slugs, which still work.
+ *
+ * The practical difference is depth, not correctness: page one of a single
+ * neighborhood reaches days back, while borough-wide newest-first paging
+ * skims hours — a 2-day-old East Village listing was reachable one way and
+ * not the other.
  */
 const SE_BY_BOROUGH: Record<Borough, string> = {
   Manhattan: "manhattan",
@@ -57,7 +67,7 @@ function hood(slug: string, label: string, borough: Borough): Area {
     label,
     borough,
     craigslist: CL_BY_BOROUGH[borough],
-    streeteasy: SE_BY_BOROUGH[borough],
+    streeteasy: label,
     zillow: `${label}, ${borough}, NY`,
     hotpads: `${label}, New York, NY`,
   };

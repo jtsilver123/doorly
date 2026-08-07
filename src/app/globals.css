@@ -911,46 +911,231 @@ kbd {
   }
 }
 
-/* --- hunt timeline ------------------------------------------------------ */
+/* --- the rail's status module -------------------------------------------- */
 
-.timeline {
-  padding: var(--s5);
+/*
+ * The hunt's vitals as one instrument in the rail: countdown, phase,
+ * funnel, pace, corpus. It inherits the rail's ink tokens, so tints and
+ * text come out right without naming a single color here beyond the
+ * phase and pace semantics.
+ */
+.railstatus {
   display: grid;
-  gap: var(--s4);
+  gap: 8px;
+  padding: 10px 0 2px;
 }
 
-/* The heading and the funnel are separate thoughts; a rule between them
-   stops the numbers reading as part of the sentence above. */
+.railstatus-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.railstatus-label {
+  font-size: var(--t-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.railstatus-phase {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.railstatus-phase[data-phase="prime"] { color: var(--good); }
+.railstatus-phase[data-phase="crunch"],
+.railstatus-phase[data-phase="final"],
+.railstatus-phase[data-phase="past"] { color: var(--warn); }
+
+.railstatus-days {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.railstatus-days i {
+  font-style: normal;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 5px;
+}
+
+.railstatus-days[data-soon="true"] { color: var(--warn); }
+
+/* The move-in runway in miniature: which stretch of it you're standing on. */
+.railstatus-bar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 6px;
+}
+
+.railstatus-band {
+  flex-basis: 0;
+  min-width: 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+}
+
+.railstatus-band.is-current.band-early,
+.railstatus-band.is-current.band-decide { background: var(--accent); }
+.railstatus-band.is-current.band-prime { background: var(--good); }
+.railstatus-band.is-current.band-crunch,
+.railstatus-band.is-current.band-final { background: var(--warn); }
+
+.railstatus-marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: var(--r-full);
+  background: var(--text);
+  transform: translateX(-1px);
+  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* The funnel as a shape: four bars falling from contacted to applied.
+   Conversion reads at a glance before any number is read at all. */
+.railstatus-funnel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s2);
+  align-items: end;
+}
+
+.railstatus-step {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+}
+
+.railstatus-stepbar {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.railstatus-stepbar i {
+  display: block;
+  width: 100%;
+  background: var(--accent);
+  opacity: 0.85;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+
+.railstatus-step b {
+  font-size: var(--t-md);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.railstatus-step span {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.railstatus-pace {
+  display: grid;
+  gap: 4px;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
+.railstatus-pace.is-behind { color: var(--warn); }
+
+.railstatus-meter {
+  display: block;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.railstatus-meter i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--good);
+}
+
+.railstatus-pace.is-behind .railstatus-meter i { background: var(--warn); }
+
+/* --- hunt timeline ------------------------------------------------------ */
+
+/*
+ * Slim and frozen. This used to be a hero panel that spent a third of the
+ * viewport before the board appeared; the phase is orientation, not content,
+ * so it now reads like an instrument strip — one line of heading, the bar,
+ * one line of advice — and stays pinned while the columns scroll. Pinned on
+ * desktop only: a phone's board needs every vertical pixel it can get.
+ */
+.timeline {
+  padding: var(--s3) var(--s4);
+  display: grid;
+  gap: var(--s2);
+}
+
+/*
+ * Desktop carries this story in the rail's status module now, always on
+ * screen from every tab — a second copy heading the board would say the
+ * same thing twice. Phones keep the strip: their rail is a bottom tab bar
+ * with no room for vitals.
+ */
+@media (min-width: 861px) {
+  .page-pipeline .timeline {
+    display: none;
+  }
+}
+
 .timeline-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--s5);
+  align-items: baseline;
+  gap: var(--s4);
   flex-wrap: wrap;
-  padding-bottom: var(--s3);
-  border-bottom: 1px solid var(--border);
+}
+
+/* Phase and countdown share a baseline; stacking them was half the height. */
+.timeline-head > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
 }
 
 .timeline-phase {
-  font-size: var(--t-2xl);
+  font-size: var(--t-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .timeline-funnel {
   display: flex;
-  gap: var(--s5);
+  gap: var(--s4);
   flex-wrap: wrap;
 }
 
 .timeline-stat {
-  display: grid;
-  gap: 1px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
   text-align: right;
 }
 
 .timeline-stat strong {
-  font-size: var(--t-xl);
+  font-size: var(--t-md);
   line-height: 1.1;
 }
 
@@ -967,7 +1152,7 @@ kbd {
   position: relative;
   display: flex;
   gap: 3px;
-  height: 34px;
+  height: 22px;
 }
 
 .timeline-band {
@@ -1020,18 +1205,34 @@ kbd {
   transform: translateX(-50%);
 }
 
+/* One line, with the full text a hover away — the advice changes weekly and
+   a pinned strip can't spend a paragraph on it. */
 .timeline-advice {
   margin: 0;
-  font-size: var(--t-md);
+  font-size: var(--t-sm);
   line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timeline-pace {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 5px 10px;
   border-radius: var(--r-md);
   background: var(--surface-2);
+}
+
+.timeline-pace .meter {
+  flex: 0 0 130px;
+}
+
+.timeline-pace > div:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timeline-pace.is-behind {

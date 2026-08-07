@@ -72,6 +72,12 @@ interface Props {
   } | null;
   /** Everything loaded, for cross-listing reads like broker memory. */
   all?: FeedListing[];
+  /**
+   * Open scrolled to a section ("sec-contact") instead of the top. The
+   * board's next-action line uses this so "Add a number" is one click from
+   * the field it means.
+   */
+  jumpTo?: string | null;
 }
 
 /**
@@ -165,6 +171,7 @@ export default function ListingDrawer({
   onChanged,
   crew,
   all,
+  jumpTo,
 }: Props) {
   /*
    * Closing is animated, which means the panel has to outlive the decision to
@@ -189,6 +196,29 @@ export default function ListingDrawer({
   /** Which section the quick tabs should light up, from scroll position. */
   const [activeSec, setActiveSec] = useState("sec-costs");
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * Arriving with a destination. Runs after first paint so the sections have
+   * heights; instant rather than smooth because on open there's no context
+   * to animate from — the person asked for the contact area, not a tour of
+   * everything above it.
+   */
+  useEffect(() => {
+    if (!jumpTo) return;
+    const body = bodyRef.current;
+    const el = body?.querySelector(`[data-sec="${jumpTo}"]`);
+    if (!body || !el) return;
+    const top =
+      el.getBoundingClientRect().top -
+      body.getBoundingClientRect().top +
+      body.scrollTop -
+      SPY_LINE +
+      8;
+    setActiveSec(jumpTo);
+    jumpUntil.current = Date.now() + 700;
+    body.scrollTo({ top });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpTo, listing.id]);
   const tabsRef = useRef<HTMLDivElement>(null);
   const spyTick = useRef(false);
   /*
@@ -768,7 +798,7 @@ export default function ListingDrawer({
               whoever found it. */}
           {(listing.stage === "passed" || listing.stage === "no_go") && listing.passReason && (
             <div className="passnote">
-              <b>{listing.stage === "no_go" ? "Didn't like it" : "Passed"}</b>
+              <b>{listing.stage === "no_go" ? "Not applying" : "Passed"}</b>
               <span>{listing.passReason}</span>
               <button className="linkish" onClick={() => patch({ action: "unpass" })}>
                 Put it back

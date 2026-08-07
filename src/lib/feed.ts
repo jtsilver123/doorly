@@ -26,7 +26,7 @@ import {
   DEFAULT_COSTS,
 } from "@/lib/cost";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
-import { applyFilters, type FeedFilterOptions } from "@/lib/filters";
+import { applyFilters, findPasted, type FeedFilterOptions } from "@/lib/filters";
 import { amenitiesOf } from "@/lib/amenities";
 import { verdictFor } from "@/lib/verdict";
 
@@ -80,6 +80,9 @@ interface StateRow {
   contact_name: string | null;
   tour_at: string | null;
   my_score: number | null;
+  lean: number | null;
+  app_result: number | null;
+  secured: boolean | null;
   tour_kind: string | null;
   tour_ends_at: string | null;
   added_by: string | null;
@@ -375,6 +378,9 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       myContactName: state?.contact_name ?? "",
       tourAt: state?.tour_at ?? null,
       myScore: state?.my_score ?? null,
+      lean: state?.lean ?? 0,
+      appResult: state?.app_result ?? 0,
+      secured: Boolean(state?.secured),
       tourKind: state?.tour_kind === "open_house" ? "open_house" : "private",
       tourEndsAt: state?.tour_ends_at ?? null,
       passReason: state?.pass_reason ?? "",
@@ -624,6 +630,9 @@ export async function setListingFields(
     passed_at: string | null;
     tour_at: string | null;
     my_score: number | null;
+    lean: number;
+    app_result: number;
+    secured: boolean;
     tour_kind: string;
     tour_ends_at: string | null;
     poc_user_id: string | null;
@@ -885,6 +894,51 @@ export async function saveProfile(profile: Partial<Profile>): Promise<void> {
       { user_id: await currentUserId(), profile: merged, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
+}
+
+/**
+ * Find a pasted address or link anywhere in the shared corpus.
+ *
+ * The feed the browser holds is scoped to your saved searches, and that's the
+ * wrong pool for quick-add: pasting a link is a manual decision, and "it's
+ * $200 over your ceiling" is not a reason to pretend the apartment doesn't
+ * exist. This searches everything the pollers have ever kept, criteria be
+ * damned — the caller then tracks the hit, and tracked places ride into the
+ * feed regardless of criteria by the same exception everything tracked uses.
+ *
+ * The rows are dressed as minimal FeedListings so the ONE matcher (findPasted,
+ * shared with the browser) does the matching — a second server-side matcher
+ * would drift from the first within a month.
+ */
+export async function findInCorpus(query: string): Promise<string | null> {
+  const supabase = await db();
+  const [{ data: rows }, { data: srcs }] = await Promise.all([
+    supabase
+      .from("listings")
+      .select("id, address, unit, neighborhood, url")
+      .eq("is_active", true)
+      .order("first_seen_at", { ascending: false })
+      .limit(4000),
+    supabase.from("listing_sources").select("listing_id, source, url"),
+  ]);
+  const alsoBy = new Map<string, { source: Source; url: string }[]>();
+  for (const s of srcs ?? []) {
+    const list = alsoBy.get(s.listing_id) ?? [];
+    list.push({ source: s.source as Source, url: s.url });
+    alsoBy.set(s.listing_id, list);
+  }
+  const stubs = (rows ?? []).map((r) => ({
+    id: r.id,
+    address: r.address ?? "",
+    unit: r.unit ?? "",
+    neighborhood: r.neighborhood ?? "",
+    notes: "",
+    url: r.url ?? "",
+    alsoOn: alsoBy.get(r.id) ?? [],
+    stage: "inbox",
+    rating: 0,
+  })) as unknown as FeedListing[];
+  return findPasted(stubs, query)?.id ?? null;
 }
 
 // --- manual entry ---------------------------------------------------------

@@ -78,7 +78,10 @@ export default function Timeline({
         </div>
       </div>
 
-      <p className="timeline-advice">{info.advice}</p>
+      {/* One line in the pinned strip; the full sentence rides on hover. */}
+      <p className="timeline-advice" title={info.advice}>
+        {info.advice}
+      </p>
 
       {/* Outreach pace. The usual way this search fails is being too selective
           in week one and running out of runway in week three. */}
@@ -95,7 +98,7 @@ export default function Timeline({
           <div style={{ fontSize: 12 }}>
             {funnel.onPace ? (
               <>
-                On pace — {funnel.contacted} contacted, about {funnel.targetContacts}{" "}
+                On pace. {funnel.contacted} contacted, about {funnel.targetContacts}{" "}
                 typically needed to land one.
               </>
             ) : (

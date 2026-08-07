@@ -141,7 +141,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
   tour: "Tour booked",
   toured: "Toured",
   applied: "Applied",
-  no_go: "Didn't like it",
+  no_go: "Not applying",
   closed: "Closed",
   passed: "Passed",
 };
@@ -224,6 +224,16 @@ export interface FeedListing extends Listing {
    * was loud or that you walked in and knew. Null until you say.
    */
   myScore: number | null;
+  /**
+   * Post-tour gut read: 1 leaning yes, -1 leaning no, 0 undecided. Softer
+   * than any stage move on purpose — it records the feeling on the sidewalk
+   * outside without forcing a verdict, and it teaches the ranker nothing.
+   */
+  lean: number;
+  /** The landlord's answer to an application: 1 accepted, -1 denied, 0 waiting. */
+  appResult: number;
+  /** Accepted and taken. The flag the whole hunt exists to set. */
+  secured: boolean;
   contactCount: number;
   lastContactAt: string | null;
   /** How you last reached out — shown on the card so it's visible at a glance. */

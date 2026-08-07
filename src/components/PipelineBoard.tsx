@@ -56,6 +56,10 @@ export default function PipelineBoard({
   onPlanTours,
   crewTag,
   onPass,
+  onLean,
+  onAppResult,
+  onSecured,
+  onOpenAt,
   onAddToCalendar,
 }: {
   listings: FeedListing[];
@@ -63,6 +67,14 @@ export default function PipelineBoard({
   onMove: (listing: FeedListing, stage: Stage) => void;
   /** Address or listing link pasted into the quick-add box. Resolved by the page. */
   onQuickAdd: (query: string) => void;
+  /** Thumb on a tour-stage card: 1 leaning yes, -1 leaning no, 0 to clear. */
+  onLean: (listing: FeedListing, lean: number) => void;
+  /** The landlord's answer on an applied card: 1 accepted, -1 denied, 0 waiting. */
+  onAppResult: (listing: FeedListing, result: number) => void;
+  /** Accepted and taken — the hunt's finish line. */
+  onSecured: (listing: FeedListing, secured: boolean) => void;
+  /** Open the drawer already scrolled to a section, e.g. "sec-contact". */
+  onOpenAt: (listing: FeedListing, section: string) => void;
   /** Opens the tour-day route planner. */
   onPlanTours: () => void;
   /**
@@ -408,12 +420,137 @@ export default function PipelineBoard({
                       </a>
                     </span>
                   )}
+                  {/* Fresh from the viewing: which way are you leaning? A
+                      thumb is a note to self, not a decision — the card
+                      stays in its column, and only a stage move files it.
+                      Tapping the same thumb again clears it. */}
+                  {(l.stage === "tour" || l.stage === "toured") && (
+                    <span className="board-lean">
+                      {([
+                        [1, "thumbup", "Leaning yes"],
+                        [-1, "thumbdown", "Leaning no"],
+                      ] as const).map(([value, icon, label]) => (
+                        <span
+                          key={icon}
+                          role="button"
+                          tabIndex={0}
+                          className={l.lean === value ? "lean-btn is-on" : "lean-btn"}
+                          data-lean={value}
+                          title={label}
+                          aria-label={`${label} on ${l.address}`}
+                          aria-pressed={l.lean === value}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onLean(l, l.lean === value ? 0 : value);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onLean(l, l.lean === value ? 0 : value);
+                            }
+                          }}
+                        >
+                          <Icon name={icon} size={14} />
+                        </span>
+                      ))}
+                      {l.lean !== 0 && (
+                        <span className="muted lean-note">
+                          {l.lean === 1 ? "leaning yes" : "leaning no"}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {/* The application's verdict, recorded where you're
+                      staring while you wait for it. Accepted opens the last
+                      question — did you take it? — as a star, because
+                      "secured" is the card every hunt is trying to draw. */}
+                  {l.stage === "applied" && (
+                    <span className="board-lean">
+                      {([
+                        [1, "thumbup", "Accepted"],
+                        [-1, "thumbdown", "Denied"],
+                      ] as const).map(([value, icon, label]) => (
+                        <span
+                          key={icon}
+                          role="button"
+                          tabIndex={0}
+                          className={l.appResult === value ? "lean-btn is-on" : "lean-btn"}
+                          data-lean={value}
+                          title={label}
+                          aria-label={`${label}: ${l.address}`}
+                          aria-pressed={l.appResult === value}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAppResult(l, l.appResult === value ? 0 : value);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onAppResult(l, l.appResult === value ? 0 : value);
+                            }
+                          }}
+                        >
+                          <Icon name={icon} size={14} />
+                        </span>
+                      ))}
+                      {l.appResult === 1 && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className={l.secured ? "lean-btn secured-btn is-on" : "lean-btn secured-btn"}
+                          title={l.secured ? "Secured. This is the one" : "Took it? Mark it secured"}
+                          aria-label={`Mark ${l.address} secured`}
+                          aria-pressed={l.secured}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSecured(l, !l.secured);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onSecured(l, !l.secured);
+                            }
+                          }}
+                        >
+                          <Icon name="star" size={14} />
+                        </span>
+                      )}
+                      {l.secured && l.appResult === 1 ? (
+                        <span className="lean-note secured-note">secured</span>
+                      ) : l.appResult !== 0 ? (
+                        <span className="muted lean-note">
+                          {l.appResult === 1 ? "accepted" : "denied"}
+                        </span>
+                      ) : null}
+                    </span>
+                  )}
                   {/* One source of truth with the cards and the panel, so the
-                      board can never disagree about what comes next. */}
+                      board can never disagree about what comes next. And the
+                      label is the shortcut: "Add a number" lands you on the
+                      number field, not at the top of a panel to scroll. */}
                   <span
+                    role="button"
+                    tabIndex={0}
                     className={
                       nextAction(l).urgent ? "board-next is-due" : "board-next"
                     }
+                    title="Jump to where this happens"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const kind = nextAction(l).kind;
+                      onOpenAt(l, kind === "apply" ? "sec-apply" : "sec-contact");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const kind = nextAction(l).kind;
+                        onOpenAt(l, kind === "apply" ? "sec-apply" : "sec-contact");
+                      }
+                    }}
                   >
                     {nextAction(l).label}
                   </span>

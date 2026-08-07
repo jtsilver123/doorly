@@ -18,6 +18,7 @@ import {
 } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
 import { applyFilters, findPasted } from "@/lib/filters";
+import { burstConfetti } from "@/lib/confetti";
 import { nextAction } from "@/lib/nextAction";
 import { runwayDays } from "@/lib/runway";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
@@ -29,6 +30,7 @@ import ApplicationPacket from "@/components/ApplicationPacket";
 import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
+import RailStatus from "@/components/RailStatus";
 import FilterBar, { type Filters } from "@/components/FilterBar";
 import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
@@ -61,13 +63,17 @@ const TourPlanner = dynamic(() => import("@/components/TourPlanner"), { ssr: fal
  * the pipeline's own finalists in a different lens, so it's a view there
  * rather than a destination.
  */
-type Tab = "feed" | "changes" | "pipeline" | "profile";
+type Tab = "feed" | "changes" | "pipeline" | "profile" | "compare";
 
 /** Every valid tab, so a hand-edited hash can't put the app in a dead state. */
-const TABS: Tab[] = ["feed", "changes", "pipeline", "profile"];
+const TABS: Tab[] = ["pipeline", "feed", "compare", "profile"];
 
-/** Old bookmarks and muscle memory keep working. */
-const LEGACY_TABS: Record<string, Tab> = { today: "feed", compare: "pipeline" };
+/**
+ * Old bookmarks and muscle memory keep working. "changes" stays a valid hash
+ * — the Activity list now lives inside Listings, so the old tab lands there
+ * with the panel open rather than 404ing someone's routine.
+ */
+const LEGACY_TABS: Record<string, Tab> = { today: "feed", changes: "feed" };
 
 interface ApiStatus {
   usage: {
@@ -92,6 +98,7 @@ const NAV_ICON: Record<string, IconName> = {
   feed: "listings",
   changes: "bell",
   pipeline: "pipeline",
+  compare: "compare",
   profile: "profile",
 };
 
@@ -119,11 +126,15 @@ function sinceText(iso: string): string {
 }
 
 export default function Home() {
-  // Today is the default: the hunt is a four-week sprint, and the first
-  // question each morning is what to do, not what exists.
-  const [tab, setTab] = useState<Tab>("feed");
-  /** Board or Compare — two lenses on the same finalists. */
-  const [pipelineView, setPipelineView] = useState<"board" | "compare">("board");
+  // Pipeline is the default: it's where the actual work lives. Listings is
+  // the finding tool, and honestly the source sites do browsing well — what
+  // they don't have is your board. The order mirrors the process: work the
+  // pipeline, find more, compare and choose.
+  const [tab, setTab] = useState<Tab>("pipeline");
+  /** The Activity list, folded into Listings as a panel rather than a tab. */
+  const [activityOpen, setActivityOpen] = useState(false);
+  /** Section the drawer should open scrolled to, from a board next-action. */
+  const [drawerJump, setDrawerJump] = useState<string | null>(null);
 
   /**
    * The tab lives in the URL.
@@ -413,6 +424,25 @@ export default function Home() {
     }
   }, []);
 
+  /*
+   * The desktop frame must never scroll as a document — `.main` owns the
+   * scrolling. CSS clips overflow on html and body already, but a clipped
+   * viewport is per spec still programmatically scrollable, and something
+   * (a focus call, a browser restoring scroll on back-navigation) kept
+   * sliding the whole shell up and off, sidebar and all, leaving raw ink and
+   * a fixed drawer hovering over content that had moved. This is the
+   * backstop the CSS can't be: whatever scrolls the document, it snaps back.
+   */
+  useEffect(() => {
+    const reset = () => {
+      if (!window.matchMedia("(min-width: 861px)").matches) return;
+      if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+    reset();
+    window.addEventListener("scroll", reset, { passive: true });
+    return () => window.removeEventListener("scroll", reset);
+  }, []);
+
   useEffect(() => {
     loadChanges();
     loadApi();
@@ -511,6 +541,20 @@ export default function Home() {
   );
 
   /**
+   * The post-tour thumb. Optimistic like star: a gut reaction recorded with
+   * a round-trip spinner stops being a gut reaction.
+   */
+  const setLean = useCallback(
+    (listing: FeedListing, lean: number) => {
+      setListings((list) =>
+        list.map((l) => (l.id === listing.id ? { ...l, lean } : l))
+      );
+      patch(listing.id, { action: "lean", lean }, false).catch(() => loadFeed());
+    },
+    [patch, loadFeed]
+  );
+
+  /**
    * Move a listing along the pipeline, from a drag or an arrow key.
    *
    * Optimistic like star and pass: a drag that snaps back while a round trip
@@ -528,6 +572,35 @@ export default function Home() {
         )
       );
       patch(listing.id, { action: "stage", stage }, false).catch(() => loadFeed());
+      // Submitting an application is the hunt's biggest single step forward.
+      if (stage === "applied") burstConfetti();
+    },
+    [patch, loadFeed]
+  );
+
+  /** The landlord's answer on an applied place: 1 accepted, -1 denied, 0 waiting. */
+  const setAppResult = useCallback(
+    (listing: FeedListing, result: number) => {
+      setListings((list) =>
+        list.map((l) =>
+          l.id === listing.id
+            ? { ...l, appResult: result, secured: result === 1 ? l.secured : false }
+            : l
+        )
+      );
+      patch(listing.id, { action: "appResult", result }, false).catch(() => loadFeed());
+    },
+    [patch, loadFeed]
+  );
+
+  /** Accepted and taken: the flag the whole hunt exists to set. */
+  const setSecured = useCallback(
+    (listing: FeedListing, secured: boolean) => {
+      setListings((list) =>
+        list.map((l) => (l.id === listing.id ? { ...l, secured } : l))
+      );
+      patch(listing.id, { action: "secured", secured }, false).catch(() => loadFeed());
+      if (secured) burstConfetti();
     },
     [patch, loadFeed]
   );
@@ -548,6 +621,40 @@ export default function Home() {
       moveStage(hit, "interested");
       setOpen(hit);
       toast({ message, tone: "good" });
+      // Landing a place you were hunting for deserves more than a toast.
+      burstConfetti();
+    };
+
+    /*
+     * The feed in this browser is criteria-scoped, and a paste is a manual
+     * decision that outranks criteria — over-budget, wrong bedroom count,
+     * outside the saved areas, none of it matters when you're adding it
+     * yourself. So a local miss asks the server to search the whole shared
+     * corpus; tracking the hit is what carries it into the feed permanently.
+     */
+    const adopt = async (id: string, message: string) => {
+      await patch(id, { action: "stage", stage: "interested" }, false);
+      const fresh = await loadFeed();
+      const hit = fresh.find((l) => l.id === id);
+      if (hit) {
+        setOpen(hit);
+        toast({ message, tone: "good" });
+        burstConfetti();
+        return true;
+      }
+      return false;
+    };
+    const inCorpus = async (): Promise<string | null> => {
+      try {
+        const body = await fetch("/api/listings/find", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ query }),
+        }).then((r) => r.json());
+        return body.id ?? null;
+      } catch {
+        return null;
+      }
     };
 
     const hit = findPasted(listings, query);
@@ -555,6 +662,10 @@ export default function Home() {
       claim(hit, `Found it. ${hit.address} is in your pipeline`);
       return;
     }
+
+    const known = await inCorpus();
+    if (known && (await adopt(known, "Found it. Added to your pipeline"))) return;
+
     if (refreshing) {
       toast({ message: "A check is already running. Paste it again when that finishes." });
       return;
@@ -567,11 +678,17 @@ export default function Home() {
       const fresh = findPasted(res.listings, query);
       if (fresh) {
         claim(fresh, `There it is. ${fresh.address} just came in`);
-      } else if (res.error) {
+        return;
+      }
+      // The check may have pulled it into the corpus outside your criteria;
+      // the corpus-wide lookup is what can still see it there.
+      const late = await inCorpus();
+      if (late && (await adopt(late, "There it is. Added to your pipeline"))) return;
+      if (res.error) {
         toast({ message: res.error, tone: "warn" });
       } else {
         toast({
-          message: `Checked just now and the sources don't have it. If it's outside your saved areas or a private tip, it won't turn up on its own.`,
+          message: `Checked just now and the sources don't have it. If it's a private tip, it won't turn up on its own.`,
           tone: "warn",
         });
       }
@@ -617,7 +734,7 @@ export default function Home() {
        */
       toast({
         message: sawIt(listing)
-          ? `${listing.address} filed under "Didn't like it"`
+          ? `${listing.address} filed under "Not applying"`
           : `Passed on ${listing.address}`,
         actionLabel: "Say why",
         onAction: () => setPassing(listing),
@@ -647,7 +764,7 @@ export default function Home() {
       patch(listing.id, { action: "pass", reason, reasons }, false).catch(() => loadFeed());
       toast({
         message: sawIt(listing)
-          ? `${listing.address} filed under "Didn't like it"`
+          ? `${listing.address} filed under "Not applying"`
           : reasons.length
             ? `Passed on ${listing.address}. Your scores know why.`
             : `Passed on ${listing.address}`,
@@ -970,46 +1087,29 @@ export default function Home() {
             <Logo />
             <span className="brand brandmark">DamnLease</span>
           </div>
-          <div className="brandmeta">
-            {/* The countdown leads — it's the premise of the product — and
-                wears the same label-above-figure shape as the masthead facts,
-                with the date itself, so nobody reverse-engineers a calendar
-                from a number. */}
-            {daysToMove > 0 && (
-              <span className="brandcount" data-soon={daysToMove <= 21 ? "true" : undefined}>
-                <span className="brandcount-label">
-                  Move-in
-                  {profile.moveInDate
-                    ? ` · ${new Date(`${profile.moveInDate}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
-                    : ""}
-                </span>
-                <b>
-                  {daysToMove}
-                  <i>days</i>
-                </b>
-              </span>
-            )}
-            <span className="brandstat">
-              <i aria-hidden="true" />
-              <b>{counts.active}</b> live
-              {counts.changed > 0 && (
-                <>
-                  {" · "}
-                  <b>{counts.changed}</b> changed
-                </>
-              )}
-            </span>
-          </div>
+          {/* The hunt's vitals, promoted from two half-versions (a bare
+              countdown here, a wide panel on Pipeline) into the rail's one
+              status instrument. Hidden on phones with the rest of the rail
+              chrome; the Pipeline page keeps a strip there instead. */}
+          <RailStatus
+            info={phase}
+            funnel={funnel}
+            moveInDate={profile.moveInDate}
+            live={counts.active}
+            changed={counts.changed}
+          />
         </div>
 
         <div className="mobile-nav" style={{ display: "grid", gap: 2 }}>
           {(
             [
-              // The badge is what needs doing, not the corpus size — a
-              // permanent "489" is noise, an occasional "3" is news.
-              ["feed", "Listings", actions.length],
-              ["changes", "Activity", unread],
+              // Ordered like the work: the board you live on, the finding
+              // tool, then choosing. Activity rides inside Listings now —
+              // its unread count joins the Listings badge so news still
+              // shows without a whole tab to hold it.
               ["pipeline", "Pipeline", counts.pipeline],
+              ["feed", "Listings", actions.length + unread],
+              ["compare", "Compare", finalistCount],
               // Phones only: the desktop rail reaches this through the account
               // button, which the bottom bar has no room for.
               ["profile", "You", 0],
@@ -1055,13 +1155,31 @@ export default function Home() {
         */}
         <div className="railfoot">
           <div className="refresh">
-            <button
-              className="btn btn-primary"
-              onClick={refresh}
-              disabled={refreshing}
-            >
-              {refreshing ? "Checking…" : "Check for new"}
-            </button>
+            {/*
+              A dead key makes "Check for new" a lie — pressing it runs a
+              check that cannot fetch and reports nothing new. When the key
+              is spent, the button says what actually needs doing and goes
+              where you do it.
+            */}
+            {api?.usage && (api.usage.exhausted || api.usage.remaining <= 0) ? (
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setSection("api");
+                  setTab("profile");
+                }}
+              >
+                Add a fresh API key
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary"
+                onClick={refresh}
+                disabled={refreshing}
+              >
+                {refreshing ? "Checking…" : "Check for new"}
+              </button>
+            )}
 
             {api?.usage && (
               <button
@@ -1099,7 +1217,7 @@ export default function Home() {
                 {api.usage.exhausted ? (
                   <span className="usage-foot">
                     <span className="warn-text">
-                      Key out of credits — paste a new one
+                      Key out of credits. Paste a new one
                     </span>
                   </span>
                 ) : (
@@ -1253,10 +1371,38 @@ export default function Home() {
               anchorLabel={anchor?.label ?? null}
               />
             )}
+
+            {/* Activity, folded in. It's diligence on the same inventory —
+                price cuts, relists, delistings — so it opens here over the
+                browse instead of living a tab away from the cards it's
+                about. */}
+            {!loading && (
+              <div className="activity-row">
+                <button
+                  className={activityOpen ? "pill is-on" : "pill"}
+                  aria-expanded={activityOpen}
+                  onClick={() => setActivityOpen((v) => !v)}
+                >
+                  <Icon name="bell" size={13} />
+                  Activity{unread > 0 ? ` (${unread})` : ""}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {tab === "feed" && (
+        {tab === "feed" && activityOpen && !loading && (
+          <Changes
+            changes={changes}
+            notices={notices}
+            listings={listings}
+            onOpen={setOpen}
+            onRefresh={refresh}
+            refreshing={refreshing}
+          />
+        )}
+
+        {tab === "feed" && !activityOpen && (
           <>
             {loading ? null : visible.length === 0 ? (
               <Empty
@@ -1312,70 +1458,53 @@ export default function Home() {
           </div>
         )}
 
-        {!loading && tab === "changes" && (
-          <Changes
-            changes={changes}
-            notices={notices}
-            listings={listings}
-            onOpen={setOpen}
-            onRefresh={refresh}
-            refreshing={refreshing}
-          />
-        )}
-
         {!loading && tab === "pipeline" && (
           <div className="page-pipeline">
-            {/* The move-in clock lives with the funnel it measures. */}
+            {/* Phones only: the rail that carries this status on desktop is
+                a bottom tab bar down there, so the strip covers for it. */}
             <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
 
-            {/* Two lenses on the same finalists: work the board, or put them
-                side by side for decision night. A view toggle, not a tab —
-                Compare's candidates were always just the pipeline. */}
-            <div className="seg pipeline-view" role="group" aria-label="Pipeline view">
-              <button
-                className={pipelineView === "board" ? "is-on" : undefined}
-                aria-pressed={pipelineView === "board"}
-                onClick={() => setPipelineView("board")}
-              >
-                Board
-              </button>
-              <button
-                className={pipelineView === "compare" ? "is-on" : undefined}
-                aria-pressed={pipelineView === "compare"}
-                onClick={() => setPipelineView("compare")}
-              >
-                Compare{finalistCount > 0 ? ` (${finalistCount})` : ""}
-              </button>
-            </div>
+            <PipelineBoard
+              listings={listings}
+              onOpen={setOpen}
+              onMove={moveStage}
+              onQuickAdd={quickAdd}
+              onPlanTours={() => setPlanning(true)}
+              onPass={(l) => setPassing(l)}
+              onLean={setLean}
+              onAppResult={setAppResult}
+              onSecured={setSecured}
+              onOpenAt={(l, sec) => {
+                setDrawerJump(sec);
+                setOpen(l);
+              }}
+              onAddToCalendar={downloadIcs}
+              crewTag={(l) => {
+                if (!crew) return null;
+                // Point person first — on a working board, "who's on this"
+                // beats "who found it".
+                const poc = crewName(l.pocId);
+                if (poc) return `${poc} has point`;
+                return via(l);
+              }}
+            />
+          </div>
+        )}
 
-            {pipelineView === "board" ? (
-              <PipelineBoard
-                listings={listings}
-                onOpen={setOpen}
-                onMove={moveStage}
-                onQuickAdd={quickAdd}
-                onPlanTours={() => setPlanning(true)}
-                onPass={(l) => setPassing(l)}
-                onAddToCalendar={downloadIcs}
-                crewTag={(l) => {
-                  if (!crew) return null;
-                  // Point person first — on a working board, "who's on this"
-                  // beats "who found it".
-                  const poc = crewName(l.pocId);
-                  if (poc) return `${poc} has point`;
-                  return via(l);
-                }}
-              />
-            ) : (
-              <Compare
-                listings={listings}
-                onOpen={setOpen}
-                onNotes={async (id, notes) => {
-                  await patch(id, { action: "notes", notes });
-                  loadFeed();
-                }}
-              />
-            )}
+        {/* Compare is the choosing step, so it stands on its own in the nav:
+            find (Listings), work it (Pipeline), choose (here). */}
+        {!loading && tab === "compare" && (
+          <div className="page-panels">
+            <Compare
+              listings={listings}
+              onOpen={setOpen}
+              onMove={moveStage}
+              onLean={setLean}
+              onNotes={async (id, notes) => {
+                await patch(id, { action: "notes", notes });
+                loadFeed();
+              }}
+            />
           </div>
         )}
 
@@ -1438,7 +1567,11 @@ export default function Home() {
         <ListingDrawer
           listing={openListing}
           profile={profile}
-          onClose={() => setOpen(null)}
+          jumpTo={drawerJump}
+          onClose={() => {
+            setOpen(null);
+            setDrawerJump(null);
+          }}
           onChanged={loadFeed}
           crew={crew}
           all={listings}

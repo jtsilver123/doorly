@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { FeedListing } from "@/types";
-import { STAGE_LABEL } from "@/types";
+import type { FeedListing, Stage } from "@/types";
+import { STAGE_LABEL, PIPELINE_STAGES } from "@/types";
 import { CONTACT_LABEL } from "@/lib/outreach";
 import { AMENITIES, AMENITY_ORDER, amenityFacts, type AmenityKey } from "@/lib/amenities";
 import { nearestStation, routesWithin } from "@/lib/subway";
@@ -93,27 +93,22 @@ type Row = {
   alwaysShow?: boolean;
 };
 
-const ROWS: Row[] = [
+/*
+ * Rows in the order a lease decision actually runs: what it costs, then what
+ * it is, then what living there is like, then the meta. Status left this list
+ * for the column header, where it's a control rather than a caption, and the
+ * amenity count went with it — every amenity that matters gets its own row
+ * below, and a count of the rest compares nothing.
+ */
+const MONEY_ROWS: Row[] = [
   { label: "Rent", value: (l) => money(l.price), num: (l) => l.price },
+  { label: "All-in monthly", value: (l) => money(l.allInMonthly), num: (l) => l.allInMonthly },
+  { label: "Cash to move in", value: (l) => money(l.upfrontCost), num: (l) => l.upfrontCost },
   {
     label: "Effective rent",
     value: (l) =>
       l.effectiveRent < l.price ? `${money(l.effectiveRent)}/mo` : "—",
     num: (l) => (l.effectiveRent < l.price ? l.effectiveRent : null),
-  },
-  { label: "Cash to move in", value: (l) => money(l.upfrontCost), num: (l) => l.upfrontCost },
-  { label: "All-in monthly", value: (l) => money(l.allInMonthly), num: (l) => l.allInMonthly },
-  {
-    label: "$/sqft",
-    value: (l) => (l.sqft ? `$${(l.price / l.sqft).toFixed(1)}` : "unknown"),
-    num: (l) => (l.sqft ? l.price / l.sqft : null),
-  },
-  {
-    label: "Size",
-    value: (l) =>
-      `${l.bedrooms === 0 ? "Studio" : `${l.bedrooms}bd`}/${l.bathrooms}ba${l.sqft ? ` · ${l.sqft}ft²` : ""}`,
-    num: (l) => l.sqft,
-    invert: true,
   },
   {
     label: "Vs market",
@@ -126,17 +121,24 @@ const ROWS: Row[] = [
     num: (l) => (l.dealVerdict === "unknown" ? null : l.dealDelta),
   },
   {
+    label: "Size",
+    value: (l) =>
+      `${l.bedrooms === 0 ? "Studio" : `${l.bedrooms}bd`}/${l.bathrooms}ba${l.sqft ? ` · ${l.sqft}ft²` : ""}`,
+    num: (l) => l.sqft,
+    invert: true,
+  },
+  {
+    label: "$/sqft",
+    value: (l) => (l.sqft ? `$${(l.price / l.sqft).toFixed(1)}` : "unknown"),
+    num: (l) => (l.sqft ? l.price / l.sqft : null),
+  },
+];
+
+const CONTEXT_ROWS: Row[] = [
+  {
     label: "Ready for your date",
     value: (l) =>
       l.timing === "ready" ? "yes" : l.timing === "unknown" ? "unlisted" : l.timingLabel,
-  },
-  { label: "Days listed", value: (l) => `${l.daysOnMarket}d`, num: (l) => l.daysOnMarket },
-  {
-    label: "Status",
-    value: (l) =>
-      `${STAGE_LABEL[l.stage]}${
-        l.lastContactChannel ? ` · ${CONTACT_LABEL[l.lastContactChannel].toLowerCase()}` : ""
-      }`,
   },
   {
     /*
@@ -159,17 +161,26 @@ const ROWS: Row[] = [
     num: (l) => routesWithin(l.lat, l.lon, 12).length,
     invert: true,
   },
+  { label: "Days listed", value: (l) => `${l.daysOnMarket}d`, num: (l) => l.daysOnMarket },
   {
-    label: "Amenities",
-    value: (l) => (l.perks.length ? `${l.perks.length} listed` : "none listed"),
-    num: (l) => l.perks.length,
-    invert: true,
+    label: "Last contact",
+    value: (l) =>
+      l.lastContactChannel ? CONTACT_LABEL[l.lastContactChannel] : "not yet",
   },
   {
     label: "Biggest catch",
     value: (l) => l.cons[0] ?? "none found",
   },
 ];
+
+/** Furthest along first: the places you've seen in person lead the table. */
+const STAGE_RANK: Partial<Record<Stage, number>> = {
+  applied: 5,
+  toured: 4,
+  tour: 3,
+  contacted: 2,
+  interested: 1,
+};
 
 /**
  * The six that decide NYC leases, each on its own line, always.
@@ -230,10 +241,16 @@ export function amenityRowsFor(finalists: FeedListing[]): Row[] {
 export default function Compare({
   listings,
   onOpen,
+  onMove,
+  onLean,
   onNotes,
 }: {
   listings: FeedListing[];
   onOpen: (l: FeedListing) => void;
+  /** Stage changes made from the column header, same handler as the board. */
+  onMove: (l: FeedListing, stage: Stage) => void;
+  /** The post-tour thumb, same handler as the board. */
+  onLean: (l: FeedListing, lean: number) => void;
   onNotes: (id: string, notes: string) => Promise<void> | void;
 }) {
   const [order, setOrder] = useState<string[]>([]);
@@ -260,12 +277,27 @@ export default function Compare({
     }
   }
 
-  /** Everything eligible to be compared, before your inclusions and order. */
+  /**
+   * Everything eligible to be compared, before your inclusions and order.
+   *
+   * Strictly the pipeline. Compare is a lens on the board, so leaving the
+   * board is leaving the table — the old starred-places exception meant a
+   * card you'd just x-ed off the pipeline sat here anyway, looking exactly
+   * like the glitch it was.
+   *
+   * Default order is stage first, furthest along leading: the same grouping
+   * as the board's columns, so the table reads left to right as "seen it,
+   * booked it, talked to them, want to" instead of a blind shuffle.
+   */
   const candidates = useMemo(
     () =>
       listings
-        .filter((l) => l.starred || !["inbox", "passed", "no_go", "closed"].includes(l.stage))
-        .sort((a, b) => b.rating - a.rating),
+        .filter((l) => (STAGE_RANK[l.stage] ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (STAGE_RANK[b.stage] ?? 0) - (STAGE_RANK[a.stage] ?? 0) ||
+            b.rating - a.rating
+        ),
     [listings]
   );
 
@@ -351,9 +383,10 @@ export default function Compare({
       <div className="surface" style={{ padding: 24 }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Nothing to compare yet</div>
         <div className="muted" style={{ fontSize: 13 }}>
-          Star a couple of places or move them along the pipeline, and they line
-          up here side by side — rent, real cost, and how each stacks up against
-          the market — for the night you have to choose.
+          Compare shows what&apos;s on your board. Put two or more places into
+          the pipeline and they line up here side by side, with rent, real
+          cost, and how each stacks up against the market, for the night you
+          have to choose.
         </div>
       </div>
     );
@@ -383,7 +416,7 @@ export default function Compare({
 
   const rows: Row[] = [];
   const agreed: string[] = [];
-  for (const row of [...ROWS, ...amenityRows]) {
+  for (const row of [...MONEY_ROWS, ...amenityRows, ...CONTEXT_ROWS]) {
     const values = finalists.map((l) => row.value(l));
     // Decision amenities stay on the table even in agreement — "everyone has
     // a washer" is the kind of agreement people are checking for.
@@ -440,40 +473,52 @@ export default function Compare({
       {picking && (
         <div className="compare-pick" role="group" aria-label="Places to compare">
           {/*
-            Three states, not two.
+            Grouped under the same headings as the board's columns, so picking
+            reads as "which of my toured ones, which of my booked ones" —
+            a flat run of addresses meant guessing where each one stood.
 
-            Everything included used to render checked and filled, including
-            the ones past the five-column cap — so a chip said "in the table"
-            and its own label said "over five" in the same breath. Only what
-            is actually on screen is filled now; the queued ones are outlined
-            and say where they stand, and clicking one promotes it into view
-            instead of leaving you to work out the trick.
+            Three chip states, not two. Everything included used to render
+            checked and filled, including the ones past the five-column cap —
+            so a chip said "in the table" and its own label said "over five"
+            in the same breath. Only what is actually on screen is filled;
+            the queued ones are outlined and say where they stand, and
+            clicking one promotes it into view.
           */}
-          {candidates.map((l) => {
-            const included = !excluded.includes(l.id);
-            const inTable = finalists.some((f) => f.id === l.id);
-            const queued = included && !inTable;
-            return (
-              <button
-                key={l.id}
-                className={inTable ? "pill is-on" : queued ? "pill is-queued" : "pill"}
-                aria-pressed={included}
-                onClick={() => (queued ? promote(l.id) : toggle(l.id))}
-                title={
-                  queued
-                    ? "Not in the table — the table shows five. Click to bring it in."
-                    : inTable
-                      ? "Shown. Click to take it out."
-                      : "Click to put it back."
-                }
-              >
-                {inTable && <Icon name="check" size={12} />}
-                {l.address}
-                {l.unit ? ` #${l.unit}` : ""}
-                {queued && <span className="pill-note">not shown</span>}
-              </button>
-            );
-          })}
+          {[...PIPELINE_STAGES]
+            .filter((stage) => candidates.some((l) => l.stage === stage))
+            .sort((a, b) => (STAGE_RANK[b] ?? 0) - (STAGE_RANK[a] ?? 0))
+            .map((stage) => (
+              <div key={stage} className="compare-pickgroup">
+                <span className="overline compare-pickstage">{STAGE_LABEL[stage]}</span>
+                {candidates
+                  .filter((l) => l.stage === stage)
+                  .map((l) => {
+                    const included = !excluded.includes(l.id);
+                    const inTable = finalists.some((f) => f.id === l.id);
+                    const queued = included && !inTable;
+                    return (
+                      <button
+                        key={l.id}
+                        className={inTable ? "pill is-on" : queued ? "pill is-queued" : "pill"}
+                        aria-pressed={included}
+                        onClick={() => (queued ? promote(l.id) : toggle(l.id))}
+                        title={
+                          queued
+                            ? "Not in the table — the table shows five. Click to bring it in."
+                            : inTable
+                              ? "Shown. Click to take it out."
+                              : "Click to put it back."
+                        }
+                      >
+                        {inTable && <Icon name="check" size={12} />}
+                        {l.address}
+                        {l.unit ? ` #${l.unit}` : ""}
+                        {queued && <span className="pill-note">not shown</span>}
+                      </button>
+                    );
+                  })}
+              </div>
+            ))}
         </div>
       )}
 
@@ -526,6 +571,23 @@ export default function Compare({
                   </span>
                   <span className="muted">{l.neighborhood}</span>
                 </button>
+                {/* The stage, where it can be changed rather than merely
+                    read. Decision night IS stage changes — "we're applying
+                    to this one, that one's out" — and bouncing back to the
+                    board for each verdict broke the comparison mid-thought.
+                    Moving one off the board takes its column with it. */}
+                <select
+                  className="field compare-stage"
+                  value={l.stage}
+                  aria-label={`Stage for ${l.address}`}
+                  onChange={(e) => onMove(l, e.target.value as Stage)}
+                >
+                  {PIPELINE_STAGES.map((stage) => (
+                    <option key={stage} value={stage}>
+                      {STAGE_LABEL[stage]}
+                    </option>
+                  ))}
+                </select>
                 <button
                   className="compare-drop"
                   onClick={() => toggle(l.id)}
@@ -556,6 +618,34 @@ export default function Compare({
               </tr>
             );
           })}
+          {/* Your gut, on the record. The same thumb as the board's tour
+              cards: softer than a stage, sharper than a memory. Live here
+              too, because this table is where the leans get compared. */}
+          <tr>
+            <td className="muted compare-label">Your take</td>
+            {finalists.map((l) => (
+              <td key={l.id}>
+                <span className="board-lean compare-lean">
+                  {([
+                    [1, "thumbup", "Leaning yes"],
+                    [-1, "thumbdown", "Leaning no"],
+                  ] as const).map(([value, icon, label]) => (
+                    <button
+                      key={icon}
+                      className={l.lean === value ? "lean-btn is-on" : "lean-btn"}
+                      data-lean={value}
+                      title={label}
+                      aria-label={`${label} on ${l.address}`}
+                      aria-pressed={l.lean === value}
+                      onClick={() => onLean(l, l.lean === value ? 0 : value)}
+                    >
+                      <Icon name={icon} size={14} />
+                    </button>
+                  ))}
+                </span>
+              </td>
+            ))}
+          </tr>
           {/* What you actually saw — the tour footage, side by side. On
               decision night "remember the bedroom in the second one" becomes
               a thing you look at instead of argue about. */}

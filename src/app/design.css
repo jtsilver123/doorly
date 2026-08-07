@@ -1479,13 +1479,15 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /*
  * The last two columns are outcomes, not work: Applied is the win pile,
- * "Didn't like it" the loss pile. The win keeps full color with an accent
+ * "Not applying" the loss pile. The win keeps full color with an accent
  * head; the loss dims — decided things shouldn't compete for attention with
  * the ones still in play.
  */
 .board-col[data-stage="applied"] .board-head span:first-child { color: var(--good); }
 .board-col[data-stage="no_go"] { border-style: dashed; }
-.board-col[data-stage="no_go"] .board-head span:first-child { color: var(--text-muted); }
+/* The loss column wears the loss color, mirroring Applied's green — the two
+   outcomes should read as the pair they are. */
+.board-col[data-stage="no_go"] .board-head span:first-child { color: var(--warn); }
 .board-col[data-stage="no_go"] .board-card { opacity: 0.66; }
 .board-col[data-stage="no_go"] .board-card:hover,
 .board-col[data-stage="no_go"] .board-card:focus-visible { opacity: 1; }
@@ -1518,6 +1520,66 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 
 .board-next.is-due { color: var(--warn); }
+
+/*
+ * The post-tour thumbs. Quiet until chosen: two outlined ghosts that read as
+ * "you could have an opinion here", and the chosen one takes a firm fill —
+ * good/warn, matching what the lean means, not the brand accent, which would
+ * make an undecided row look like a call to action.
+ */
+.board-lean {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: 6px;
+}
+
+.lean-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.lean-btn:hover { transform: translateY(-1px); color: var(--text); }
+.lean-btn:active { transform: translateY(0); }
+
+.lean-btn.is-on[data-lean="1"] {
+  background: var(--good-soft);
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.lean-btn.is-on[data-lean="-1"] {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.lean-note { font-size: var(--t-xs); }
+
+/* The finish line. Gold, not the semantic good-green: securing the place
+   isn't one more status, it's the end of the hunt. */
+.lean-btn.secured-btn.is-on {
+  background: rgba(240, 180, 41, 0.16);
+  border-color: #f0b429;
+  color: #f0b429;
+}
+
+.secured-note {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: #f0b429;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .board-empty {
   font-size: var(--t-sm);
@@ -2246,13 +2308,55 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .crewline-poc { display: inline-flex; align-items: center; gap: var(--s2); }
 
+/* --- confetti -------------------------------------------------------------- */
+
+/* The celebration layer. Fixed and pointer-transparent: it draws over
+   everything and blocks nothing. Each piece's path comes in as custom
+   properties from lib/confetti.ts; the animation itself stays here where
+   the compositor can run it. */
+.confetti {
+  position: fixed;
+  inset: 0;
+  overflow: clip;
+  pointer-events: none;
+  z-index: 400;
+}
+
+.confetti i {
+  position: absolute;
+  top: -14px;
+  left: var(--x);
+  width: 8px;
+  height: 13px;
+  opacity: 0;
+  animation: confetti-fall var(--t) cubic-bezier(0.25, 0.6, 0.45, 1) var(--d) forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  100% {
+    opacity: 0.85;
+    transform: translate3d(var(--dx), 105vh, 0) rotate(var(--r));
+  }
+}
+
 /* --- the split map view ---------------------------------------------------- */
 
 /* Zillow's arrangement, because it's correct: the map holds still while the
    results scroll past it, so geography and inventory are on screen together. */
+/*
+ * The map yields to the cards as the window narrows. At 44% it was winning
+ * the tug-of-war on mid-size windows: the card area landed just under two
+ * card-widths, so auto-fill dealt a single enormous column and the page read
+ * as one listing at a time. 38% with a smaller floor keeps two card columns
+ * alive down to ordinary-laptop widths.
+ */
 .split {
   display: grid;
-  grid-template-columns: minmax(340px, 44%) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 38%) minmax(0, 1fr);
   gap: var(--s4);
   align-items: start;
 }
@@ -2268,7 +2372,7 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .split-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: var(--s4);
   align-content: start;
 }
@@ -2853,14 +2957,44 @@ button.fact:hover .fact-label { color: var(--accent); }
 .compare-bar > .muted { font-size: var(--t-xs); }
 
 .compare-pick {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--s2);
   margin-bottom: var(--s3);
   padding: var(--s3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface);
+}
+
+/* One line per pipeline column: the stage names the chips that follow it. */
+.compare-pickgroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.compare-pickstage {
+  flex-basis: 100%;
+  color: var(--text-muted);
+}
+
+/* The stage select, sized as a caption rather than a form. */
+.compare-stage {
+  width: 100%;
+  margin-top: var(--s1);
+  padding: 3px 6px;
+  font-size: var(--t-xs);
+  font-weight: 600;
+}
+
+.compare-lean { margin-top: 0; }
+
+/* The Activity toggle rides the sticky header's bottom edge. */
+.activity-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--s2);
 }
 
 /* The heading is the drag handle, so it has to say so on approach. */
