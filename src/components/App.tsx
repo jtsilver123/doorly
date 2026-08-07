@@ -76,6 +76,15 @@ const TABS: Tab[] = ["pipeline", "feed", "compare", "profile"];
  * — the Activity list now lives inside Listings, so the old tab lands there
  * with the panel open rather than 404ing someone's routine.
  */
+/** Which diary heading a listing files under, for the newest-first grid. */
+function freshnessBucket(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "New today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return "Earlier this week";
+  return "Older";
+}
+
 const LEGACY_TABS: Record<string, Tab> = { today: "feed", changes: "feed" };
 
 /** The clean addresses, one per section, and the way back. */
@@ -402,8 +411,12 @@ export default function Home() {
 
 
   const anchor = (profile.anchors ?? [])[0];
-  const visible = useMemo(() => {
-    const filtered = applyFilters(listings, {
+  /** Late listings shown anyway, by explicit request. */
+  const [showLate, setShowLate] = useState(false);
+  /** Phones: which of the two views the toggle is showing. */
+  const [mobileMap, setMobileMap] = useState(false);
+  const { visible, lateHidden } = useMemo(() => {
+    let filtered = applyFilters(listings, {
       stage: "all",
       search: query,
       priceMin: priceMin ? Number(priceMin) : undefined,
@@ -422,13 +435,25 @@ export default function Home() {
       sort: sort as Parameters<typeof applyFilters>[1]["sort"],
     });
     // The commute cap is against the first anchor — "work", for most people.
-    if (!anchor || commuteMax === "any") return filtered;
-    const cap = Number(commuteMax);
-    return filtered.filter((l) => {
-      const est = commuteMinutes(l, anchor);
-      return est != null && est.minutes <= cap;
-    });
+    if (anchor && commuteMax !== "any") {
+      const cap = Number(commuteMax);
+      filtered = filtered.filter((l) => {
+        const est = commuteMinutes(l, anchor);
+        return est != null && est.minutes <= cap;
+      });
+    }
+    /*
+     * A place that won't be free until weeks after the move-in date is not a
+     * candidate, and showing it as one reads as the app not listening. Hidden
+     * by default rather than dropped: the count and a reveal keep it honest,
+     * and "soon" (a week or two late — landlords flex) stays visible with its
+     * label. Anything already in your pipeline is yours regardless.
+     */
+    if (showLate || readyOnly) return { visible: filtered, lateHidden: 0 };
+    const kept = filtered.filter((l) => l.timing !== "late" || l.stage !== "inbox");
+    return { visible: kept, lateHidden: filtered.length - kept.length };
   }, [
+    showLate,
     listings,
     query,
     priceMin,
@@ -1039,7 +1064,9 @@ export default function Home() {
 
   // Keep the focused card in view as you move through the list.
   useEffect(() => {
-    const node = gridRef.current?.children[focus] as HTMLElement | undefined;
+    // Cards sit inside display:contents wrappers now, which have no box to
+    // scroll to — target the card itself.
+    const node = gridRef.current?.querySelectorAll(".card")[focus] as HTMLElement | undefined;
     node?.scrollIntoView({ block: "nearest" });
   }, [focus]);
 
@@ -1558,41 +1585,88 @@ export default function Home() {
                 onClear={clearFilters}
               />
             ) : (
-              // Zillow's split, always: the map holds still on the left while
-              // the results scroll on the right, hover linked both ways. The
-              // old Photos/Map toggle was a decision nobody needed to make.
-              <div className="split">
-                <div className="split-map">
-                  <CityMap
-                    listings={visible}
-                    onOpen={setOpen}
-                    linkedId={linkedId}
-                    onHover={setLinkedId}
-                  />
-                </div>
-                <div className="split-cards" ref={gridRef}>
-                  {visible.slice(0, pageSize).map((listing, i) => (
-                    <ListingCard
-                      key={listing.id}
-                      listing={listing}
-                      via={via(listing)}
-                      focused={i === focus}
-                      linked={linkedId === listing.id}
-                      preferredSource={profile.preferredSource}
+              // Zillow's split on desktop: the map holds still on the left
+              // while the results scroll on the right, hover linked both
+              // ways. Phones choose one at a time via the floating toggle —
+              // a 300px map above the cards taxed every visit a scroll.
+              <>
+                {(lateHidden > 0 || showLate) && (
+                  <div className="late-note" role="status">
+                    {showLate ? (
+                      <>
+                        Including places that are not free until well after
+                        your move-in.{" "}
+                        <button className="linkish" onClick={() => setShowLate(false)}>
+                          Hide them again
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {lateHidden} hidden: not free until well after your
+                        move-in date.{" "}
+                        <button className="linkish" onClick={() => setShowLate(true)}>
+                          Show them
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+                <div className="split" data-view={mobileMap ? "map" : "list"}>
+                  <div className="split-map">
+                    <CityMap
+                      listings={visible}
+                      onOpen={setOpen}
+                      linkedId={linkedId}
                       onHover={setLinkedId}
-                      onOpen={openCard}
-                      onStar={star}
-                      onPass={pass}
-                      onReach={reachOut}
                     />
-                  ))}
-                  {visible.length > pageSize && (
-                    <div ref={sentinelRef} className="more-sentinel">
-                      Showing {pageSize} of {visible.length.toLocaleString()}
-                    </div>
-                  )}
+                  </div>
+                  <div className="split-cards" ref={gridRef}>
+                    {visible.slice(0, pageSize).map((listing, i) => (
+                      <div className="card-cell" key={listing.id}>
+                        {/* Sorted by newest, the grid reads as a diary:
+                            day headings mark where today's crop ends and
+                            yesterday's begins. Other sorts interleave dates,
+                            where headings would lie. */}
+                        {sort === "newest" &&
+                          (() => {
+                            const bucket = freshnessBucket(listing.firstSeenAt);
+                            const prev =
+                              i > 0 ? freshnessBucket(visible[i - 1].firstSeenAt) : null;
+                            if (bucket === prev) return null;
+                            return <h3 className="grid-day">{bucket}</h3>;
+                          })()}
+                        <ListingCard
+                          listing={listing}
+                          via={via(listing)}
+                          focused={i === focus}
+                          linked={linkedId === listing.id}
+                          preferredSource={profile.preferredSource}
+                          onHover={setLinkedId}
+                          onOpen={openCard}
+                          onStar={star}
+                          onPass={pass}
+                          onReach={reachOut}
+                        />
+                      </div>
+                    ))}
+                    {visible.length > pageSize && (
+                      <div ref={sentinelRef} className="more-sentinel">
+                        Showing {pageSize} of {visible.length.toLocaleString()}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+                {/* Phones: one view at a time, switched from a thumb-height
+                    floating pill — the pattern every listing app lands on. */}
+                <button
+                  className="mapswitch"
+                  onClick={() => setMobileMap((v) => !v)}
+                  aria-pressed={mobileMap}
+                >
+                  <Icon name={mobileMap ? "listings" : "pin"} size={15} />
+                  {mobileMap ? "List" : "Map"}
+                </button>
+              </>
             )}
           </>
         )}

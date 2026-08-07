@@ -300,6 +300,7 @@ export default function ListingCard({
           keys={listing.perks}
           // The walk-up flag earns card space; a whole list of noes would not.
           absent={amenityFacts(listing).elevator === "no" ? ["elevator"] : []}
+          quietWhenEmpty
         />
 
         <ProsConsLine listing={listing} />

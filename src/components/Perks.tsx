@@ -107,6 +107,7 @@ export default function Perks({
   absent = [],
   limit = 4,
   showLabels = false,
+  quietWhenEmpty = false,
 }: {
   keys: AmenityKey[];
   /**
@@ -117,8 +118,15 @@ export default function Perks({
   absent?: AmenityKey[];
   limit?: number;
   showLabels?: boolean;
+  /**
+   * Cards: hold the row's height but say nothing. "No amenities listed" on
+   * two of every three cards stopped being information and became texture;
+   * the panel keeps the sentence, where a person is actually reading.
+   */
+  quietWhenEmpty?: boolean;
 }) {
   if (!keys.length && !absent.length) {
+    if (quietWhenEmpty) return <span className="perks-empty" aria-hidden="true" />;
     return <span className="perks-empty">No amenities listed</span>;
   }
 

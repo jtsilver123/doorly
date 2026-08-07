@@ -5319,3 +5319,62 @@ button.fact:hover .fact-label { color: var(--accent); }
 .stale-warn .icon { flex-shrink: 0; margin-top: 2px; }
 
 .card-stale { color: var(--warn); font-weight: 600; }
+
+/* --- the listings page, refined ------------------------------------------ */
+
+/* A wrapper with no box: the day heading and the card both join the grid,
+   so headings can span the full row without breaking the card columns. */
+.card-cell { display: contents; }
+
+.grid-day {
+  grid-column: 1 / -1;
+  margin: var(--s2) 0 calc(-1 * var(--s2));
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.grid-day:first-child { margin-top: 0; }
+
+/* The not-free-in-time count: quiet, above the grid, always reversible. */
+.late-note {
+  margin-bottom: var(--s3);
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+}
+
+/* Phones pick one view at a time; the pill floats above the tab bar. */
+.mapswitch { display: none; }
+
+@media (max-width: 860px) {
+  .mapswitch {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--t-sm);
+    font-weight: 700;
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+  }
+
+  /* One view at a time. The map stops being a 300px toll booth above the
+     cards and becomes a real full-height map when asked for. */
+  .split[data-view="list"] .split-map { display: none; }
+  .split[data-view="map"] .split-cards { display: none; }
+  .split[data-view="map"] .split-map {
+    height: calc(100dvh - 360px);
+    min-height: 340px;
+    margin-bottom: 0;
+  }
+}
