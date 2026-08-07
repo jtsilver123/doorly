@@ -5,6 +5,7 @@ import { ALL_SOURCES, SOURCE_LABEL, type Source } from "@/types";
 import { AMENITIES, AMENITY_ORDER, type AmenityKey } from "@/lib/amenities";
 import SourceMark from "@/components/SourceMark";
 import { SORT_OPTIONS } from "@/lib/filters";
+import type { SiteJump } from "@/lib/siteLinks";
 import Icon from "@/components/Icon";
 
 /**
@@ -70,6 +71,8 @@ export default function FilterBar({
   lastCheckedAt,
   sourceCount,
   anchorLabel,
+  jumps,
+  trailing,
 }: {
   filters: Filters;
   onChange: (next: Partial<Filters>) => void;
@@ -79,6 +82,10 @@ export default function FilterBar({
   sourceCount?: number;
   /** First commute anchor's name — the control only exists when one does. */
   anchorLabel?: string | null;
+  /** The saved search, opened on the big sites. The trust escape hatch. */
+  jumps?: SiteJump[];
+  /** Extra control rendered at the row's end (the Activity toggle). */
+  trailing?: React.ReactNode;
 }) {
   const [openPanel, setOpenPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -348,6 +355,28 @@ export default function FilterBar({
             </>
           )}
         </span>
+        {/* The escape hatch. A tailored feed earns trust by making the
+            double-check effortless: the same search, one click, on the sites
+            everyone already knows. */}
+        {jumps && jumps.length > 0 && (
+          <span className="sitejumps">
+            <span className="muted">This search on</span>
+            {jumps.map((jump) => (
+              <a
+                key={jump.source}
+                className="sitejump"
+                href={jump.url}
+                target="_blank"
+                rel="noreferrer"
+                title={`Open this search on ${jump.label}`}
+              >
+                <SourceMark source={jump.source} size={14} />
+                {jump.label}
+                <Icon name="external" size={11} />
+              </a>
+            ))}
+          </span>
+        )}
         {/* Where it came from and how stale it is, on the results themselves.
             Freshness is the thing a renter is implicitly trusting on every
             card, so it shouldn't take a trip to the settings page to find. */}
@@ -355,6 +384,7 @@ export default function FilterBar({
           Pulled from {sourceCount ?? 5} listing sites
           {lastCheckedAt ? ` · checked ${sinceText(lastCheckedAt)}` : " · not checked yet"}
         </span>
+        {trailing}
       </div>
     </div>
   );

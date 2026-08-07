@@ -726,6 +726,37 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
 
 .filterbar-trust { font-size: var(--t-xs); }
 .filterbar-count strong { color: var(--text); }
+/* The row centers its items: the pill and the jump buttons are taller than
+   the text, and baseline alignment left them hanging below the line. */
+.filterbar-count { align-items: center; }
+
+/* The escape hatch: this exact search, opened on the sites everyone already
+   trusts. Styled as small real buttons, not links, because they are the
+   page's answer to "but what if this app missed something". */
+.sitejumps {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  font-size: var(--t-xs);
+}
+
+.sitejump {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.sitejump:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.sitejump .icon { color: var(--text-muted); }
 
 .sourcefilter { display: inline-flex; gap: var(--s1); }
 
@@ -1197,6 +1228,18 @@ button.fact:hover .fact-label { color: var(--accent); }
   display: contents;
 }
 
+/* Phones: search takes the first line alone, Filters and Sort share the
+   second. This re-states the older mobile rules because this "second pass"
+   block sits later in the sheet and its flex/contents pair was silently
+   winning the cascade — which crushed the search field to three characters. */
+@media (max-width: 860px) {
+  .filterbar-row { display: grid; gap: var(--s2); }
+  .filterbar-row .searchfield { width: 100%; }
+  .filterbar-controls { display: flex; gap: var(--s2); }
+  .filterbar-controls > * { flex: 1; min-width: 0; max-width: none; }
+  .control-sort { margin-left: 0; }
+}
+
 .control.is-on {
   border-color: var(--accent);
   color: var(--accent);
@@ -1345,7 +1388,11 @@ button.fact:hover .fact-label { color: var(--accent); }
  */
 .stickytop {
   position: sticky;
-  top: 0;
+  /* Sticky pins to the scrollport's content edge, which sits below .main's
+     18px top padding — cards scrolled past showed through that strip above
+     the frozen band. A negative offset lets the band ride up flush with the
+     panel's real top and its background covers the gap. */
+  top: -18px;
   z-index: 25;
   background: var(--bg);
   padding-top: var(--s3);
@@ -3510,13 +3557,6 @@ button.fact:hover .fact-label { color: var(--accent); }
   font-size: var(--t-xs);
   padding: 5px 10px;
   cursor: pointer;
-}
-
-/* The Activity toggle rides the sticky header's bottom edge. */
-.activity-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--s2);
 }
 
 /* The heading is the drag handle, so it has to say so on approach. */

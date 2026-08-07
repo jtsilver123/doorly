@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { FeedListing, Source } from "@/types";
+import type { FeedListing, SearchCriteria, Source } from "@/types";
 import type { Stage } from "@/types";
+import { siteJumps } from "@/lib/siteLinks";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
 import {
   DEFAULT_PROFILE,
@@ -257,6 +258,8 @@ export default function Home() {
   const [budget, setBudget] = useState(0);
   /** The saved search's neighborhoods — what "Where" actually means. */
   const [searchAreas, setSearchAreas] = useState<string[]>([]);
+  /** The whole saved search, for the jump-to-StreetEasy/Zillow links. */
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(null);
   const [focus, setFocus] = useState(0);
   const { toasts, push: toast, dismiss } = useToasts();
 
@@ -512,6 +515,7 @@ export default function Home() {
         const first = (b.searches ?? [])[0];
         if (first?.criteria?.priceMax) setBudget(first.criteria.priceMax);
         if (Array.isArray(first?.criteria?.areas)) setSearchAreas(first.criteria.areas);
+        if (first?.criteria) setSearchCriteria(first.criteria);
       })
       .catch(() => {});
     fetch("/api/profile")
@@ -1447,24 +1451,24 @@ export default function Home() {
               lastCheckedAt={api?.lastCheckedAt}
               sourceCount={ALL_SOURCES.length}
               anchorLabel={anchor?.label ?? null}
+              jumps={searchCriteria ? siteJumps(searchCriteria) : undefined}
+              /* Activity used to hold a whole row of the frozen header for
+                 one pill; it rides the count row now. It's diligence on the
+                 same inventory (price cuts, relists, delistings), so it
+                 opens here over the browse instead of a tab away. */
+              trailing={
+                !loading ? (
+                  <button
+                    className={activityOpen ? "pill is-on" : "pill"}
+                    aria-expanded={activityOpen}
+                    onClick={() => setActivityOpen((v) => !v)}
+                  >
+                    <Icon name="bell" size={13} />
+                    Activity{unread > 0 ? ` (${unread})` : ""}
+                  </button>
+                ) : null
+              }
               />
-            )}
-
-            {/* Activity, folded in. It's diligence on the same inventory —
-                price cuts, relists, delistings — so it opens here over the
-                browse instead of living a tab away from the cards it's
-                about. */}
-            {!loading && (
-              <div className="activity-row">
-                <button
-                  className={activityOpen ? "pill is-on" : "pill"}
-                  aria-expanded={activityOpen}
-                  onClick={() => setActivityOpen((v) => !v)}
-                >
-                  <Icon name="bell" size={13} />
-                  Activity{unread > 0 ? ` (${unread})` : ""}
-                </button>
-              </div>
             )}
           </div>
         )}

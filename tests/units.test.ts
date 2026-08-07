@@ -47,6 +47,7 @@ import {
   walkMinutes,
 } from "@/lib/subway";
 import { applyFilters, findPasted, addressFromListingUrl } from "@/lib/filters";
+import { streeteasySearchUrl, zillowSearchUrl, siteJumps } from "@/lib/siteLinks";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { nearAreas } from "@/lib/geo";
 import { safeNext } from "@/lib/nextPath";
@@ -2097,4 +2098,44 @@ test("the chip list only carries confirmed yeses", () => {
   assert.ok(keys.includes("dishwasher"));
   assert.ok(!keys.includes("elevator"));
   assert.ok(!keys.includes("pets"));
+});
+
+/* --- site jumps: the saved search, opened on the big sites --------------- */
+
+test("one neighborhood links straight to it on StreetEasy, filters riding along", () => {
+  const url = streeteasySearchUrl({ ...DEFAULT_CRITERIA, areas: ["east-village"] });
+  assert.equal(url, "https://streeteasy.com/for-rent/east-village/price:2000-4000%7Cbeds:0-1");
+});
+
+test("several areas in one borough widen to the borough; a mixed bag widens to nyc", () => {
+  const manhattan = streeteasySearchUrl(DEFAULT_CRITERIA);
+  assert.ok(manhattan.includes("/for-rent/manhattan/"));
+  const mixed = streeteasySearchUrl({
+    ...DEFAULT_CRITERIA,
+    areas: ["east-village", "williamsburg"],
+  });
+  assert.ok(mixed.includes("/for-rent/nyc/"));
+});
+
+test("open-ended bed counts become a floor, and studios-only names the count", () => {
+  const openEnded = streeteasySearchUrl({ ...DEFAULT_CRITERIA, bedMin: 2, bedMax: null });
+  assert.ok(openEnded.endsWith("beds>=2"));
+  const studios = streeteasySearchUrl({ ...DEFAULT_CRITERIA, bedMin: 0, bedMax: 0 });
+  assert.ok(studios.endsWith("beds:0"));
+});
+
+test("zillow gets the neighborhood rentals page, or the city when spread out", () => {
+  assert.equal(
+    zillowSearchUrl({ ...DEFAULT_CRITERIA, areas: ["chelsea"] }),
+    "https://www.zillow.com/chelsea-new-york-ny/rentals/"
+  );
+  assert.equal(zillowSearchUrl(DEFAULT_CRITERIA), "https://www.zillow.com/new-york-ny/rentals/");
+});
+
+test("the jump row carries both sites in cross-check order", () => {
+  const jumps = siteJumps(DEFAULT_CRITERIA);
+  assert.deepEqual(
+    jumps.map((j) => j.source),
+    ["streeteasy", "zillow"]
+  );
 });
