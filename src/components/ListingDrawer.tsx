@@ -150,6 +150,13 @@ function PriceChart({ points }: { points: PricePoint[] }) {
   );
 }
 
+/**
+ * The reading line: how far below the panel's top edge a section has to climb
+ * before its chip lights. Shared by the scrollspy and the jump-to handler, so
+ * tapping a chip always leaves that chip lit.
+ */
+const SPY_LINE = 90;
+
 export default function ListingDrawer({
   listing,
   profile,
@@ -183,6 +190,20 @@ export default function ListingDrawer({
   const bodyRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const spyTick = useRef(false);
+  /*
+   * A tapped chip outranks the scrollspy until the smooth scroll settles.
+   *
+   * The last two or three sections are shorter than the panel, so once it is
+   * scrolled as far as it goes they all sit below the reading line at once and
+   * the spy can only ever name the final one. Tapping "Footage" scrolled to
+   * the bottom and lit "Notes" — the destination was right and the tab bar
+   * looked broken, which is worse than either problem alone.
+   *
+   * So a tap sets the chip directly and holds it while the animation runs.
+   * The spy resumes the moment the user scrolls under their own steam, which
+   * is when its answer is the true one again.
+   */
+  const jumpUntil = useRef(0);
   const [notes, setNotes] = useState(listing.notes);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -524,12 +545,30 @@ export default function ListingDrawer({
               spyTick.current = false;
               const body = bodyRef.current;
               if (!body) return;
-              const line = body.getBoundingClientRect().top + 90;
+              // A jump is in flight; the chip it came from already won.
+              if (Date.now() < jumpUntil.current) return;
+              const sections = [...body.querySelectorAll("[data-sec]")];
+              const line = body.getBoundingClientRect().top + SPY_LINE;
               let current = "sec-costs";
-              for (const sec of body.querySelectorAll("[data-sec]")) {
+              for (const sec of sections) {
                 if (sec.getBoundingClientRect().top <= line) {
                   current = sec.getAttribute("data-sec") ?? current;
                 }
+              }
+              /*
+               * The last sections can never win on their own.
+               *
+               * Once the panel is scrolled as far as it goes, everything after
+               * the final screenful still sits below the reading line, so the
+               * chip that lights is whichever section happens to straddle it.
+               * Tapping "Footage" scrolled to the bottom and left "Contact"
+               * lit, which reads as a tab bar that doesn't work.
+               *
+               * At the bottom the honest answer is the last section, because
+               * that is what you are looking at.
+               */
+              if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) {
+                current = sections.at(-1)?.getAttribute("data-sec") ?? current;
               }
               setActiveSec(current);
               // Keep the lit chip in view without scrolling anything else.
@@ -632,11 +671,18 @@ export default function ListingDrawer({
                     const body = bodyRef.current;
                     const el = body?.querySelector(`[data-sec="${id}"]`);
                     if (!body || !el) return;
+                    // Land the heading just under the pinned bar, and use
+                    // the same constant the spy reads from so a tap and the
+                    // highlight can't disagree about where the line is.
                     const top =
                       el.getBoundingClientRect().top -
                       body.getBoundingClientRect().top +
                       body.scrollTop -
-                      60;
+                      SPY_LINE +
+                      8;
+                    // Light it now, and hold it while the scroll animates.
+                    setActiveSec(id);
+                    jumpUntil.current = Date.now() + 700;
                     body.scrollTo({ top, behavior: "smooth" });
                   }}
                 >

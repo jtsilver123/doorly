@@ -3911,7 +3911,13 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* The panel's table of contents: sticky chips that jump and light up. */
 .drawer-tabs {
   position: sticky;
-  top: 0;
+  /*
+   * Negative, and deliberately so. Sticky offsets are measured from the
+   * scroll container's *padding* box, so `top: 0` pinned the bar 16px down
+   * from the panel's edge and left a strip of content scrolling through the
+   * gap above it. Pulling back by the body's own padding puts it flush.
+   */
+  top: calc(-1 * var(--s4));
   /* Above Leaflet, which paints its panes at 400 and its controls at 800 —
      the map scrolled straight over the pinned chips without this. */
   z-index: 900;
@@ -3921,15 +3927,13 @@ button.fact:hover .fact-label { color: var(--accent); }
   scrollbar-width: none;
   background: var(--surface);
   /*
-   * Pulled flush with the panel's top edge on all three sides.
-   *
-   * Sticky pins at the scroll container's *content* box, so the body's own
-   * padding was left as a gap above the chips — and the content underneath
-   * showed through it as the panel scrolled, which read as a rendering bug.
-   * Cancelling the padding with a negative margin puts the bar against the
-   * edge, where a frozen toolbar belongs.
+   * Bleeding to the panel's left and right edges, so the strip scrolls
+   * corner to corner rather than sitting in a 16px trough. The vertical
+   * spacing belongs to `.drawer-body > .drawer-tabs` below, which keeps a
+   * little air above the bar while it is still in flow; once pinned, the
+   * negative `top` above is what holds it flush.
    */
-  margin: calc(-1 * var(--s4)) calc(-1 * var(--s4)) 0;
+  margin: 0 calc(-1 * var(--s4));
   padding: var(--s3) var(--s4);
   border-bottom: 1px solid var(--border);
 }
@@ -3951,7 +3955,7 @@ button.fact:hover .fact-label { color: var(--accent); }
   border-color: var(--accent);
   color: var(--accent);
 }
-/* Tight to the section above; the body's sibling rhythm resumes after. */
+/* Tight to the section above while in flow; pinning takes over from there. */
 .drawer-body > .drawer-tabs { margin-top: var(--s3); }
 
 /* When it was listed and when it last moved — the staleness answer. */

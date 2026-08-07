@@ -472,6 +472,15 @@ textarea {
 }
 
 /*
+ * A phone has no frame to be ink. The mobile block further down already
+ * flattens the shell to the page, and this keeps the ink from flashing
+ * behind it during load, before that block's own background applies.
+ */
+@media (max-width: 860px) {
+  .shell { background: var(--bg); }
+}
+
+/*
  * The rail is ink, and re-themes itself by redefining the tokens rather than
  * restyling its children.
  *
@@ -485,21 +494,30 @@ textarea {
  * with a line between them. Ink is what the brand already uses for the hero
  * and the sign-in panel, so the app now opens looking like the site that sold
  * it: chrome is the brand, content is paper.
+ *
+ * Bounded to desktop, and that boundary is load-bearing: below 861px this
+ * same element stops being a rail and becomes the bottom tab bar, sitting on
+ * the bone page rather than on ink. Left unbounded, the overrides went with
+ * it — the bar's `background: var(--surface)` resolved to a 6% tint and its
+ * labels to near-white, so the only navigation a phone has turned invisible
+ * while still registering taps.
  */
-.sidebar {
-  color: #f4f2ea;
-  --text: #f4f2ea;
-  --text-muted: rgba(244, 242, 234, 0.6);
-  --border: rgba(244, 242, 234, 0.16);
-  --border-strong: rgba(244, 242, 234, 0.3);
-  --surface: rgba(244, 242, 234, 0.06);
-  --surface-2: rgba(244, 242, 234, 0.12);
-  --accent: #f4f2ea;
-  --accent-soft: rgba(244, 242, 234, 0.14);
-  --on-accent: #14141a;
-  --shadow: none;
-  /* The mark's unlit lines, against ink. */
-  --logo-dim: #f4f2ea;
+@media (min-width: 861px) {
+  .sidebar {
+    color: #f4f2ea;
+    --text: #f4f2ea;
+    --text-muted: rgba(244, 242, 234, 0.6);
+    --border: rgba(244, 242, 234, 0.16);
+    --border-strong: rgba(244, 242, 234, 0.3);
+    --surface: rgba(244, 242, 234, 0.06);
+    --surface-2: rgba(244, 242, 234, 0.12);
+    --accent: #f4f2ea;
+    --accent-soft: rgba(244, 242, 234, 0.14);
+    --on-accent: #14141a;
+    --shadow: none;
+    /* The mark's unlit lines, against ink. */
+    --logo-dim: #f4f2ea;
+  }
 }
 
 .sidebar {
