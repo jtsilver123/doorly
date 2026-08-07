@@ -518,6 +518,22 @@ textarea {
     /* The mark's unlit lines, against ink. */
     --logo-dim: #f4f2ea;
   }
+
+  /*
+   * Floating panels opt out of the rail's translucency.
+   *
+   * The token override above makes `--surface` a 6% tint, which is right for
+   * rows that sit ON the rail and catastrophic for a menu that floats OVER
+   * it: the account popover painted itself with the tint and everything
+   * behind — the refresh meter, the feedback row — read straight through the
+   * menu items. A layer that covers content has to be opaque, whatever the
+   * tokens say.
+   */
+  .sidebar .accountmenu {
+    background: #202027;
+    border-color: rgba(244, 242, 234, 0.18);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  }
 }
 
 .sidebar {
