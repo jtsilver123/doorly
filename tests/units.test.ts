@@ -50,6 +50,7 @@ import { applyFilters } from "@/lib/filters";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { withinAreas, nearAreas } from "@/lib/geo";
 import { train } from "@/lib/rank";
+import { safeNext } from "@/lib/nextPath";
 import type { Listing } from "@/types";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
 import { hpdAddress } from "@/lib/nycdata";
@@ -1905,4 +1906,31 @@ test("a pass with no reason still counts against the whole listing", () => {
   ]);
   assert.equal(model.passes, 1);
   assert.ok(model.weights["hood:Bushwick"] < 0);
+});
+
+// --- where an emailed link may send you ------------------------------------
+
+test("a next parameter can only point back at this site", () => {
+  // The whole attack: our domain in the mail, someone else's on arrival.
+  for (const hostile of [
+    "//evil.example.com",
+    "///evil.example.com",
+    "https://evil.example.com",
+    "http://evil.example.com/x",
+    "/\\evil.example.com",
+    "javascript:alert(1)",
+    "evil.example.com",
+  ]) {
+    assert.equal(safeNext(hostile), "/", `${hostile} must not survive`);
+  }
+});
+
+test("ordinary destinations pass through untouched", () => {
+  assert.equal(safeNext("/reset"), "/reset");
+  assert.equal(safeNext("/app#feed"), "/app#feed");
+  assert.equal(safeNext("/join/abc?x=1"), "/join/abc?x=1");
+  // Missing or empty falls back, and the fallback is the caller's to choose.
+  assert.equal(safeNext(null), "/");
+  assert.equal(safeNext(undefined, "/app"), "/app");
+  assert.equal(safeNext("", "/app"), "/app");
 });

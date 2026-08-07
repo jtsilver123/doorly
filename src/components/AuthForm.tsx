@@ -203,7 +203,16 @@ export default function AuthForm({
           </label>
 
           <label className="auth-field">
-            <span>Password</span>
+            <span className="auth-field-row">
+              Password
+              {/* Only on sign-in: offering a reset next to "choose a password"
+                  on the signup form is a question nobody has yet. */}
+              {!signup && (
+                <Link className="auth-forgot" href="/forgot" tabIndex={-1}>
+                  Forgot it?
+                </Link>
+              )}
+            </span>
             <input
               className="field"
               name="password"

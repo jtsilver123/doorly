@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { cookieDomainFor, originsFor } from "@/lib/hosts";
+import { safeNext } from "@/lib/nextPath";
 
 /**
  * OAuth landing.
@@ -16,6 +17,14 @@ import { cookieDomainFor, originsFor } from "@/lib/hosts";
  */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
+  /*
+   * Where to go once the code is spent. A password-reset link points here with
+   * `next=/reset`; everything else lands on the board. Only same-site paths are
+   * honoured, so a crafted link can't turn our own callback into an open
+   * redirect to somebody else's site.
+   */
+  const requested = request.nextUrl.searchParams.get("next");
+  const next = requested ? safeNext(requested, "") || null : null;
 
   if (code) {
     const supabase = await supabaseServer();
@@ -28,15 +37,32 @@ export async function GET(request: NextRequest) {
        * its own. The session cookie is domain-scoped, so it comes along.
        */
       const host = request.headers.get("host");
-      const base = originsFor(host)?.app ?? request.url;
-      const to = NextResponse.redirect(new URL(invite ? `/join/${invite}` : "/app", base));
+      const origins = originsFor(host);
+      /*
+       * A reset has to finish on the marketing host, because that is where the
+       * form lives and where the session cookie was just written. Everything
+       * else belongs on the app host.
+       */
+      const base = next
+        ? (origins?.marketing ?? request.url)
+        : (origins?.app ?? request.url);
+      const to = NextResponse.redirect(
+        new URL(next ?? (invite ? `/join/${invite}` : "/app"), base)
+      );
       // Set with a domain, so it only clears when deleted with the same one.
       if (invite) to.cookies.set("pending_invite", "", { domain: cookieDomainFor(host), path: "/", maxAge: 0 });
       return to;
     }
   }
 
-  const to = new URL("/login", request.url);
-  to.searchParams.set("error", "Google sign-in didn't complete — try again.");
+  // This route lands both the Google round trip and the password-reset link,
+  // so the failure has to name neither.
+  const to = new URL(next === "/reset" ? "/reset" : "/login", request.url);
+  to.searchParams.set(
+    "error",
+    next === "/reset"
+      ? "That reset link has expired or was already used. Ask for a new one."
+      : "That sign-in link didn't complete. Try again."
+  );
   return NextResponse.redirect(to);
 }

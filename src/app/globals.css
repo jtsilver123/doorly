@@ -1892,6 +1892,19 @@ kbd {
 .auth-field > span { font-size: var(--t-md); font-weight: 600; }
 .auth-field .field { height: 46px; font-size: var(--t-lg); }
 
+/* "Forgot it?" sits on the label's own line, right-aligned against the field
+   it belongs to, rather than below the input where it reads as a second
+   action competing with the submit button. */
+.auth-field-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+.auth-forgot {
+  font-size: var(--t-sm);
+  font-weight: 550;
+  color: var(--text-muted);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+.auth-forgot:hover { color: var(--text); text-decoration: underline; }
+
 .auth-submit { height: 48px; font-size: var(--t-lg); font-weight: 650; }
 
 .auth-error {

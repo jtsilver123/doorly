@@ -144,7 +144,19 @@ export async function middleware(request: NextRequest) {
   signedIn = Boolean(user);
 
   const isAuthRoute =
-    path.startsWith("/login") || path.startsWith("/signup") || path.startsWith("/auth");
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/forgot") ||
+    path.startsWith("/reset");
+  /*
+   * Setting a new password is the one auth screen a signed-in person is
+   * allowed to sit on. A recovery link signs you in *before* it shows you the
+   * form, so the usual "you're logged in, go to the app" bounce would throw
+   * you off the page you were sent to — and it doubles as change-your-password
+   * for anyone already in.
+   */
+  const isPasswordSet = path.startsWith("/reset");
   const isWelcome = path.startsWith("/welcome");
   // Invite links arrive from group chats, signed out more often than not.
   const isJoin = path.startsWith("/join/");
@@ -218,7 +230,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Just signed in: straight into the app, on the app's own host.
-  if (user && isAuthRoute && !path.startsWith("/auth")) {
+  if (user && isAuthRoute && !path.startsWith("/auth") && !isPasswordSet) {
     const to = origins ? new URL("/app", origins.app) : request.nextUrl.clone();
     if (!origins) to.pathname = "/app";
     return finish(NextResponse.redirect(to));

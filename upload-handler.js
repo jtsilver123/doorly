@@ -76,6 +76,115 @@ const json = (body, status = 200) =>
     headers: { "content-type": "application/json" },
   });
 
+/** Resolve the session cookie to a verified user id, or null. */
+async function verifiedUser(request, env) {
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anonKey) return null;
+  const token = accessTokenFrom(request.headers.get("cookie"), supabaseUrl);
+  if (!token) return null;
+  const who = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: anonKey, authorization: `Bearer ${token}` },
+  });
+  if (!who.ok) return null;
+  const id = (await who.json()).id;
+  return id ? { id, token } : null;
+}
+
+/**
+ * Handles `GET /api/media/<key>`. Returns null for anything else.
+ *
+ * Here for the same reason the upload is: the video was uploading fine and
+ * then dying on playback with "Worker exceeded CPU time limit". Streaming a
+ * 60MB file through Next means every chunk crosses the JS boundary twice, and
+ * a phone's video element opens several parallel range requests per clip —
+ * multiplied together they blew the CPU budget, which a user reads as "my
+ * upload failed" because the tile they just uploaded never appears.
+ *
+ * At the front door the bytes go from R2 to the socket natively, and Range is
+ * honoured for real: R2 reads only the requested slice, and the 206 that
+ * Safari's scrubber depends on actually comes back as one.
+ *
+ * Authorization is the same shape as everywhere else: the metadata row is
+ * fetched through PostgREST *as the viewer*, so row-level security decides
+ * whether this is their file or their crew-mate's. No row, no bytes.
+ */
+export async function handleMediaGet(request, env) {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/media/") || request.method !== "GET") return null;
+
+  try {
+    const key = url.pathname
+      .slice("/api/media/".length)
+      .split("/")
+      .map((part) => decodeURIComponent(part))
+      .join("/");
+    if (!key || key.includes("..")) return json({ error: "bad path" }, 400);
+
+    const user = await verifiedUser(request, env);
+    if (!user) return json({ error: "not signed in" }, 401);
+
+    // RLS does the deciding: own rows and crew rows are visible, and a 404
+    // deliberately looks the same whether the file is missing or not theirs.
+    const row = await fetch(
+      `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/user_listing_media?path=eq.${encodeURIComponent(key)}&select=id&limit=1`,
+      {
+        headers: {
+          apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+    if (!row.ok || (await row.json()).length === 0) {
+      return json({ error: "not found" }, 404);
+    }
+
+    /*
+     * Range, parsed the way media elements actually send it: "bytes=0-1" to
+     * probe, "bytes=N-" to resume, "bytes=-N" for the tail. Serving 200-full
+     * to a range probe is what makes Safari refuse to scrub.
+     */
+    const rangeHeader = request.headers.get("range");
+    let range;
+    if (rangeHeader) {
+      const m = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+      if (m && (m[1] !== "" || m[2] !== "")) {
+        if (m[1] === "") range = { suffix: Number(m[2]) };
+        else if (m[2] === "") range = { offset: Number(m[1]) };
+        else range = { offset: Number(m[1]), length: Number(m[2]) - Number(m[1]) + 1 };
+      }
+    }
+
+    const object = await env.MEDIA.get(key, range ? { range } : undefined);
+    if (!object) return json({ error: "not found" }, 404);
+
+    const total = object.size;
+    const headers = new Headers({
+      "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
+      "accept-ranges": "bytes",
+      "cache-control": "private, max-age=3600",
+      etag: object.httpEtag ?? "",
+    });
+
+    if (range) {
+      const offset =
+        "suffix" in range ? Math.max(0, total - range.suffix) : range.offset;
+      const length =
+        "suffix" in range
+          ? Math.min(range.suffix, total)
+          : Math.min(range.length ?? total - offset, total - offset);
+      headers.set("content-range", `bytes ${offset}-${offset + length - 1}/${total}`);
+      headers.set("content-length", String(length));
+      return new Response(object.body, { status: 206, headers });
+    }
+
+    headers.set("content-length", String(total));
+    return new Response(object.body, { status: 200, headers });
+  } catch (err) {
+    return json({ error: err instanceof Error ? err.message : "read failed" }, 500);
+  }
+}
+
 /**
  * Handles `POST /api/upload`. Returns null for anything else, so the caller
  * falls through to the app untouched.
@@ -91,17 +200,12 @@ export async function handleUpload(request, env) {
       return json({ error: "uploads are not configured" }, 500);
     }
 
-    const token = accessTokenFrom(request.headers.get("cookie"), supabaseUrl);
-    if (!token) return json({ error: "not signed in" }, 401);
-
     // Verified against Supabase rather than merely decoded: an expired or
     // forged token has to fail here, not at the database.
-    const who = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { apikey: anonKey, authorization: `Bearer ${token}` },
-    });
-    if (!who.ok) return json({ error: "session expired — reload and try again" }, 401);
-    const userId = (await who.json()).id;
-    if (!userId) return json({ error: "not signed in" }, 401);
+    const user = await verifiedUser(request, env);
+    if (!user) return json({ error: "session expired, reload and try again" }, 401);
+    const userId = user.id;
+    const token = user.token;
 
     const listingId = url.searchParams.get("listing");
     const filename = url.searchParams.get("name") || "upload";

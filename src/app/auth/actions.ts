@@ -119,6 +119,80 @@ export async function signUp(_prev: AuthResult, formData: FormData): Promise<Aut
   redirect(await landingPath());
 }
 
+/**
+ * Ask for a reset link.
+ *
+ * The reply is identical whether or not the address has an account, and that
+ * is the whole security of this screen: a form that says "no such user" is a
+ * free tool for working out who is registered. Everything real happens in the
+ * inbox, where only the owner of the address can see it.
+ *
+ * The link lands on the marketing host because that is the origin Supabase is
+ * configured to send people back to, the same constraint the Google callback
+ * lives under.
+ */
+export async function requestReset(
+  _prev: AuthResult,
+  formData: FormData
+): Promise<AuthResult> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter the email you signed up with." };
+
+  const origins = originsFor((await headers()).get("host"));
+  const base = origins ? origins.marketing : "";
+
+  const supabase = await supabaseServer();
+  await supabase.auth.resetPasswordForEmail(email, {
+    // `next` carries the destination through whichever landing route the
+    // email template uses — see auth/callback and auth/confirm, which both
+    // honour it, so either the PKCE or the token-hash template works.
+    redirectTo: `${base}/auth/callback?next=${encodeURIComponent("/reset")}`,
+  });
+
+  // Deliberately not branching on the result. A rate-limit or an unknown
+  // address both end here, saying the same thing.
+  return {
+    message: `If ${email} has an account, a reset link is on its way. It expires in an hour.`,
+  };
+}
+
+/**
+ * Set the new password.
+ *
+ * Reached with a live session: the recovery link signs the user in before it
+ * hands them this form, which is what authorises the change. A signed-in user
+ * who simply wants a new password lands here too, and gets the same path.
+ *
+ * Other sessions are cut afterwards. Someone resetting a password has often
+ * just decided that somebody else might have it, and leaving every other
+ * logged-in device untouched would make the reset mostly ceremonial.
+ */
+export async function updatePassword(
+  _prev: AuthResult,
+  formData: FormData
+): Promise<AuthResult> {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (password.length < 8) return { error: "Use at least 8 characters." };
+  if (password !== confirm) return { error: "Those two don't match." };
+
+  const supabase = await supabaseServer();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    return {
+      error: "That reset link has expired. Ask for a new one and use it within the hour.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+
+  await supabase.auth.signOut({ scope: "others" });
+
+  revalidatePath("/", "layout");
+  redirect(await landingPath());
+}
+
 export async function signOut(): Promise<void> {
   const supabase = await supabaseServer();
   await supabase.auth.signOut();

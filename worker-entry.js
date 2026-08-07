@@ -26,7 +26,7 @@
  * from the entry point, and OpenNext's caching machinery declares them.
  */
 import worker from "./.open-next/worker.js";
-import { handleUpload } from "./upload-handler.js";
+import { handleUpload, handleMediaGet } from "./upload-handler.js";
 
 export {
   DOQueueHandler,
@@ -36,7 +36,12 @@ export {
 
 export default {
   async fetch(request, env, ctx) {
-    const handled = await handleUpload(request, env);
+    // Uploads and media reads both move bulk bytes, and both are answered
+    // here — before Next — where the body is still the runtime's own stream.
+    // See upload-handler.js for why that matters twice over. DELETE falls
+    // through to the app, where the row-then-object dance lives.
+    const handled =
+      (await handleUpload(request, env)) ?? (await handleMediaGet(request, env));
     return handled ?? worker.fetch(request, env, ctx);
   },
 
