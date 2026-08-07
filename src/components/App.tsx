@@ -1355,46 +1355,6 @@ export default function Home() {
           </button>
         )}
 
-        {/* The triage keys, listed where your eyes rest between cards. Shown
-            only on Listings, the one page they drive; the phone rail is a tab
-            bar and never renders this. */}
-        {tab === "feed" && (
-          <div className="keys" aria-label="Keyboard shortcuts">
-            <span className="keys-title">Keyboard</span>
-            <dl className="keys-grid">
-              <dt>
-                <kbd>J</kbd>
-                <kbd>K</kbd>
-              </dt>
-              <dd>next, previous</dd>
-              <dt>
-                <kbd>↵</kbd>
-              </dt>
-              <dd>open the place</dd>
-              <dt>
-                <kbd>⇧</kbd>
-                <kbd>↵</kbd>
-              </dt>
-              <dd>open it + its site</dd>
-              <dt>
-                <kbd>O</kbd>
-              </dt>
-              <dd>the listing site</dd>
-              <dt>
-                <kbd>E</kbd>
-              </dt>
-              <dd>reach out</dd>
-              <dt>
-                <kbd>S</kbd>
-              </dt>
-              <dd>save</dd>
-              <dt>
-                <kbd>X</kbd>
-              </dt>
-              <dd>pass</dd>
-            </dl>
-          </div>
-        )}
 
         {/*
           Checking for listings and the budget that check spends are one
@@ -1628,12 +1588,13 @@ export default function Home() {
               trailing={
                 !loading ? (
                   <button
-                    className={activityOpen ? "pill is-on" : "pill"}
+                    className={activityOpen ? "pill activity-pill is-on" : "pill activity-pill"}
                     aria-expanded={activityOpen}
                     onClick={() => setActivityOpen((v) => !v)}
                   >
-                    <Icon name="bell" size={13} />
-                    Activity{unread > 0 ? ` (${unread})` : ""}
+                    <Icon name="bell" size={14} />
+                    Activity
+                    {unread > 0 && <span className="chip">{unread}</span>}
                   </button>
                 ) : null
               }

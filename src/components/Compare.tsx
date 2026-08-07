@@ -186,7 +186,16 @@ function HeaderPhotos({ listing, siteUrl }: { listing: FeedListing; siteUrl: str
     : listing.imageUrl
       ? [listing.imageUrl]
       : [];
-  if (!photos.length) return null;
+  // No photos still holds the slot: a missing box shortened one column and
+  // knocked its stage select, price and every row below out of line with
+  // its neighbours.
+  if (!photos.length) {
+    return (
+      <div className="compare-photo is-empty" aria-hidden="true">
+        <span>No photo</span>
+      </div>
+    );
+  }
   return (
     <>
       <button
