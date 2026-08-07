@@ -46,7 +46,7 @@ import {
   subwayLabel,
   walkMinutes,
 } from "../src/lib/subway.ts";
-import { applyFilters, findPasted } from "@/lib/filters";
+import { applyFilters, findPasted, addressFromListingUrl } from "@/lib/filters";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { withinAreas, nearAreas } from "@/lib/geo";
 import { train } from "@/lib/rank";
@@ -1448,6 +1448,37 @@ test("a site's front page is not a listing and matches nothing", () => {
   const list = [feed({ id: "a", url: "https://streeteasy.com/" })];
   assert.equal(findPasted(list, "https://streeteasy.com/"), undefined);
   assert.equal(findPasted(list, "https://streeteasy.com/for-rent"), undefined);
+});
+
+test("a link to an untracked copy still finds the same apartment from another site", () => {
+  // Tracked from Zillow only; the paste is the StreetEasy tab. The slug
+  // spells the address, and that has to be enough.
+  const list = [
+    feed({ id: "z3a", address: "239 E 10th St APT 3A", unit: "3A", url: "https://www.zillow.com/homedetails/112086548_zpid/" }),
+  ];
+  assert.equal(
+    findPasted(list, "https://streeteasy.com/building/239-east-10-street-new_york/3a?from_map=1&lstt=junk")?.id,
+    "z3a"
+  );
+  // And the other direction: a Zillow link against a StreetEasy-tracked row.
+  const se = [
+    feed({ id: "se", address: "239 East 10th Street", unit: "3A", url: "https://streeteasy.com/building/239-east-10-street-new_york/3a" }),
+  ];
+  assert.equal(
+    findPasted(se, "https://www.zillow.com/homedetails/239-E-10th-St-APT-3A-New-York-NY-10003/112086548_zpid/")?.id,
+    "se"
+  );
+});
+
+test("slug fallback reads the address, not the ids and city suffixes", () => {
+  assert.equal(
+    addressFromListingUrl("https://streeteasy.com/building/239-east-10-street-new_york/3a"),
+    "239 east 10 street 3a"
+  );
+  assert.equal(
+    addressFromListingUrl("https://www.zillow.com/homedetails/239-E-10th-St-APT-3A-New-York-NY-10003/112086548_zpid/"),
+    "239 e 10th st apt 3a"
+  );
 });
 
 test("non-URL pastes fall through to the address search", () => {

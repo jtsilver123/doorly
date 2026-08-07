@@ -216,13 +216,60 @@ export function applyFilters(
   return filters.limit ? result.slice(0, filters.limit) : result;
 }
 
+/*
+ * Words in a listing URL that aren't the address: the sites' own path
+ * furniture and the city/borough suffixes their slugs carry. "no" is not in
+ * here even though "no-fee" appears in slugs, because "No." starts real unit
+ * designators.
+ */
+const SLUG_NOISE = new Set([
+  "building", "buildings", "rental", "rentals", "homedetails", "homes",
+  "home", "apartments", "apartment", "listing", "listings", "for", "rent",
+  "sale", "b", "new", "york", "ny", "nyc", "brooklyn", "manhattan",
+  "queens", "bronx", "staten", "island", "jersey", "city",
+]);
+
+/**
+ * Read an address back out of a listing URL's path.
+ *
+ * Both StreetEasy and Zillow spell the address into the slug:
+ * "/building/239-east-10-street-new_york/3a" and
+ * "/homedetails/239-E-10th-St-APT-3A-New-York-NY-10003/112086548_zpid/".
+ * Dashes and underscores become spaces, site furniture and city suffixes are
+ * dropped, and numeric ids (5+ digits, or anything_zpid) go — while short
+ * numeric segments stay, because on StreetEasy the unit is its own segment.
+ */
+export function addressFromListingUrl(url: string): string {
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(url).pathname).toLowerCase();
+  } catch {
+    return "";
+  }
+  const words: string[] = [];
+  for (const seg of path.split("/").filter(Boolean)) {
+    if (/^\d+_zpid$/.test(seg) || /^\d{5,}$/.test(seg)) continue;
+    for (const w of seg.split(/[-_]+/).filter(Boolean)) {
+      if (SLUG_NOISE.has(w)) continue;
+      if (/^\d{5,}$/.test(w)) continue; // zips and ids, never house numbers
+      words.push(w);
+    }
+  }
+  return words.join(" ");
+}
+
 /**
  * Quick-add's matcher: an address, a scrap of one, or a whole pasted link.
  *
  * People paste what they have. A text from a friend has an address; a
- * StreetEasy tab has a URL. Links are matched by pathname, because that part
- * is the listing's identity on every source we watch, while the query string
- * carries per-person tracking junk that would defeat an exact compare.
+ * StreetEasy tab has a URL. Links are matched by pathname first, because that
+ * part is the listing's identity on every source we watch, while the query
+ * string carries per-person tracking junk that would defeat an exact compare.
+ *
+ * When no tracked URL matches, the slug's own address is the fallback. The
+ * same apartment is usually listed on several sites, and the one being pasted
+ * is not always the one the poll happened to pull — a StreetEasy link has to
+ * find the Zillow copy of the same place.
  *
  * URL matches ignore stage on purpose. Pasting a link to a place you passed
  * on is deliberate in a way typing an address isn't, so it should find the
@@ -249,9 +296,13 @@ export function findPasted(
         return false;
       }
     };
-    return listings.find(
+    const byUrl = listings.find(
       (l) => matches(l.url) || l.alsoOn.some((s) => matches(s.url))
     );
+    if (byUrl) return byUrl;
+    const address = addressFromListingUrl(q);
+    if (!address) return undefined;
+    return applyFilters(listings, { stage: "all", search: address })[0];
   }
   return applyFilters(listings, { stage: "all", search: q })[0];
 }

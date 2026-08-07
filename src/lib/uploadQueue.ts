@@ -113,14 +113,17 @@ const MAX_BYTES = 200 * 1024 * 1024;
 
 /*
  * The edge accepts at most 100MB per request, measured empirically: a 105MB
- * probe got a raw 413 with the Worker never invoked. Whole files go up in one
- * request below the threshold; above it the file is sliced into parts that
- * clear the cap with room, and R2 reassembles them server-side. 32MB keeps a
- * part cheap to retry and small enough that the server's buffering fallback
- * can never threaten an isolate.
+ * probe got a raw 413 with the Worker never invoked. But the binding numbers
+ * are tighter than the edge's: the Worker accrues CPU per byte it relays, and
+ * production logs showed minute-long transfers on phone connections being
+ * killed with exceededCpu partway through. Small parts keep every single
+ * request short enough to stay inside that budget, cheap to retry when a
+ * radio drops, and small enough that the server's buffering fallback can
+ * never threaten an isolate. Only files that fit in one small request skip
+ * the multipart dance entirely.
  */
-const SINGLE_SHOT_BYTES = 90 * 1024 * 1024;
-const PART_BYTES = 32 * 1024 * 1024;
+const SINGLE_SHOT_BYTES = 24 * 1024 * 1024;
+const PART_BYTES = 16 * 1024 * 1024;
 
 /**
  * How many times one chunk gets to fail before the file does.
@@ -134,10 +137,50 @@ const TRIES = 3;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/*
+ * Some phone pickers hand over files with an empty MIME type — an iPhone
+ * .MOV arriving as type "" was silently skipped by the image-or-video gate,
+ * which reads to the person as "I selected my videos and nothing happened".
+ * The extension is the fallback identity, and it also becomes the stored
+ * content-type so playback gets a real one instead of octet-stream.
+ */
+const EXT_TYPES: Record<string, string> = {
+  mov: "video/quicktime",
+  mp4: "video/mp4",
+  m4v: "video/x-m4v",
+  webm: "video/webm",
+  "3gp": "video/3gpp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+  avif: "image/avif",
+};
+
+function sniffType(file: File): string {
+  if (file.type) return file.type;
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return EXT_TYPES[ext] ?? "";
+}
+
 /** 5xx and dropped connections are worth another go; 4xx never is. */
 function worthRetrying(res: { status: number } | null): boolean {
   return res === null || res.status >= 500 || res.status === 429;
 }
+
+/*
+ * How long a request may sit with zero progress before it's declared dead.
+ *
+ * Not a total timeout — a big part on hotel wifi legitimately takes minutes,
+ * and killing it for being slow would be self-harm. What's being caught is
+ * the stall: a phone that walked out of coverage keeps the socket open
+ * without moving a byte, and without this the bar froze at 40% forever with
+ * no error and no retry.
+ */
+const STALL_MS = 75 * 1000;
 
 /** One request with a raw body, reporting progress as it drains. */
 function send(
@@ -148,15 +191,34 @@ function send(
 ): Promise<{ status: number; text: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    let stalled = false;
+    let watchdog: ReturnType<typeof setTimeout>;
+    const rearm = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        stalled = true;
+        xhr.abort();
+      }, STALL_MS);
+    };
+    const settle = <T,>(fn: (v: T) => void) => (v: T) => {
+      clearTimeout(watchdog);
+      fn(v);
+    };
     xhr.open("POST", url);
     xhr.setRequestHeader("content-type", contentType);
     xhr.upload.onprogress = (e) => {
+      rearm();
       if (e.lengthComputable) onProgress(e.loaded / e.total);
     };
-    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
-    xhr.onerror = () => reject(new Error("connection dropped — try again"));
-    xhr.onabort = () => reject(new Error("upload cancelled"));
+    xhr.onload = settle(() => resolve({ status: xhr.status, text: xhr.responseText }));
+    xhr.onerror = settle(() => reject(new Error("connection dropped. Try again")));
+    // A stall wears the same abort event as a user cancel; the flag is what
+    // routes one to the retry loop and the other out of it.
+    xhr.onabort = settle(() =>
+      reject(new Error(stalled ? "connection stalled" : "upload cancelled"))
+    );
     current = xhr;
+    rearm();
     xhr.send(body);
   });
 }
@@ -177,10 +239,10 @@ let current: XMLHttpRequest | null = null;
 async function doUpload(job: UploadJob): Promise<void> {
   if (job.file.size > MAX_BYTES) {
     throw new Error(
-      `too big (${Math.round(job.file.size / 1048576)}MB) — 200MB is the ceiling`
+      `too big (${Math.round(job.file.size / 1048576)}MB). 200MB is the ceiling`
     );
   }
-  const type = job.file.type || "application/octet-stream";
+  const type = sniffType(job.file) || "application/octet-stream";
   const track = (fraction: number) => {
     /*
      * Held just shy of 1. The last bytes leaving the browser is not the same
@@ -247,6 +309,11 @@ async function doUpload(job: UploadJob): Promise<void> {
       );
       parts.push(JSON.parse(res!.text));
     }
+    // A cancel that lands between the last part and assembly: the XHR is
+    // already gone, so the only trace is the job's absence from the queue.
+    // Without this check the file completed anyway and reappeared, uploaded,
+    // on a listing the person had explicitly told it to stop for.
+    if (!jobs.some((j) => j.id === job.id)) throw new Error("upload cancelled");
     const done = await fetch(`/api/upload?action=complete`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -319,12 +386,13 @@ export function enqueueUploads(listingId: string, files: File[] | FileList): voi
   // A fresh run restarts the count; files added to a run in progress extend it.
   if (!running) batchTotal = 0;
   for (const file of [...files]) {
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue;
+    const type = sniffType(file);
+    if (!type.startsWith("image/") && !type.startsWith("video/")) continue;
     jobs.push({
       id: ++seq,
       listingId,
       name: file.name,
-      kind: file.type.startsWith("video/") ? "video" : "photo",
+      kind: type.startsWith("video/") ? "video" : "photo",
       state: "queued",
       progress: 0,
       bytes: file.size,

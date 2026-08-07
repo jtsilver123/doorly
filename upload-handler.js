@@ -143,19 +143,45 @@ export async function handleMediaGet(request, env) {
      * Range, parsed the way media elements actually send it: "bytes=0-1" to
      * probe, "bytes=N-" to resume, "bytes=-N" for the tail. Serving 200-full
      * to a range probe is what makes Safari refuse to scrub.
+     *
+     * Every ranged read is clamped to an 8MB window, whatever was asked for.
+     * Chrome opens "bytes=0-" and holds that one response for the entire
+     * playback, which on a phone connection means minutes of wall time — and
+     * streaming accrues CPU per byte pumped, which is what was killing long
+     * plays with exceededCpu partway through a clip. A short 206 is the
+     * standard answer: the player reads the content-range, sees there's more,
+     * and asks for the next window, so a two-minute stream becomes a handful
+     * of invocations that each stay comfortably inside the budget.
      */
+    const WINDOW = 8 * 1024 * 1024;
     const rangeHeader = request.headers.get("range");
     let range;
     if (rangeHeader) {
       const m = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
       if (m && (m[1] !== "" || m[2] !== "")) {
-        if (m[1] === "") range = { suffix: Number(m[2]) };
-        else if (m[2] === "") range = { offset: Number(m[1]) };
-        else range = { offset: Number(m[1]), length: Number(m[2]) - Number(m[1]) + 1 };
+        if (m[1] === "") range = { suffix: Math.min(Number(m[2]), WINDOW) };
+        else if (m[2] === "") range = { offset: Number(m[1]), length: WINDOW };
+        else
+          range = {
+            offset: Number(m[1]),
+            length: Math.min(Number(m[2]) - Number(m[1]) + 1, WINDOW),
+          };
       }
     }
 
-    const object = await env.MEDIA.get(key, range ? { range } : undefined);
+    let object;
+    try {
+      object = await env.MEDIA.get(key, range ? { range } : undefined);
+    } catch (err) {
+      // The clamp can push a window past the end of the file ("bytes=N-" near
+      // the tail becomes offset N, length 8MB). If R2 rejects that instead of
+      // clamping, ask again open-ended — by definition under 8MB remains.
+      if (range && "length" in range) {
+        object = await env.MEDIA.get(key, { range: { offset: range.offset } });
+        if (object) range = { offset: range.offset };
+      }
+      if (!object) throw err;
+    }
     if (!object) return json({ error: "not found" }, 404);
 
     const total = object.size;
@@ -176,6 +202,26 @@ export async function handleMediaGet(request, env) {
       headers.set("content-range", `bytes ${offset}-${offset + length - 1}/${total}`);
       headers.set("content-length", String(length));
       return new Response(object.body, { status: 206, headers });
+    }
+
+    /*
+     * No Range header and a big file: hand back the first window as a 206
+     * anyway. Technically a bent rule — 206 answers a Range request — but the
+     * only no-range readers of a 100MB+ object are a navigation straight to
+     * the file or a bulk download, both of which either recover via ranges or
+     * were going to die mid-stream with the Worker anyway. Photos and small
+     * clips, which is everything an <img> tag asks for, still get their
+     * ordinary 200.
+     */
+    if (total > 4 * WINDOW) {
+      const first = await env.MEDIA.get(key, { range: { offset: 0, length: WINDOW } });
+      if (first) {
+        // The full-body read above never gets consumed on this path.
+        try { object.body?.cancel(); } catch { /* already closed */ }
+        headers.set("content-range", `bytes 0-${WINDOW - 1}/${total}`);
+        headers.set("content-length", String(WINDOW));
+        return new Response(first.body, { status: 206, headers });
+      }
     }
 
     headers.set("content-length", String(total));
