@@ -412,7 +412,7 @@ test("the message greets the agent by first name when you know it", () => {
     feed({ myContactName: "Jane at Corcoran" }),
     DEFAULT_PROFILE
   );
-  assert.match(message, /^Hi Jane!/);
+  assert.match(message, /^Hi Jane,/);
 });
 
 test("an empty profile still produces a sendable message", () => {
@@ -1832,7 +1832,7 @@ test("the follow-up greets the agent by name when we have one", () => {
     { ...DEFAULT_PROFILE, name: "Jake Silver" }
   );
   assert.match(named, /^Hi Jane —/);
-  assert.match(named, /This is Jake\./);
+  assert.match(named, /Jake again/);
 });
 
 // --- the delist circuit breaker --------------------------------------------

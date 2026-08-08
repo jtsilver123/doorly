@@ -210,15 +210,22 @@ export function renderTemplate(
  * The built-in drafts, spelled as templates. "Start from the default" hands
  * these to the editor so customizing is an edit, never a blank page.
  */
+/*
+ * The voice rule for every default: written the way a person texts, not the
+ * way software writes. Lead with the question, say who you are in one
+ * clause, one concrete ask, done. No "I came across", no "it looks great",
+ * no "when you get a minute" — a broker reads fifty of these a day, and the
+ * ones that get answered are the ones that are easy to answer.
+ */
 export const DEFAULT_TEMPLATES = {
   first:
-    "Hi {agent}! I'm {my name} — I came across the {beds} at {address} listed at {price} and it looks great.\n\nAny chance you could send a quick video walkthrough when you get a minute? If it looks as good as the photos, I'd love to come tour it right after — I'm flexible on timing.\n\nHoping to move in around {move in}.\n\nThanks so much! You can reach me here or at {my phone}.",
+    "Hi {agent}, is the {beds} at {address} listed at {price} still available? I'm {my name}, looking to move around {move in}.\n\nCould you send a quick video walkthrough? If it holds up I'll come tour right after.\n\nThanks! You can reach me here or at {my phone}.",
   followUp:
-    "Hi {agent} — following up on {address}. This is {my name}. Is it still available? Happy to come see it whenever suits you.",
+    "Hi {agent} — {my name} again, about {address}. Still available? I can come see it whenever works.",
   repeat:
-    "Hi {agent}! It's {my name} — we spoke about {previous address} recently. I also came across the {beds} at {address} listed at {price} and it looks great. Could I come see this one too? I'm flexible on timing.\n\nThanks so much! You can reach me here or at {my phone}.",
+    "Hi {agent}, it's {my name} — we talked about {previous address}. Is the {beds} at {address} listed at {price} available too? Happy to see both in one trip if that's easier.\n\nThanks! You can reach me here or at {my phone}.",
   sale:
-    "Hi {agent}! I'm {my name} — I saw {address} is on the market at {asking price}. I'm not a buyer, but I'd love to live there: would the owner consider renting it out instead, or while it sells? I could offer around {price}/mo on a 12-month lease.\n\nI can move fast — documents ready, flexible on the start date, hoping to be in around {move in}.\n\nWorth a conversation? You can reach me here or at {my phone}.",
+    "Hi {agent}, I'm {my name}. I saw {address} is on the market at {asking price}. Different idea: would the owner rent it instead of selling, or while it sells? I'd sign a 12-month lease at around {price}/mo.\n\nDocuments ready, flexible on the start date. I could be in by {move in}. Worth putting to them? You can reach me here or at {my phone}.",
 } as const;
 
 export function draftTourMessage(
@@ -238,7 +245,7 @@ export function draftTourMessage(
       listing.price > 0
         ? DEFAULT_TEMPLATES.sale
         : DEFAULT_TEMPLATES.sale.replace(
-            " I could offer around {price}/mo on a 12-month lease.",
+            " I'd sign a 12-month lease at around {price}/mo.",
             " I'd sign a 12-month lease at a fair market rent."
           );
     return renderTemplate(template, listing, profile, prior);
@@ -246,8 +253,7 @@ export function draftTourMessage(
   if (prior && t?.repeat?.trim()) return renderTemplate(t.repeat, listing, profile, prior);
   if (t?.first?.trim()) return renderTemplate(t.first, listing, profile, prior);
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
-  const greeting = agent ? `Hi ${agent}!` : "Hi there!";
-  const me = profile.name ? `I'm ${firstNameOf(profile.name)} —` : "";
+  const greeting = agent ? `Hi ${agent},` : "Hi,";
 
   const unit = listing.unit ? ` #${listing.unit}` : "";
   const size =
@@ -257,41 +263,45 @@ export function draftTourMessage(
         ? `${listing.bedrooms} bed`
         : "place";
   const price = listing.price ? ` listed at $${listing.price.toLocaleString()}` : "";
+  const first = firstNameOf(profile.name || "");
   /*
-   * Third message to the same agent shouldn't read like a stranger's form
-   * letter — brokers remember repeat interest, and saying so out loud is
-   * exactly the leverage the broker-memory panel tells the user to use.
+   * The question leads. A broker triages fifty messages a day, and the one
+   * that opens with what it wants is the one that's easy to answer. Third
+   * message to the same agent says so out loud — brokers remember repeat
+   * interest, and that's exactly the leverage the broker-memory panel
+   * tells the user to use.
    */
-  const intro = prior
-    ? `We spoke about ${prior.address}${prior.unit ? ` #${prior.unit}` : ""} recently. I also came across the ${size} at ${listing.address}${unit}${price} and it looks great.`
-    : `I came across the ${size} at ${listing.address}${unit}${price} and it looks great.`;
-  const opener = [greeting, me, intro].filter(Boolean).join(" ");
+  const opener = prior
+    ? [
+        greeting,
+        first ? `it's ${first} —` : "",
+        `we talked about ${prior.address}${prior.unit ? ` #${prior.unit}` : ""}.`,
+        `Is the ${size} at ${listing.address}${unit}${price} available too?`,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : [
+        greeting,
+        `is the ${size} at ${listing.address}${unit}${price} still available?`,
+        first
+          ? `I'm ${first}${profile.moveInDate ? `, looking to move around ${formatMoveIn(profile.moveInDate)}` : ""}.`
+          : profile.moveInDate
+            ? `Looking to move around ${formatMoveIn(profile.moveInDate)}.`
+            : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
   // The small ask first. A video costs the agent ninety seconds and filters
   // out the places that photograph better than they live — then the tour ask
-  // is already teed up for the ones that survive.
-  const ask =
-    "Any chance you could send a quick video walkthrough when you get a minute? If it looks as good as the photos, I'd love to come tour it right after — I'm flexible on timing.";
-
-  /*
-   * No qualifications in the opener.
-   *
-   * The draft used to lead the second paragraph with income, employment and
-   * the documents on hand. It reads as an application to someone who hasn't
-   * offered you anything yet — and on a first message to a broker the only
-   * question on the table is whether they'll send a video. The packet exists
-   * for the moment that question is settled.
-   */
-  const about = profile.moveInDate
-    ? `Hoping to move in around ${formatMoveIn(profile.moveInDate)}.`
-    : "";
+  // is already teed up for the ones that survive. Qualifications stay out:
+  // income and documents belong to the packet, once there's a yes to apply to.
+  const ask = "Could you send a quick video walkthrough? If it holds up I'll come tour right after.";
 
   const callback = [profile.phone, profile.email].filter(Boolean).join(" / ");
-  const thanks = callback
-    ? `Thanks so much! You can reach me here or at ${callback}.`
-    : "Thanks so much!";
+  const thanks = callback ? `Thanks! You can reach me here or at ${callback}.` : "Thanks!";
 
-  return [opener, ask, about, thanks, profile.extra].filter(Boolean).join("\n\n");
+  return [opener, ask, thanks, profile.extra].filter(Boolean).join("\n\n");
 }
 
 /**
@@ -398,7 +408,10 @@ export function draftFollowUp(
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
   const greeting = agent ? `Hi ${agent} —` : "Hi —";
   const unit = listing.unit ? ` #${listing.unit}` : "";
-  const me = profile.name ? ` This is ${firstNameOf(profile.name)}.` : "";
+  const first = firstNameOf(profile.name || "");
+  // "Jake again" carries both who you are and that you've asked before, in
+  // two words — a nudge should read in one glance.
+  const me = first ? `${first} again,` : "checking back";
   const also = prior
     ? ` (We were also in touch about ${prior.address}${prior.unit ? ` #${prior.unit}` : ""}.)`
     : "";
@@ -406,13 +419,13 @@ export function draftFollowUp(
   // not "is it available" but "what did the owner think".
   if (listing.forSale) {
     return (
-      `${greeting} following up on ${listing.address}${unit}.${me}${also} ` +
-      `Any word from the owner on renting it out? Happy to talk terms whenever suits.`
+      `${greeting} ${me} about ${listing.address}${unit}.${also} ` +
+      `Any word from the owner on renting it out? Happy to talk numbers whenever.`
     );
   }
   return (
-    `${greeting} following up on ${listing.address}${unit}.${me}${also} ` +
-    `Is it still available? Happy to come see it whenever suits you.`
+    `${greeting} ${me} about ${listing.address}${unit}.${also} ` +
+    `Still available? I can come see it whenever works.`
   );
 }
 
