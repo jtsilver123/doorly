@@ -151,6 +151,15 @@ export default function PipelineBoard({
   const inColumnSince = (l: FeedListing) =>
     new Date(l.stageChangedAt ?? l.firstSeenAt).getTime();
 
+  /** The viewing is behind you: past its time, or past its window's end. */
+  const tourOver = (l: FeedListing) =>
+    Boolean(
+      l.tourAt &&
+        new Date(
+          (l.tourKind === "open_house" && l.tourEndsAt) || l.tourAt
+        ).getTime() < Date.now()
+    );
+
   /**
    * Where the card's next-action button should land in the drawer: the
    * control the label names, not just the neighborhood. "Set the time"
@@ -613,8 +622,11 @@ export default function PipelineBoard({
                   {/* Fresh from the viewing: which way are you leaning? A
                       thumb is a note to self, not a decision — the card
                       stays in its column, and only a stage move files it.
-                      Tapping the same thumb again clears it. */}
-                  {(l.stage === "tour" || l.stage === "toured") && (
+                      Tapping the same thumb again clears it. Asking before
+                      the viewing happened would be polling a gut that has
+                      nothing to go on yet, so a booked tour keeps its
+                      thumbs until its time (or its window) has passed. */}
+                  {(l.stage === "toured" || (l.stage === "tour" && tourOver(l))) && (
                     <span className="board-lean">
                       {([
                         [1, "thumbup", "Leaning yes"],
