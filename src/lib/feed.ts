@@ -65,6 +65,8 @@ interface ListingRow {
   last_seen_at: string;
   price_changed_at: string | null;
   relisted_at: string | null;
+  for_sale: boolean | null;
+  sale_price: number | null;
 }
 
 interface StateRow {
@@ -126,6 +128,8 @@ function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
     leaseMonths: row.lease_months ?? 12,
     netEffectiveRent: row.net_effective_rent ?? null,
     availableText: row.available_text ?? "",
+    forSale: row.for_sale ?? false,
+    salePrice: row.sale_price ?? null,
   };
 }
 
@@ -995,6 +999,12 @@ export interface ManualListing {
   contactPhone?: string;
   contactEmail?: string;
   notes?: string;
+  /**
+   * On the market to buy, added to pitch the owner on renting instead.
+   * `price` is then the rent you'd propose; `salePrice` is their ask.
+   */
+  forSale?: boolean;
+  salePrice?: number;
 }
 
 /**
@@ -1055,6 +1065,8 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     monthsFree: 0,
     leaseMonths: 12,
     netEffectiveRent: null,
+    forSale: input.forSale ?? false,
+    salePrice: input.salePrice ?? null,
   };
 
   const { error } = await supabase.from("listings").insert({
@@ -1073,6 +1085,8 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     contact_phone: listing.contactPhone,
     contact_name: listing.contactName,
     contact_email: listing.contactEmail,
+    for_sale: listing.forSale ?? false,
+    sale_price: listing.salePrice ?? null,
     is_active: true,
     first_seen_at: now,
     last_seen_at: now,
@@ -1093,7 +1107,11 @@ export async function addManualListing(input: ManualListing): Promise<string> {
     listing_id: id,
     kind: "new",
     new_value: String(listing.price),
-    detail: src === "facebook" ? "From a Facebook group" : "Added by hand",
+    detail: listing.forSale
+      ? "For sale. The plan is to pitch the owner on renting it"
+      : src === "facebook"
+        ? "From a Facebook group"
+        : "Added by hand",
     occurred_at: now,
   });
 

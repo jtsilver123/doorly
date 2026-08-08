@@ -17,6 +17,7 @@ import {
   STAGES,
   STAGE_LABEL,
 } from "@/types";
+import { compactPrice } from "@/lib/cost";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { amenityFacts, AMENITY_ORDER } from "@/lib/amenities";
@@ -776,9 +777,24 @@ export default function ListingDrawer({
             );
           })()}
 
+          {/* A place you're pitching, not renting yet: say the play out
+              loud, next to both numbers it turns on. */}
+          {listing.forSale && (
+            <div className="sale-plan">
+              <Icon name="star" size={14} />
+              <span>
+                Listed for sale
+                {listing.salePrice ? ` at ${compactPrice(listing.salePrice)}` : ""}.
+                The play here is convincing the owner to rent it to you
+                {listing.price ? ` — your opening offer is ${money(listing.price)}/mo` : ""}.
+                The drafts below make that pitch.
+              </span>
+            </div>
+          )}
+
           <dl className="drawer-facts" data-sec="sec-costs">
             <div>
-              <dt>Rent</dt>
+              <dt>{listing.forSale ? "Your pitch rent" : "Rent"}</dt>
               <dd>{money(listing.price)}<span>/mo</span></dd>
             </div>
             <div>

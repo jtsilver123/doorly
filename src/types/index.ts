@@ -101,6 +101,16 @@ export interface Listing {
   contactEmail: string;
   /** Raw availability string from the source ("2026-09-01", "Immediate"). */
   availableText: string;
+  /**
+   * A place listed for sale, added with the intent of convincing the owner
+   * to rent it instead. `price` on such a listing is the rent you'd
+   * propose, so every rent computation keeps working; the asking price
+   * lives in `salePrice`. Optional so the source adapters, which only ever
+   * see rentals, don't have to say so.
+   */
+  forSale?: boolean;
+  /** What they're asking to sell it for. Null/absent on rentals. */
+  salePrice?: number | null;
   /** Months of free rent offered as a concession. 0 when there's no deal. */
   monthsFree: number;
   /** Lease length the concession is spread over. 12 unless stated. */

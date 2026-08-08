@@ -7,6 +7,7 @@ import { RatingDisc } from "@/components/Rating";
 import { googleCalendarUrl } from "@/lib/calendar";
 import { nextAction } from "@/lib/nextAction";
 import { CONTACT_LABEL } from "@/lib/outreach";
+import { compactPrice } from "@/lib/cost";
 import Icon from "@/components/Icon";
 
 /**
@@ -450,6 +451,11 @@ export default function PipelineBoard({
                     {l.unit ? ` #${l.unit}` : ""}
                   </span>
                   <span className="muted board-where">{l.neighborhood}</span>
+                  {l.forSale && (
+                    <span className="sale-tag">
+                      For sale{l.salePrice ? ` · asks ${compactPrice(l.salePrice)}` : ""}
+                    </span>
+                  )}
                   {crewTag?.(l) && <span className="board-crew">{crewTag(l)}</span>}
 
                   {/* The question each column actually raises. Interested:

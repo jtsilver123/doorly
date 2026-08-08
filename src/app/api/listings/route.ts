@@ -31,6 +31,8 @@ export async function POST(request: Request) {
       contactPhone: body.contactPhone ? String(body.contactPhone) : undefined,
       contactEmail: body.contactEmail ? String(body.contactEmail) : undefined,
       notes: body.notes ? String(body.notes) : undefined,
+      forSale: Boolean(body.forSale),
+      salePrice: body.salePrice ? Number(body.salePrice) : undefined,
     });
     return NextResponse.json({ ok: true, id });
   } catch (err) {

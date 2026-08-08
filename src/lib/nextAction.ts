@@ -147,6 +147,15 @@ export function nextAction(listing: FeedListing): NextAction {
           hint: "Nothing published — paste one in and you can text them straight from here",
         };
       }
+      // A for-sale place isn't toured into renting — it's pitched into it.
+      if (listing.forSale) {
+        return {
+          kind: "reach",
+          label: "Pitch renting it",
+          hint: "They're selling — ask if the owner would rent it to you instead",
+          becomes: "contacted",
+        };
+      }
       return {
         kind: "reach",
         label: bestChannel(listing).label,

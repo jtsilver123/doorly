@@ -49,7 +49,7 @@ import {
 } from "@/lib/subway";
 import { applyFilters, findPasted, addressFromListingUrl } from "@/lib/filters";
 import { streeteasySearchUrl, zillowSearchUrl, siteJumps } from "@/lib/siteLinks";
-import { parseFreePost, isFacebookUrl } from "@/lib/freepost";
+import { parseFreePost, isFacebookUrl, suggestedRentFor } from "@/lib/freepost";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { nearAreas } from "@/lib/geo";
 import { safeNext } from "@/lib/nextPath";
@@ -2237,6 +2237,60 @@ test("the repeat template fires only when there is a prior thread", () => {
 test("a saved follow-up template carries the chase everywhere", () => {
   const profile = { ...DEFAULT_PROFILE, templates: { followUp: "Still free? {address}" } };
   assert.equal(draftFollowUp(feed({}), profile), "Still free? 55 Morton Street #5J");
+});
+
+/* --- the long shot: for-sale places pitched into rentals ----------------- */
+
+test("a sale paste is recognized, with its ask, and a rental is not", () => {
+  const sale = parseFreePost(
+    "Beautiful co-op at 25 W 13th St, listed for sale at $562,000. Sunny 1br, elevator building."
+  );
+  assert.equal(sale.forSale, true);
+  assert.equal(sale.salePrice, 562_000);
+  assert.equal(sale.looksLikeListing, true);
+
+  const compact = parseFreePost("For sale: gorgeous 2br townhouse duplex, asking $1.2M, motivated seller.");
+  assert.equal(compact.salePrice, 1_200_000);
+
+  const rental = parseFreePost("Asking $3,200. First, last and deposit due: $9,600 total to move in.");
+  assert.equal(rental.forSale, false);
+  assert.equal(rental.salePrice, null);
+});
+
+test("the suggested pitch rent is a 5% yield on the ask, said roundly", () => {
+  assert.equal(suggestedRentFor(750_000), 3_150);
+  assert.equal(suggestedRentFor(562_000), 2_350);
+});
+
+test("a for-sale place gets the owner pitch, not a tour ask", () => {
+  const sale = feed({
+    forSale: true,
+    salePrice: 815_000,
+    price: 3400,
+    myContactName: "Dana Realty",
+  });
+  const msg = draftTourMessage(sale, { ...DEFAULT_PROFILE, name: "Jake Silver" });
+  assert.ok(msg.includes("on the market at $815,000"));
+  assert.ok(msg.includes("$3,400/mo"));
+  assert.ok(!msg.toLowerCase().includes("walkthrough"));
+
+  // No offer set: the draft skips the number rather than saying "around /mo".
+  const openEnded = draftTourMessage(feed({ forSale: true, salePrice: 815_000, price: 0 }), DEFAULT_PROFILE);
+  assert.ok(openEnded.includes("fair market rent"));
+  assert.ok(!openEnded.includes("/mo"));
+
+  // Your own sale template still beats the built-in pitch.
+  const tpl = { ...DEFAULT_PROFILE, templates: { sale: "Rent me {address}? Asking {asking price} is a lot." } };
+  assert.equal(
+    draftTourMessage(sale, tpl),
+    "Rent me 55 Morton Street #5J? Asking $815,000 is a lot."
+  );
+});
+
+test("chasing a pitch asks about the owner, not availability", () => {
+  const msg = draftFollowUp(feed({ forSale: true, myContactName: "Dana" }), DEFAULT_PROFILE);
+  assert.ok(msg.includes("owner"));
+  assert.ok(!msg.includes("still available"));
 });
 
 test("the built-in follow-up names the earlier thread with the same agent", () => {

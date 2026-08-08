@@ -39,6 +39,16 @@ const SAMPLE = {
 
 const SAMPLE_PRIOR = { address: "12 Charles Street", unit: "3B" };
 
+/** The stand-in for-sale place: pitching the owner to rent it instead. */
+const SAMPLE_SALE = {
+  ...SAMPLE,
+  address: "210 West 10th Street",
+  unit: "4A",
+  price: 3400,
+  forSale: true,
+  salePrice: 815_000,
+} as FeedListing;
+
 const SLOTS = [
   {
     key: "first" as const,
@@ -58,6 +68,12 @@ const SLOTS = [
     hint: "Reaching out about a new listing to an agent you've contacted before",
     preview: (p: Profile) => draftTourMessage(SAMPLE, p, SAMPLE_PRIOR),
   },
+  {
+    key: "sale" as const,
+    label: "For-sale pitch",
+    hint: "Asking the owner of a for-sale place to rent it to you instead",
+    preview: (p: Profile) => draftTourMessage(SAMPLE_SALE, p),
+  },
 ];
 
 export default function MessageSettings({
@@ -71,6 +87,7 @@ export default function MessageSettings({
     first: profile.templates?.first ?? "",
     followUp: profile.templates?.followUp ?? "",
     repeat: profile.templates?.repeat ?? "",
+    sale: profile.templates?.sale ?? "",
   });
   const areas = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const saveState = useAutosave(templates, (next) =>
@@ -149,7 +166,9 @@ export default function MessageSettings({
 
             <div className="msgslot-vars">
               {TEMPLATE_VARS.filter(
-                (v) => slot.key === "repeat" || v.token !== "{previous address}"
+                (v) =>
+                  (slot.key === "repeat" || v.token !== "{previous address}") &&
+                  (slot.key === "sale" || v.token !== "{asking price}")
               ).map((v) => (
                 <button
                   key={v.token}

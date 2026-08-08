@@ -5,6 +5,7 @@ import type { FeedListing } from "@/types";
 import type { Source } from "@/types";
 import { linkPreference, SOURCE_LABEL, STAGE_LABEL } from "@/types";
 import { CONTACT_ICON, CONTACT_LABEL } from "@/lib/outreach";
+import { compactPrice } from "@/lib/cost";
 import { nextAction } from "@/lib/nextAction";
 import { lastChangeOf } from "@/lib/timeline";
 import SourceMark from "@/components/SourceMark";
@@ -236,13 +237,16 @@ export default function ListingCard({
               <span className="price-from">from </span>
             )}
             {money(listing.price)}
+            {listing.forSale && <span className="sale-tag">for sale</span>}
           </span>
           <span className="card-size">{size}</span>
         </button>
 
         <div className="card-sub">
-          {money(listing.upfrontCost)} to move in
-          {listing.sqft ? ` · ${listing.sqft} ft²` : ""}
+          {/* On a pitch, the sub-line's job is the play, not the fees. */}
+          {listing.forSale
+            ? `Asking ${listing.salePrice ? compactPrice(listing.salePrice) : "?"} to buy · you're pitching a rental`
+            : `${money(listing.upfrontCost)} to move in${listing.sqft ? ` · ${listing.sqft} ft²` : ""}`}
         </div>
 
         <button className="card-address" onClick={(e) => onOpen(listing, e.shiftKey)}>

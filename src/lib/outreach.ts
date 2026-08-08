@@ -69,6 +69,8 @@ export interface Profile {
     followUp?: string;
     /** Reaching out about a new place to an agent you've contacted before. */
     repeat?: string;
+    /** Pitching the owner of a for-sale place on renting it to you instead. */
+    sale?: string;
   };
 }
 
@@ -165,6 +167,7 @@ export const TEMPLATE_VARS: { token: string; hint: string }[] = [
   { token: "{my email}", hint: "your email" },
   { token: "{move in}", hint: "your target date" },
   { token: "{previous address}", hint: "the place you contacted them about before" },
+  { token: "{asking price}", hint: "what they want for it, on a for-sale place" },
 ];
 
 export function renderTemplate(
@@ -192,6 +195,7 @@ export function renderTemplate(
     "{previous address}": prior
       ? `${prior.address}${prior.unit ? ` #${prior.unit}` : ""}`
       : "",
+    "{asking price}": listing.salePrice ? `$${listing.salePrice.toLocaleString()}` : "",
   };
   let out = template;
   for (const [token, value] of Object.entries(values)) {
@@ -213,6 +217,8 @@ export const DEFAULT_TEMPLATES = {
     "Hi {agent} — following up on {address}. This is {my name}. Is it still available? Happy to come see it whenever suits you.",
   repeat:
     "Hi {agent}! It's {my name} — we spoke about {previous address} recently. I also came across the {beds} at {address} listed at {price} and it looks great. Could I come see this one too? I'm flexible on timing.\n\nThanks so much! You can reach me here or at {my phone}.",
+  sale:
+    "Hi {agent}! I'm {my name} — I saw {address} is on the market at {asking price}. I'm not a buyer, but I'd love to live there: would the owner consider renting it out instead, or while it sells? I could offer around {price}/mo on a 12-month lease.\n\nI can move fast — documents ready, flexible on the start date, hoping to be in around {move in}.\n\nWorth a conversation? You can reach me here or at {my phone}.",
 } as const;
 
 export function draftTourMessage(
@@ -222,7 +228,21 @@ export function draftTourMessage(
 ): string {
   // Your words beat ours. The repeat variant only fires when there is a
   // prior thread to mention; otherwise the first-contact template carries.
+  // A for-sale place gets the pitch instead of a tour ask — asking to tour
+  // a place that's for sale as if it were a rental reads as a wrong number.
   const t = profile.templates;
+  if (listing.forSale) {
+    if (t?.sale?.trim()) return renderTemplate(t.sale, listing, profile, prior);
+    // No offer rent set yet: drop the number rather than say "around /mo".
+    const template =
+      listing.price > 0
+        ? DEFAULT_TEMPLATES.sale
+        : DEFAULT_TEMPLATES.sale.replace(
+            " I could offer around {price}/mo on a 12-month lease.",
+            " I'd sign a 12-month lease at a fair market rent."
+          );
+    return renderTemplate(template, listing, profile, prior);
+  }
   if (prior && t?.repeat?.trim()) return renderTemplate(t.repeat, listing, profile, prior);
   if (t?.first?.trim()) return renderTemplate(t.first, listing, profile, prior);
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
@@ -382,6 +402,14 @@ export function draftFollowUp(
   const also = prior
     ? ` (We were also in touch about ${prior.address}${prior.unit ? ` #${prior.unit}` : ""}.)`
     : "";
+  // Chasing a rent pitch asks a different question than chasing a rental:
+  // not "is it available" but "what did the owner think".
+  if (listing.forSale) {
+    return (
+      `${greeting} following up on ${listing.address}${unit}.${me}${also} ` +
+      `Any word from the owner on renting it out? Happy to talk terms whenever suits.`
+    );
+  }
   return (
     `${greeting} following up on ${listing.address}${unit}.${me}${also} ` +
     `Is it still available? Happy to come see it whenever suits you.`
@@ -455,6 +483,7 @@ export function bestChannel(listing: {
   myContactPhone?: string;
   myContactEmail?: string;
   url: string;
+  forSale?: boolean;
 }): Reachable {
   const { phone, email } = reachableOn(listing);
   /**
@@ -467,24 +496,28 @@ export function bestChannel(listing: {
    * the thing you actually want, so the strongest call to action on the page
    * sounded like a chore. The goal is identical every time; only the plumbing
    * differs, and the plumbing belongs in the tooltip.
+   *
+   * The one honest exception: a for-sale place isn't asked for a tour, it's
+   * pitched — and the button should say the play, not the wrong ask.
    */
+  const goal = listing.forSale ? "Pitch renting it" : null;
   if (phone) {
     return {
       channel: "text",
-      label: "Text for a tour",
+      label: goal ?? "Text for a tour",
       hint: "Opens Messages with your introduction already written",
     };
   }
   if (email) {
     return {
       channel: "email",
-      label: "Request a tour",
+      label: goal ?? "Request a tour",
       hint: "Opens your email app with the message already written",
     };
   }
   return {
     channel: "portal",
-    label: "Request a tour",
+    label: goal ?? "Request a tour",
     hint: "No phone or email published — copies your message and opens their contact form",
   };
 }

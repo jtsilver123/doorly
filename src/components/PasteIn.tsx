@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FreePost } from "@/lib/freepost";
+import { suggestedRentFor, type FreePost } from "@/lib/freepost";
 
 /**
  * The paste-in form: a Facebook-group post (or any tip) becoming a listing.
@@ -43,7 +43,25 @@ export default function PasteIn({
   const [phone, setPhone] = useState(parsed.phone ?? "");
   const [email, setEmail] = useState(parsed.email ?? "");
   const [link, setLink] = useState(url);
-  const [fromFacebook, setFromFacebook] = useState(true);
+  const [fromFacebook, setFromFacebook] = useState(!parsed.forSale);
+  /*
+   * The long-shot play: a place listed for sale, added to pitch the owner
+   * on renting it. The rent field then holds your opening offer — the rest
+   * of the app (filters, move-in math, drafts) treats it as the rent — and
+   * a fair default is suggested from the ask so the field never starts at
+   * a guessless zero.
+   */
+  const [forSale, setForSale] = useState(parsed.forSale);
+  const [salePrice, setSalePrice] = useState(
+    parsed.salePrice ? String(parsed.salePrice) : ""
+  );
+  useEffect(() => {
+    if (forSale && !price && Number(salePrice) >= 100_000) {
+      setPrice(String(suggestedRentFor(Number(salePrice))));
+    }
+    // Suggest only when the offer box is empty: a typed offer is theirs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forSale, salePrice]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -76,6 +94,8 @@ export default function PasteIn({
           contactEmail: email.trim() || undefined,
           url: link.trim(),
           notes: text.trim() || undefined,
+          forSale,
+          salePrice: forSale && Number(salePrice) > 0 ? Number(salePrice) : undefined,
         }),
       });
       const body = await res.json();
@@ -123,7 +143,7 @@ export default function PasteIn({
             />
           </label>
           <label>
-            <span className="muted">Rent</span>
+            <span className="muted">{forSale ? "Rent you'd offer" : "Rent"}</span>
             <input
               className="field"
               inputMode="numeric"
@@ -132,6 +152,18 @@ export default function PasteIn({
               onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))}
             />
           </label>
+          {forSale && (
+            <label>
+              <span className="muted">Their asking price</span>
+              <input
+                className="field"
+                inputMode="numeric"
+                value={salePrice}
+                placeholder="750000"
+                onChange={(e) => setSalePrice(e.target.value.replace(/[^\d]/g, ""))}
+              />
+            </label>
+          )}
           <label>
             <span className="muted">Bedrooms</span>
             <input
@@ -187,7 +219,23 @@ export default function PasteIn({
             />
             From a Facebook group
           </label>
+          <label className="packet-toggle pastein-wide">
+            <input
+              type="checkbox"
+              checked={forSale}
+              onChange={(e) => setForSale(e.target.checked)}
+            />
+            It&apos;s listed for sale. I want to pitch the owner on renting it
+          </label>
         </div>
+
+        {forSale && (
+          <p className="pastein-note muted">
+            The drafts will pitch a lease instead of asking for a tour. The
+            suggested offer is about a 5% return on their ask, which is the
+            math an owner&apos;s accountant would run.
+          </p>
+        )}
 
         {text.trim() && (
           <p className="pastein-note muted">

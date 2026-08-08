@@ -2476,6 +2476,37 @@ button.fact:hover .fact-label { color: var(--accent); }
   font-size: var(--t-xs);
 }
 
+/* The long-shot play: a for-sale place you're pitching into a rental. */
+.sale-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-left: 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-full);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.board-card .sale-tag { margin-left: 0; align-self: start; }
+
+/* In the drawer: the play, said out loud next to its numbers. */
+.sale-plan {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: var(--t-sm);
+  margin-bottom: var(--s3);
+}
+.sale-plan .icon { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+
 /* In the drawer: attribution + point-person, one quiet row. */
 .crewline {
   display: flex;

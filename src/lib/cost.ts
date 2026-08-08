@@ -96,6 +96,16 @@ export function allInMonthly(
   return Math.round(rent + fees / term);
 }
 
+/** "$815k", "$1.2M": the way people say sale prices out loud. */
+export function compactPrice(n: number): string {
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `$${m >= 10 ? Math.round(m) : Math.round(m * 10) / 10}M`;
+  }
+  if (n >= 10_000) return `$${Math.round(n / 1000)}k`;
+  return `$${n.toLocaleString()}`;
+}
+
 export function moveInCost(
   listing: Pick<FeedListing, "price" | "noFee">,
   assumptions: CostAssumptions = DEFAULT_COSTS
