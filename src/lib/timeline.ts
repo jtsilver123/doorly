@@ -169,9 +169,24 @@ export function funnelFor(
   daysLeft: number,
   assumptions: FunnelAssumptions = DEFAULT_FUNNEL
 ): Funnel {
-  const contacted = listings.filter((l) => l.contactCount > 0).length;
+  /*
+   * Contacted is a claim the user can make two ways: by sending a message
+   * through the app (a logged contact) or by dragging the card into the
+   * Contacted column after texting from their own phone. Counting only the
+   * log made the pace meter ignore the drag — "11 contacted" sat still
+   * while the column grew, which read as broken because it was.
+   */
+  const reachedStages = ["contacted", "tour", "toured", "applied", "closed", "no_go"];
+  const contacted = listings.filter(
+    (l) => l.contactCount > 0 || reachedStages.includes(l.stage)
+  ).length;
+  // A reply is either logged inbound, or implied by the card moving past
+  // Contacted after an outreach — nobody books a tour with a broker who
+  // never answered.
   const replied = listings.filter(
-    (l) => l.lastContactChannel != null && l.stage !== "contacted" && l.stage !== "inbox"
+    (l) =>
+      l.hasReply ||
+      (l.lastContactChannel != null && l.stage !== "contacted" && l.stage !== "inbox")
   ).length;
   const viewed = listings.filter((l) =>
     ["toured", "applied", "closed"].includes(l.stage)

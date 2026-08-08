@@ -2180,3 +2180,18 @@ test("facebook doors are recognised in their many spellings", () => {
   assert.ok(isFacebookUrl("https://fb.com/share/abc"));
   assert.ok(!isFacebookUrl("https://streeteasy.com/building/x"));
 });
+
+test("dragging a card into Contacted counts as contacted, log or no log", () => {
+  const dragged = feed({ stage: "contacted", contactCount: 0 });
+  const logged = feed({ stage: "interested", contactCount: 1 });
+  const untouched = feed({ stage: "inbox", contactCount: 0 });
+  const funnel = funnelFor([dragged, logged, untouched], 25);
+  assert.equal(funnel.contacted, 2);
+});
+
+test("a logged reply counts as replied even while the card sits in Contacted", () => {
+  const replied = feed({ stage: "contacted", contactCount: 1, hasReply: true });
+  const waiting = feed({ stage: "contacted", contactCount: 1, hasReply: false });
+  const funnel = funnelFor([replied, waiting], 25);
+  assert.equal(funnel.replied, 1);
+});
