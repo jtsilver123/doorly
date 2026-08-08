@@ -1992,6 +1992,18 @@ export default function Home() {
           right here, on top of the thing they were doing. */}
       {joinOpen && <JoinGate onClose={() => setJoinOpen(false)} />}
 
+      {/* The standing offer, top right of every page a guest visits. It
+          sits below the drawer and the modal in the stack, so it never
+          shouts over the thing it's selling. */}
+      {guest && !joinOpen && (
+        <button
+          className="btn btn-primary guest-topcta"
+          onClick={() => setJoinOpen(true)}
+        >
+          Create free account
+        </button>
+      )}
+
       {/* A pasted post becoming a card. Lands as Interested, same as any
           manual add: your paste outranks the criteria. */}
       {pasteDraft && (

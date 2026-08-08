@@ -3454,8 +3454,8 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .joingate {
   position: relative;
-  width: min(760px, calc(100vw - 28px));
-  max-height: 88dvh;
+  width: min(940px, calc(100vw - 24px));
+  max-height: 90dvh;
   overflow: auto;
   display: grid;
   background: var(--surface);
@@ -3466,6 +3466,22 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 @media (min-width: 720px) {
   .joingate { grid-template-columns: 0.85fr 1fr; }
+}
+
+/* The standing offer for guests, top right of every page. Below the
+   drawer (50) and the modal (320) in the stack. */
+.guest-topcta {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 45;
+  padding: 9px 16px;
+  border-radius: var(--r-full);
+  box-shadow: var(--shadow-lg);
+  font-weight: 700;
+}
+@media (max-width: 860px) {
+  .guest-topcta { top: 10px; right: 10px; padding: 7px 12px; font-size: var(--t-sm); }
 }
 
 @keyframes gatefade {
@@ -3499,8 +3515,8 @@ button.fact:hover .fact-label { color: var(--accent); }
 .joingate-pitch {
   display: grid;
   align-content: start;
-  gap: var(--s3);
-  padding: 26px 24px;
+  gap: var(--s4);
+  padding: 36px 32px;
   background: var(--ink, #16161c);
   color: rgba(244, 242, 234, 0.92);
 }
@@ -3514,14 +3530,14 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 .joingate-pitch h2 {
   margin: 0;
-  font-size: 26px;
+  font-size: 32px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #fff;
 }
 .joingate-pitch p {
   margin: 0;
-  font-size: var(--t-sm);
+  font-size: var(--t-md);
   line-height: 1.55;
   color: rgba(244, 242, 234, 0.7);
 }
@@ -3534,14 +3550,14 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 .joingate-claims li {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: baseline;
-  font-size: var(--t-sm);
+  font-size: var(--t-md);
   color: rgba(244, 242, 234, 0.85);
 }
 .joingate-claims b {
-  flex: 0 0 26px;
-  font-size: 20px;
+  flex: 0 0 30px;
+  font-size: 24px;
   color: var(--action);
   text-align: center;
 }
@@ -3550,16 +3566,16 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* Right: the shortest path in. */
 .joingate-panel {
   display: grid;
-  align-content: start;
-  gap: var(--s3);
-  padding: 26px 24px;
+  align-content: center;
+  gap: var(--s4);
+  padding: 36px 32px;
 }
-.joingate-panel-head { display: grid; gap: 2px; padding-right: 34px; }
-.joingate-panel-head b { font-size: var(--t-lg); }
-.joingate-panel-head .muted { font-size: var(--t-sm); }
+.joingate-panel-head { display: grid; gap: 4px; padding-right: 34px; }
+.joingate-panel-head b { font-size: var(--t-xl); }
+.joingate-panel-head .muted { font-size: var(--t-md); }
 .joingate-google,
 .joingate-email-toggle,
-.joingate-submit { justify-content: center; padding: 11px 14px; font-weight: 600; }
+.joingate-submit { justify-content: center; padding: 13px 16px; font-weight: 600; font-size: var(--t-md); }
 .joingate-email-toggle { display: inline-flex; align-items: center; gap: 6px; }
 .joingate-or {
   display: flex;
