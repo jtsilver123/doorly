@@ -3389,6 +3389,30 @@ button.fact:hover .fact-label { color: var(--accent); }
   color: var(--text-muted);
 }
 
+/* Why the situation controls live with the checklist they shape. */
+.packet-situation-why {
+  flex-basis: 100%;
+  font-size: 11px;
+}
+
+/* The packet's one-page summary, folded until asked for. */
+.packet-preview summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.packet-preview summary::-webkit-details-marker { display: none; }
+.packet-preview summary .icon {
+  transform: rotate(-90deg);
+  transition: transform var(--t-fast) var(--ease);
+}
+.packet-preview[open] summary .icon { transform: rotate(0deg); }
+.packet-preview summary:hover { color: var(--text); }
+
 /* The honest word about who can see these: only you. */
 .packet-privacy {
   display: inline-flex;
@@ -5471,7 +5495,64 @@ button.fact:hover .fact-label { color: var(--accent); }
 .packet-pulse .meter { max-width: 220px; }
 
 /* --- the Apply page: places at the applying stage, one row each ---------- */
+
+/* Am I ready? The number the whole page exists to move, said at full size. */
+.applyhero {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: 18px 20px;
+}
+.applyhero-num {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  min-width: 96px;
+}
+.applyhero-num b {
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--warn);
+}
+.applyhero[data-ready] .applyhero-num b { color: var(--good); }
+.applyhero-num span { font-size: var(--t-xs); }
+.applyhero-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+.applyhero-meter { max-width: none; }
+.applyhero-note { font-size: var(--t-sm); }
+.applyhero-copy { white-space: nowrap; }
+@media (max-width: 560px) {
+  .applyhero { flex-wrap: wrap; }
+  .applyhero-copy { flex-basis: 100%; }
+}
+
 .applyhub-group { font-size: var(--t-sm); }
+.applyhub-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  text-align: center;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.applyrow-chev {
+  margin-left: 4px;
+  color: var(--text-muted);
+  transform: rotate(-90deg);
+  transition: transform var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.applyrow-place:hover .applyrow-chev { color: var(--accent); }
+.applyrow-place:hover .applyrow-addr { text-decoration: underline; }
 .applyrow {
   display: flex;
   align-items: center;
@@ -5494,7 +5575,13 @@ button.fact:hover .fact-label { color: var(--accent); }
   font: inherit;
   color: inherit;
 }
-.applyrow-addr { font-weight: 600; font-size: var(--t-sm); }
+.applyrow-addr {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 600;
+  font-size: var(--t-sm);
+}
 .applyrow-meta { font-size: var(--t-xs); }
 .applyrow-status {
   font-size: var(--t-xs);

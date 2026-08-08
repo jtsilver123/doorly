@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { PROOF_OPTIONS, type Profile } from "@/lib/outreach";
-import { buildPacket, packetText, packetSlots, packetReadiness } from "@/lib/packet";
+import { buildPacket, packetSlots, packetReadiness } from "@/lib/packet";
 import Icon from "@/components/Icon";
-import { enqueueUploads, pendingUploads, subscribeUploads } from "@/lib/uploadQueue";
+import { enqueueUploads } from "@/lib/uploadQueue";
 
-interface PacketDoc {
+export interface PacketDoc {
   id: string;
   path: string;
   name: string;
@@ -187,48 +187,25 @@ function SlotRow({
 export default function ApplicationPacket({
   profile,
   onSave,
+  docs,
+  onDocsChanged,
 }: {
   profile: Profile;
   onSave: (p: Profile) => void;
+  /** The papers, owned by the page so the hero and this list agree. */
+  docs: PacketDoc[];
+  onDocsChanged: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
   const documents = profile.documents ?? [];
-  /**
-   * The cost fields are typed into, so they go through a draft and a debounce
-   * — writing "1.5" used to persist "1" and then "1." on the way there. The
-   * document chips stay immediate: a click is already a finished thought.
-   */
-
-  /*
-   * The files are the checklist now. Loaded here so readiness, the slot
-   * rows, and the packet summary all read one truth.
-   */
-  const [docs, setDocs] = useState<PacketDoc[]>([]);
-  const loadDocs = useCallback(async () => {
-    try {
-      const body = await fetch("/api/documents").then((r) => r.json());
-      setDocs(body.documents ?? []);
-    } catch {
-      /* the next upload or visit retries */
-    }
-  }, []);
-  useEffect(() => {
-    loadDocs();
-    return subscribeUploads(() => {
-      if (pendingUploads() === 0) loadDocs();
-    });
-  }, [loadDocs]);
   const removeDoc = async (doc: PacketDoc) => {
-    setDocs((list) => list.filter((d) => d.id !== doc.id));
     try {
       await fetch(`/api/media/${doc.path}`, { method: "DELETE" });
     } finally {
-      loadDocs();
+      onDocsChanged();
     }
   };
-  /** Re-file after the fact: optimistic, then the server's word is final. */
+  /** Re-file after the fact; the server's word comes back via the reload. */
   const moveDoc = async (doc: PacketDoc, slot: string) => {
-    setDocs((list) => list.map((d) => (d.id === doc.id ? { ...d, slot } : d)));
     try {
       await fetch("/api/documents", {
         method: "PATCH",
@@ -236,25 +213,15 @@ export default function ApplicationPacket({
         body: JSON.stringify({ id: doc.id, slot }),
       });
     } finally {
-      loadDocs();
+      onDocsChanged();
     }
   };
   const [dragOver, setDragOver] = useState(false);
   const options = slotOptions(profile);
 
   const slots = packetSlots(profile);
-  const { percent, missing, satisfied } = packetReadiness(profile, docs);
+  const { satisfied } = packetReadiness(profile, docs);
   const sections = buildPacket(profile, [...documents, ...satisfied]);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(packetText(profile, [...documents, ...satisfied]));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  }
 
   return (
     <div className="surface" style={{ padding: 20, display: "grid", gap: 16 }}>
@@ -272,31 +239,14 @@ export default function ApplicationPacket({
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: 6 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-          <span>Ready to apply</span>
-          <strong className={percent >= 80 ? "" : "warn-text"}>{percent}%</strong>
-        </div>
-        <div className="meter">
-          <span
-            style={{
-              width: `${percent}%`,
-              background: percent >= 80 ? "var(--good)" : "var(--warn)",
-            }}
-          />
-        </div>
-        {missing.length > 0 && (
-          <div className="muted" style={{ fontSize: 11 }}>
-            Still needed: {missing.join(", ")}
-          </div>
-        )}
-      </div>
-
       {/* The situation decides the checklist, so it's set right here: how
           you earn picks the B column, and a guarantor brings their own
           parallel stack — the same shape as the sheets management companies
           circulate. */}
       <div className="packet-situation">
+        <span className="packet-situation-why muted">
+          Your situation sets the checklist below
+        </span>
         <label>
           <span className="muted">How you earn</span>
           <select
@@ -519,16 +469,14 @@ export default function ApplicationPacket({
         })}
       </div>
 
-      <div style={{ display: "grid", gap: 6 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="muted" style={{ fontSize: 12 }}>
-            Preview
-          </span>
-          <button className="btn" style={{ fontSize: 12, padding: "4px 9px" }} onClick={copy}>
-            {copied ? "Copied" : "Copy packet"}
-          </button>
-        </div>
-        <div className="preview" style={{ display: "grid", gap: 10 }}>
+      {/* The one-page summary the copy button sends, folded away: worth a
+          glance, not permanent screen. Copying lives in the hero above. */}
+      <details className="packet-preview">
+        <summary>
+          <Icon name="chevron" size={12} />
+          What the copied packet says
+        </summary>
+        <div className="preview" style={{ display: "grid", gap: 10, marginTop: 8 }}>
           {sections.map((section) => (
             <div key={section.heading}>
               <strong>{section.heading}</strong>
@@ -540,8 +488,7 @@ export default function ApplicationPacket({
             </div>
           ))}
         </div>
-      </div>
-
+      </details>
     </div>
   );
 }
