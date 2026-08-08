@@ -1400,6 +1400,10 @@ export default function Home() {
           they were related.
         */}
         <div className="railfoot">
+          {/* A guest can't run a poll and has no key to meter; the whole
+              refresh block would just shout over the one button that
+              matters down here, the account CTA. */}
+          {!guest && (
           <div className="refresh">
             {/*
               A dead key makes "Check for new" a lie — pressing it runs a
@@ -1490,6 +1494,7 @@ export default function Home() {
               </button>
             )}
           </div>
+          )}
 
           {/* Straight to the person who builds this — a pre-filled email
               beats a feedback form nobody maintains. */}
