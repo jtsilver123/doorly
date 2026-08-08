@@ -2476,6 +2476,23 @@ button.fact:hover .fact-label { color: var(--accent); }
   font-size: var(--t-xs);
 }
 
+/* Column-header sort toggle: default order → oldest here → newest here. */
+.board-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.board-sort:hover { color: var(--text); }
+.board-sort.is-on { color: var(--accent); }
+
 /* The long-shot play: a for-sale place you're pitching into a rental. */
 .sale-tag {
   display: inline-block;
@@ -3812,7 +3829,9 @@ button.fact:hover .fact-label { color: var(--accent); }
   color: var(--accent);
   font-size: var(--t-xs);
   font-weight: 600;
+  white-space: nowrap;
 }
+.board-sort { white-space: nowrap; }
 
 .board-plan:hover { border-color: var(--accent); background: var(--accent-soft); }
 

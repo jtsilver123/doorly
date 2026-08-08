@@ -117,6 +117,39 @@ export default function PipelineBoard({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
   const [quick, setQuick] = useState("");
+  /**
+   * Per-column sort by time in the column. Three states per column: the
+   * default order (rating as the feed arrived; Tour reads as a schedule),
+   * oldest here first (what's been waiting longest), newest here first.
+   * Loaded after mount rather than in the initializer so the server and
+   * first client render agree.
+   */
+  const [sorts, setSorts] = useState<Partial<Record<Stage, "old" | "new">>>({});
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("damnlease.board.sort");
+      if (raw) setSorts(JSON.parse(raw));
+    } catch {
+      /* an unreadable preference is just the default order */
+    }
+  }, []);
+  function cycleSort(stage: Stage) {
+    setSorts((prev) => {
+      const next = { ...prev };
+      if (!prev[stage]) next[stage] = "old";
+      else if (prev[stage] === "old") next[stage] = "new";
+      else delete next[stage];
+      try {
+        localStorage.setItem("damnlease.board.sort", JSON.stringify(next));
+      } catch {
+        /* private mode: the toggle still works for the session */
+      }
+      return next;
+    });
+  }
+  /** When the card landed in its column; discovery time before it moved. */
+  const inColumnSince = (l: FeedListing) =>
+    new Date(l.stageChangedAt ?? l.firstSeenAt).getTime();
   /** A touch-lifted card: what's being dragged and where the finger is. */
   const [lifted, setLifted] = useState<{ listing: FeedListing; x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -283,14 +316,22 @@ export default function PipelineBoard({
     >
       {PIPELINE_STAGES.map((stage) => {
         const column = listings.filter((l) => l.stage === stage);
+        const sortDir = sorts[stage];
         /*
          * The Tour column is a schedule, so it reads like one: soonest
          * viewing first. Cards with no time yet sort after the timed ones —
          * they carry their own coral "Set the time" flag, and a schedule
          * interleaved with unscheduled entries stops being scannable as a
          * day. Other columns keep the rating order the feed arrived in.
+         * A chosen column sort overrides both — the person asked for time.
          */
-        if (stage === "tour") {
+        if (sortDir) {
+          column.sort((a, b) =>
+            sortDir === "old"
+              ? inColumnSince(a) - inColumnSince(b)
+              : inColumnSince(b) - inColumnSince(a)
+          );
+        } else if (stage === "tour") {
           column.sort((a, b) => {
             if (a.tourAt && b.tourAt)
               return new Date(a.tourAt).getTime() - new Date(b.tourAt).getTime();
@@ -379,6 +420,26 @@ export default function PipelineBoard({
                   >
                     <Icon name="video" size={13} />
                     Review
+                  </button>
+                )}
+                {/* Time in column, on demand: what's been sitting longest
+                    is usually what needs the next push. */}
+                {column.length > 1 && (
+                  <button
+                    className={sortDir ? "board-sort is-on" : "board-sort"}
+                    onClick={() => cycleSort(stage)}
+                    aria-pressed={Boolean(sortDir)}
+                    title={
+                      sortDir === "old"
+                        ? "Oldest here first. Tap for newest first"
+                        : sortDir === "new"
+                          ? "Newest here first. Tap to go back to the usual order"
+                          : "Sort by how long each place has been in this column"
+                    }
+                    aria-label={`Sort the ${STAGE_LABEL[stage]} column by time here`}
+                  >
+                    <Icon name="sort" size={12} />
+                    {sortDir === "old" ? "Oldest" : sortDir === "new" ? "Newest" : ""}
                   </button>
                 )}
                 <span className="muted">{column.length}</span>
