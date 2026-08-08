@@ -58,6 +58,18 @@ export interface Profile {
    * saved; every listing then wears a door-to-door estimate per anchor.
    */
   anchors?: { label: string; address: string; lat: number; lon: number }[];
+  /**
+   * Your own words for the three messages the app writes. Empty or absent
+   * means the built-in draft; a saved template wins everywhere drafts are
+   * used — the card button, the drawer, the bulk runs. Variables in braces
+   * ({agent}, {address}...) fill in per listing at send time.
+   */
+  templates?: {
+    first?: string;
+    followUp?: string;
+    /** Reaching out about a new place to an agent you've contacted before. */
+    repeat?: string;
+  };
 }
 
 /** The documents a NYC landlord actually asks for. */
@@ -136,11 +148,83 @@ export interface PriorContact {
   unit?: string;
 }
 
+/* --- your own words ------------------------------------------------------
+ *
+ * The variables a template can carry. Names are what a person would say,
+ * not code: {agent}, {address}, {price}. Unknown braces pass through
+ * untouched, so a typo shows itself in the preview instead of vanishing.
+ */
+export const TEMPLATE_VARS: { token: string; hint: string }[] = [
+  { token: "{agent}", hint: "the agent's first name, or 'there'" },
+  { token: "{address}", hint: "address with unit" },
+  { token: "{neighborhood}", hint: "the neighborhood" },
+  { token: "{price}", hint: "asking rent" },
+  { token: "{beds}", hint: "studio / 2 bed" },
+  { token: "{my name}", hint: "your first name" },
+  { token: "{my phone}", hint: "your phone" },
+  { token: "{my email}", hint: "your email" },
+  { token: "{move in}", hint: "your target date" },
+  { token: "{previous address}", hint: "the place you contacted them about before" },
+];
+
+export function renderTemplate(
+  template: string,
+  listing: FeedListing,
+  profile: Profile,
+  prior?: PriorContact | null
+): string {
+  const unit = listing.unit ? ` #${listing.unit}` : "";
+  const values: Record<string, string> = {
+    "{agent}": firstNameOf(listing.myContactName || listing.contactName || "") || "there",
+    "{address}": `${listing.address}${unit}`,
+    "{neighborhood}": listing.neighborhood || listing.borough || "the area",
+    "{price}": listing.price ? `$${listing.price.toLocaleString()}` : "",
+    "{beds}":
+      listing.bedrooms === 0
+        ? "studio"
+        : Number.isFinite(listing.bedrooms)
+          ? `${listing.bedrooms} bed`
+          : "place",
+    "{my name}": firstNameOf(profile.name || ""),
+    "{my phone}": profile.phone || "",
+    "{my email}": profile.email || "",
+    "{move in}": formatMoveIn(profile.moveInDate),
+    "{previous address}": prior
+      ? `${prior.address}${prior.unit ? ` #${prior.unit}` : ""}`
+      : "",
+  };
+  let out = template;
+  for (const [token, value] of Object.entries(values)) {
+    out = out.split(token).join(value);
+  }
+  // A blank variable can orphan its sentence's spacing; tidy the seams
+  // without touching the words.
+  return out.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * The built-in drafts, spelled as templates. "Start from the default" hands
+ * these to the editor so customizing is an edit, never a blank page.
+ */
+export const DEFAULT_TEMPLATES = {
+  first:
+    "Hi {agent}! I'm {my name} — I came across the {beds} at {address} listed at {price} and it looks great.\n\nAny chance you could send a quick video walkthrough when you get a minute? If it looks as good as the photos, I'd love to come tour it right after — I'm flexible on timing.\n\nHoping to move in around {move in}.\n\nThanks so much! You can reach me here or at {my phone}.",
+  followUp:
+    "Hi {agent} — following up on {address}. This is {my name}. Is it still available? Happy to come see it whenever suits you.",
+  repeat:
+    "Hi {agent}! It's {my name} — we spoke about {previous address} recently. I also came across the {beds} at {address} listed at {price} and it looks great. Could I come see this one too? I'm flexible on timing.\n\nThanks so much! You can reach me here or at {my phone}.",
+} as const;
+
 export function draftTourMessage(
   listing: FeedListing,
   profile: Profile,
   prior?: PriorContact | null
 ): string {
+  // Your words beat ours. The repeat variant only fires when there is a
+  // prior thread to mention; otherwise the first-contact template carries.
+  const t = profile.templates;
+  if (prior && t?.repeat?.trim()) return renderTemplate(t.repeat, listing, profile, prior);
+  if (t?.first?.trim()) return renderTemplate(t.first, listing, profile, prior);
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
   const greeting = agent ? `Hi ${agent}!` : "Hi there!";
   const me = profile.name ? `I'm ${firstNameOf(profile.name)} —` : "";
@@ -288,6 +372,9 @@ export function draftFollowUp(
   profile: Profile,
   prior?: PriorContact | null
 ): string {
+  if (profile.templates?.followUp?.trim()) {
+    return renderTemplate(profile.templates.followUp, listing, profile, prior);
+  }
   const agent = firstNameOf(listing.myContactName || listing.contactName || "");
   const greeting = agent ? `Hi ${agent} —` : "Hi —";
   const unit = listing.unit ? ` #${listing.unit}` : "";

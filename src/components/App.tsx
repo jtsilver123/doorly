@@ -36,6 +36,7 @@ import RailStatus from "@/components/RailStatus";
 import ChaseAll from "@/components/ChaseAll";
 import ReviewTours from "@/components/ReviewTours";
 import MoveInCosts from "@/components/MoveInCosts";
+import MessageSettings from "@/components/MessageSettings";
 import FilterBar, { type Filters } from "@/components/FilterBar";
 import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
@@ -206,7 +207,7 @@ export default function Home() {
     const sec = window.location.hash.replace(/^#/, "");
     if (
       window.location.pathname === "/you" &&
-      ["details", "search", "crew", "packet", "api"].includes(sec)
+      ["details", "search", "messages", "crew", "packet", "api"].includes(sec)
     ) {
       setSection(sec as ProfileSection);
     }
@@ -1766,6 +1767,7 @@ export default function Home() {
                   [
                     ["details", "Your details"],
                     ["search", "What you're looking for"],
+                    ["messages", "Your messages"],
                     ["crew", "Search together"],
                     ["packet", "Application packet"],
                     ["api", "Data & refresh"],
@@ -1783,6 +1785,9 @@ export default function Home() {
                 ))}
               </div>
             </div>
+            {section === "messages" && (
+              <MessageSettings profile={profile} onSave={saveProfile} />
+            )}
             {section === "details" && (
               <ProfileForm
                 profile={profile}
@@ -2524,24 +2529,6 @@ function ProfileForm({
         <PushToggle />
       </div>
 
-      <div style={{ display: "grid", gap: 4 }}>
-        <span className="muted" style={{ fontSize: 12 }}>
-          Preview
-        </span>
-        <pre className="preview">
-          {draftTourMessage(
-            {
-              address: "55 Morton Street",
-              unit: "5J",
-              price: 3500,
-              bedrooms: 1,
-              neighborhood: "West Village",
-              myContactName: "Jane at Corcoran",
-            } as FeedListing,
-            draft
-          )}
-        </pre>
-      </div>
 
       <div className="savestate" data-state={saveState} role="status">
         {saveLabel(saveState)}

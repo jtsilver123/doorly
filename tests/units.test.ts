@@ -15,6 +15,7 @@ import {
   smsLink,
   normalizePhone,
   reachableOn,
+  renderTemplate,
   DEFAULT_PROFILE,
 } from "@/lib/outreach";
 import { nextAction } from "@/lib/nextAction";
@@ -2201,4 +2202,39 @@ test("a stored address that repeats its unit stops saying it twice", () => {
   assert.equal(addressSansUnit("25 W 13th St APT 2CS", "2CS"), "25 W 13th St");
   assert.equal(addressSansUnit("330 East 35th Street", "3"), "330 East 35th Street");
   assert.equal(addressSansUnit("184 Ludlow St", null), "184 Ludlow St");
+});
+
+/* --- your own words: templates over the built-in drafts ------------------ */
+
+test("variables fill in per listing, and unknown braces survive to be seen", () => {
+  const out = renderTemplate(
+    "Hi {agent}, about {address} at {price} — {my name}. {typo}",
+    feed({ address: "55 Morton Street", unit: "5J", price: 3500, myContactName: "Jane at Corcoran" }),
+    { ...DEFAULT_PROFILE, name: "Jake Silver" }
+  );
+  assert.ok(out.includes("Hi Jane, about 55 Morton Street #5J at $3,500"));
+  assert.ok(out.includes("Jake"));
+  assert.ok(out.includes("{typo}"));
+});
+
+test("a saved first-contact template beats the built-in draft", () => {
+  const profile = { ...DEFAULT_PROFILE, templates: { first: "Yo {agent}, is {address} free?" } };
+  const msg = draftTourMessage(feed({ myContactName: "Jane Doe" }), profile);
+  assert.equal(msg, "Yo Jane, is 55 Morton Street #5J free?");
+});
+
+test("the repeat template fires only when there is a prior thread", () => {
+  const profile = {
+    ...DEFAULT_PROFILE,
+    templates: { first: "First about {address}.", repeat: "Us again: {previous address} then, {address} now." },
+  };
+  const withPrior = draftTourMessage(feed({}), profile, { address: "12 Charles Street", unit: "3B" });
+  assert.equal(withPrior, "Us again: 12 Charles Street #3B then, 55 Morton Street #5J now.");
+  const without = draftTourMessage(feed({}), profile);
+  assert.equal(without, "First about 55 Morton Street #5J.");
+});
+
+test("a saved follow-up template carries the chase everywhere", () => {
+  const profile = { ...DEFAULT_PROFILE, templates: { followUp: "Still free? {address}" } };
+  assert.equal(draftFollowUp(feed({}), profile), "Still free? 55 Morton Street #5J");
 });

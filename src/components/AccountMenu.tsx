@@ -19,7 +19,7 @@ import Icon from "@/components/Icon";
  * dropping down would put it off-screen.
  */
 
-export type ProfileSection = "search" | "details" | "packet" | "api" | "crew";
+export type ProfileSection = "search" | "details" | "messages" | "packet" | "api" | "crew";
 
 const ITEMS: { key: ProfileSection; label: string; hint: string }[] = [
   { key: "details", label: "Your details", hint: "Name, income, what you can show" },

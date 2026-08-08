@@ -5473,3 +5473,28 @@ button.fact:hover .fact-label { color: var(--accent); }
   .filterbar-count { row-gap: 6px; }
   .sitejumps, .filterbar-trust { flex-basis: 100%; }
 }
+
+/* Your messages: three templates, each with its chips and its preview. */
+.msgslot {
+  display: grid;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+.msgslot-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  font-size: var(--t-sm);
+}
+.msgslot textarea { font-family: inherit; line-height: 1.5; }
+.msgslot-vars { display: flex; flex-wrap: wrap; gap: 5px; }
+.msgvar {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: var(--t-2xs);
+  padding: 3px 8px;
+}
+.msgslot-preview { display: grid; gap: 4px; font-size: var(--t-xs); }
+.msgslot-preview .preview { margin: 0; }
