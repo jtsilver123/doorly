@@ -1188,10 +1188,18 @@ export default function Home() {
     [open, listings]
   );
 
+  /*
+   * Compare is a strict subset of the pipeline: every board card except
+   * the ones that ended (not interested, closed). The badge used to also
+   * count anything starred — leftovers starred before being passed on —
+   * which made Compare read BIGGER than Pipeline and look like a bug.
+   * This mirrors the Compare page's own membership rule (STAGE_RANK), so
+   * the number on the tab is the number of places the page compares.
+   */
   const finalistCount = useMemo(
     () =>
       listings.filter(
-        (l) => l.starred || !["inbox", "passed", "no_go", "closed"].includes(l.stage)
+        (l) => !["inbox", "passed", "no_go", "closed"].includes(l.stage)
       ).length,
     [listings]
   );
