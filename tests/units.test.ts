@@ -2238,3 +2238,14 @@ test("a saved follow-up template carries the chase everywhere", () => {
   const profile = { ...DEFAULT_PROFILE, templates: { followUp: "Still free? {address}" } };
   assert.equal(draftFollowUp(feed({}), profile), "Still free? 55 Morton Street #5J");
 });
+
+test("the built-in follow-up names the earlier thread with the same agent", () => {
+  const withPrior = draftFollowUp(feed({ myContactName: "Jennifer C" }), DEFAULT_PROFILE, {
+    address: "121 East 12th Street",
+    unit: "7J",
+  });
+  assert.ok(withPrior.includes("We were also in touch about 121 East 12th Street #7J"));
+  const without = draftFollowUp(feed({ myContactName: "Jennifer C" }), DEFAULT_PROFILE);
+  assert.ok(!withPrior.includes("undefined"));
+  assert.ok(!without.includes("We were also in touch"));
+});

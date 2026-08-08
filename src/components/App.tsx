@@ -27,6 +27,7 @@ import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import { formatPhone } from "@/lib/phone";
 import { usePush } from "@/lib/usePush";
 import { commuteMinutes } from "@/lib/commute";
+import { brokerHistory } from "@/lib/leverage";
 import type { AmenityKey } from "@/lib/amenities";
 import ApplicationPacket from "@/components/ApplicationPacket";
 import UploadStatus from "@/components/UploadStatus";
@@ -1002,9 +1003,16 @@ export default function Home() {
        * getting the original again is what makes people look like bots.
        */
       const chasing = listing.stage === "contacted";
+      /*
+       * The broker-memory panel tells the user their repeat interest is
+       * leverage; the draft this button sends has to actually use it. This
+       * call site was the one place that forgot to pass the prior thread,
+       * so the panel promised a warmer message than the button delivered.
+       */
+      const prior = brokerHistory(listings, listing)?.others[0] ?? null;
       const message = chasing
-        ? draftFollowUp(listing, profile)
-        : draftTourMessage(listing, profile);
+        ? draftFollowUp(listing, profile, prior)
+        : draftTourMessage(listing, profile, prior);
 
       await patch(
         listing.id,
@@ -1046,7 +1054,9 @@ export default function Home() {
         if (target) window.open(target, "_blank", "noopener");
       }
     },
-    [patch, profile, loadFeed]
+    // listings rides along for broker memory — a stale closure would draft
+    // from last render's threads.
+    [patch, profile, listings, loadFeed]
   );
 
   // --- keyboard triage -----------------------------------------------------
