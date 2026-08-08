@@ -14,6 +14,7 @@ import { db, adminDb, currentUserId } from "@/lib/supabase";
 import { pipelineOwnerId, crewOf } from "@/lib/crew";
 import { DEFAULT_CRITERIA, searchKey, normalizeCriteria, inBounds } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
+import { addressSansUnit } from "@/lib/parse";
 import { fingerprint, extractUnit } from "@/lib/dedupe";
 import { boroughFor } from "@/lib/areas";
 import { deliver } from "@/lib/notify";
@@ -105,7 +106,7 @@ function toListing(row: ListingRow, source: Source = "streeteasy"): Listing {
     sqft: row.sqft,
     neighborhood: row.neighborhood,
     borough: row.borough,
-    address: row.address,
+    address: addressSansUnit(row.address, row.unit),
     unit: row.unit,
     lat: row.lat,
     lon: row.lon,

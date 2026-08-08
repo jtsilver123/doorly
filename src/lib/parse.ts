@@ -42,3 +42,19 @@ export function toPrice(...candidates: unknown[]): number | null {
   }
   return null;
 }
+
+/**
+ * The address without its trailing unit clause. Some stored rows carry
+ * "99 Suffolk St #2B" as the address AND "2B" as the unit — written before
+ * the intake learned to split them — and every renderer that prints
+ * "address #unit" would say the unit twice. Reading strips it once, so old
+ * rows and new agree.
+ */
+export function addressSansUnit(address: string, unit: string | null): string {
+  if (!unit) return address;
+  const safe = unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const cleaned = address
+    .replace(new RegExp(`\\s*(?:#|Apt\\.?|Unit)\\s*${safe}\\s*$`, "i"), "")
+    .trim();
+  return cleaned || address;
+}

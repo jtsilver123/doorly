@@ -4,7 +4,7 @@ import { loadConfig } from "@/lib/apikey";
 import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
 import { locate } from "@/lib/geo";
-import { toPrice, toNum } from "@/lib/parse";
+import { addressSansUnit, toPrice, toNum } from "@/lib/parse";
 
 /**
  * Zillow via realtyapi.io.
@@ -173,7 +173,9 @@ export function normalizeZillow(
       sqft: (toNum(p.livingArea) ?? 0) > 0 ? (toNum(p.livingArea) as number) : null,
       neighborhood,
       borough,
-      address: street,
+      // "312 W 23rd St APT 4M" plus unit "4M" printed the unit twice on
+      // every renderer; the clause lives in the unit field alone.
+      address: addressSansUnit(street, extractUnit(street)),
       unit: extractUnit(street),
       lat: p.location?.latitude ?? null,
       lon: p.location?.longitude ?? null,

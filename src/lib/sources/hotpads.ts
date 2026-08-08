@@ -3,6 +3,7 @@ import { realtyGet, POLL_PAGE_CAP } from "@/lib/realtyapi";
 import { loadConfig } from "@/lib/apikey";
 import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
+import { addressSansUnit } from "@/lib/parse";
 import { locate } from "@/lib/geo";
 
 /**
@@ -88,7 +89,7 @@ export function normalizeHotPads(rows: HotPadsListing[], areaLabel = ""): Listin
       sqft: row.sqft && row.sqft > 0 ? row.sqft : null,
       neighborhood,
       borough,
-      address: street,
+      address: addressSansUnit(street, unit),
       unit,
       lat: row.address?.latitude ?? null,
       lon: row.address?.longitude ?? null,

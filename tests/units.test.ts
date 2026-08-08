@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { fingerprint, streetKey, extractUnit, matchConfidence, hasStreetNumber } from "@/lib/dedupe";
-import { toNum, toPrice } from "@/lib/parse";
+import { toNum, toPrice, addressSansUnit } from "@/lib/parse";
 import { craigslistId, parseCraigslistHtml } from "@/lib/sources/craigslist";
 import { inBounds, searchKey, normalizeCriteria, DEFAULT_CRITERIA } from "@/lib/criteria";
 import { train, score, features } from "@/lib/rank";
@@ -2194,4 +2194,11 @@ test("a logged reply counts as replied even while the card sits in Contacted", (
   const waiting = feed({ stage: "contacted", contactCount: 1, hasReply: false });
   const funnel = funnelFor([replied, waiting], 25);
   assert.equal(funnel.replied, 1);
+});
+
+test("a stored address that repeats its unit stops saying it twice", () => {
+  assert.equal(addressSansUnit("99 Suffolk St #2B", "2B"), "99 Suffolk St");
+  assert.equal(addressSansUnit("25 W 13th St APT 2CS", "2CS"), "25 W 13th St");
+  assert.equal(addressSansUnit("330 East 35th Street", "3"), "330 East 35th Street");
+  assert.equal(addressSansUnit("184 Ludlow St", null), "184 Ludlow St");
 });

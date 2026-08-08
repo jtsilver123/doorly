@@ -4,7 +4,7 @@ import { loadConfig } from "@/lib/apikey";
 import { queryScopes, boroughFor, canonicalNeighborhood } from "@/lib/areas";
 import { extractUnit } from "@/lib/dedupe";
 import { locate } from "@/lib/geo";
-import { toPrice, toNum } from "@/lib/parse";
+import { addressSansUnit, toPrice, toNum } from "@/lib/parse";
 
 /**
  * Apartments.com via realtyapi.io.
@@ -165,7 +165,7 @@ export function normalizeApartments(
       sqft: sqft && sqft > 0 ? Math.round(sqft) : null,
       neighborhood,
       borough: located.borough || boroughFor(`${neighborhood} ${address}`),
-      address: address || name,
+      address: addressSansUnit(address, extractUnit(address)) || name,
       unit: extractUnit(address),
       lat,
       lon,

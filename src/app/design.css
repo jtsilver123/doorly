@@ -5466,3 +5466,10 @@ button.fact:hover .fact-label { color: var(--accent); }
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* Phones: the meta line stacks instead of squeezing. The jump chips were
+   getting clipped at the screen edge rather than wrapping under. */
+@media (max-width: 640px) {
+  .filterbar-count { row-gap: 6px; }
+  .sitejumps, .filterbar-trust { flex-basis: 100%; }
+}
