@@ -74,6 +74,7 @@ export default function FilterBar({
   anchorLabel,
   jumps,
   trailing,
+  onPasteSubmit,
 }: {
   filters: Filters;
   onChange: (next: Partial<Filters>) => void;
@@ -87,6 +88,12 @@ export default function FilterBar({
   jumps?: SiteJump[];
   /** Extra control rendered at the row's end (the Activity toggle). */
   trailing?: React.ReactNode;
+  /**
+   * Pressing Enter on a pasted link or a whole post hands it off to the
+   * pull-it-in flow; returns true when consumed, so the box can clear.
+   * One input, two intents — typing narrows, pasting adds.
+   */
+  onPasteSubmit?: (query: string) => boolean;
 }) {
   const [openPanel, setOpenPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -143,9 +150,16 @@ export default function FilterBar({
           <Icon name="search" size={16} />
           <input
             value={filters.query}
-            placeholder="Search address, neighborhood or your notes"
+            placeholder="Search, or paste a link to pull a place in"
             onChange={(e) => onChange({ query: e.target.value })}
-            aria-label="Search listings"
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || !filters.query.trim()) return;
+              if (onPasteSubmit?.(filters.query)) {
+                e.preventDefault();
+                onChange({ query: "" });
+              }
+            }}
+            aria-label="Search listings, or paste a link to add one"
           />
           {filters.query && (
             <button onClick={() => onChange({ query: "" })} aria-label="Clear search">
@@ -351,6 +365,7 @@ export default function FilterBar({
           ))}
         </select>
 
+        {trailing}
         </div>
 
       </div>
@@ -396,7 +411,6 @@ export default function FilterBar({
           Pulled from {sourceCount ?? 5} listing sites
           {lastCheckedAt ? ` · checked ${sinceText(lastCheckedAt)}` : " · not checked yet"}
         </span>
-        {trailing}
       </div>
     </div>
   );

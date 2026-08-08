@@ -423,30 +423,6 @@ export default function Home() {
   }>(null);
   /** Phones: which of the two views the toggle is showing. */
   const [mobileMap, setMobileMap] = useState(false);
-  /*
-   * The radar: what happened since you last stood here. The page's job is
-   * not browsing (StreetEasy is better at that, and the jump buttons say
-   * so); it's watching all five sites so you don't have to. The watermark
-   * lives in this browser because "since you last looked" is a fact about
-   * you, not about the corpus.
-   */
-  const [radarPrev, setRadarPrev] = useState<number | null>(null);
-  const [radarOnly, setRadarOnly] = useState(false);
-  useEffect(() => {
-    if (tab !== "feed") return;
-    const KEY = "damnlease.feed.lastVisit";
-    const prev = Number(window.localStorage.getItem(KEY)) || null;
-    setRadarPrev(prev);
-    window.localStorage.setItem(KEY, String(Date.now()));
-  }, [tab]);
-  const sinceRadar = useCallback(
-    (l: FeedListing) => {
-      if (!radarPrev) return false;
-      const after = (iso: string | null) => Boolean(iso && new Date(iso).getTime() > radarPrev);
-      return after(l.firstSeenAt) || after(l.priceChangedAt) || after(l.relistedAt);
-    },
-    [radarPrev]
-  );
   const { visible, lateHidden } = useMemo(() => {
     let filtered = applyFilters(listings, {
       stage: "all",
@@ -474,7 +450,6 @@ export default function Home() {
         return est != null && est.minutes <= cap;
       });
     }
-    if (radarOnly) filtered = filtered.filter(sinceRadar);
     /*
      * A place that won't be free until weeks after the move-in date is not a
      * candidate, and showing it as one reads as the app not listening. Hidden
@@ -487,8 +462,6 @@ export default function Home() {
     return { visible: kept, lateHidden: filtered.length - kept.length };
   }, [
     showLate,
-    radarOnly,
-    sinceRadar,
     listings,
     query,
     priceMin,
@@ -1517,6 +1490,7 @@ export default function Home() {
                   <button
                     key={action.key}
                     className={`surface action action-${action.tone}`}
+                    title={action.detail}
                     onClick={() => {
                       if (action.filter === "followUp") {
                         setFollowUpOnly(true);
@@ -1581,6 +1555,16 @@ export default function Home() {
               sourceCount={ALL_SOURCES.length}
               anchorLabel={anchor?.label ?? null}
               jumps={searchCriteria ? siteJumps(searchCriteria) : undefined}
+              /* One box for both intents: typing filters, pasting a link or
+                 a whole group post pulls the place in. Two side-by-side
+                 inputs made people guess which one meant what. */
+              onPasteSubmit={(q) => {
+                const pastable =
+                  /^https?:\/\//i.test(q.trim()) || isFacebookUrl(q) || q.trim().length > 60;
+                if (!pastable) return false;
+                quickAdd(q.trim());
+                return true;
+              }}
               /* Activity used to hold a whole row of the frozen header for
                  one pill; it rides the count row now. It's diligence on the
                  same inventory (price cuts, relists, delistings), so it
@@ -1628,64 +1612,6 @@ export default function Home() {
               // ways. Phones choose one at a time via the floating toggle —
               // a 300px map above the cards taxed every visit a scroll.
               <>
-                {/* The radar line: the page's opening claim. Counts what
-                    appeared or moved since your last visit, filters to just
-                    that on request, and — when there's nothing — says so
-                    instead of pretending there's always more to browse. */}
-                {radarPrev != null &&
-                  (() => {
-                    const news = listings.filter(
-                      (l) => sinceRadar(l) && l.isActive
-                    ).length;
-                    return (
-                      <div className="radar" role="status">
-                        <span>
-                          {news > 0 ? (
-                            <>
-                              <b>
-                                {news} new or changed
-                              </b>{" "}
-                              since you last looked.{" "}
-                              <button
-                                className="linkish"
-                                onClick={() => setRadarOnly((v) => !v)}
-                              >
-                                {radarOnly ? "Show everything" : "Just the news"}
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              You&apos;re caught up. Nothing new on any of the
-                              five sites since you last looked. Browse deeper
-                              on StreetEasy if you like; this is where a place
-                              gets won.
-                            </>
-                          )}
-                        </span>
-                        <form
-                          className="radar-paste"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            const input = e.currentTarget.elements.namedItem(
-                              "paste"
-                            ) as HTMLInputElement;
-                            if (input.value.trim()) quickAdd(input.value.trim());
-                            input.value = "";
-                          }}
-                        >
-                          <input
-                            name="paste"
-                            className="field"
-                            placeholder="Found one elsewhere? Paste the link"
-                            aria-label="Pull in a listing by address or link"
-                          />
-                          <button className="btn" type="submit">
-                            Pull it in
-                          </button>
-                        </form>
-                      </div>
-                    );
-                  })()}
                 {(lateHidden > 0 || showLate) && (
                   <div className="late-note" role="status">
                     {showLate ? (

@@ -1319,9 +1319,28 @@ button.fact:hover .fact-label { color: var(--accent); }
    the timeline heads Pipeline. Both keep the old three-across rhythm. */
 .actions-strip {
   display: grid;
-  gap: var(--s3);
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--s2);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   margin-bottom: var(--s3);
+}
+
+/* Compact in the frozen header: the strip sits above the search bar, so
+   every extra line it takes is a card row it costs. Title and detail share
+   one line and the detail truncates; the full sentence rides the title
+   attribute on hover. */
+.actions-strip .action { padding: 8px 12px; gap: var(--s2); }
+.actions-strip .action > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+}
+.actions-strip .action > div > div:first-child { flex-shrink: 0; font-size: 13px !important; }
+.actions-strip .action > div > div:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px !important;
 }
 
 /* Layout lives with the kanban block further down (flex column filling the
@@ -5333,31 +5352,6 @@ button.fact:hover .fact-label { color: var(--accent); }
   }
 }
 
-/* The radar line: the page's opening claim, with the intake beside it. */
-.radar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s4);
-  flex-wrap: wrap;
-  margin-bottom: var(--s3);
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  font-size: var(--t-sm);
-  color: var(--text-muted);
-}
-.radar b { color: var(--text); }
-
-.radar-paste {
-  display: flex;
-  gap: var(--s2);
-  flex: 0 1 360px;
-  min-width: 240px;
-}
-.radar-paste .field { flex: 1; min-width: 0; }
-.radar-paste .btn { flex-shrink: 0; white-space: nowrap; }
 
 /* One tap when they answer. Styled as the good news it is. */
 .board-replied {
@@ -5388,10 +5382,6 @@ button.fact:hover .fact-label { color: var(--accent); }
 .packet-pulse.is-ready { color: var(--text); }
 .packet-pulse .meter { max-width: 220px; }
 
-@media (max-width: 640px) {
-  .radar { flex-direction: column; align-items: stretch; }
-  .radar-paste { flex-basis: auto; }
-}
 
 /* The paste-in form: two columns of guesses, every one editable. */
 .pastein-grid {
