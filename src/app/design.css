@@ -2471,6 +2471,11 @@ button.fact:hover .fact-label { color: var(--accent); }
   color: var(--accent);
 }
 
+/* On a board card: "Texted today 2:14 PM" / "Spotted Aug 5". */
+.board-stamp {
+  font-size: var(--t-xs);
+}
+
 /* In the drawer: attribution + point-person, one quiet row. */
 .crewline {
   display: flex;
@@ -5381,6 +5386,47 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 .packet-pulse.is-ready { color: var(--text); }
 .packet-pulse .meter { max-width: 220px; }
+
+/* --- the Apply page: places at the applying stage, one row each ---------- */
+.applyhub-group { font-size: var(--t-sm); }
+.applyrow {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.applyrow-place {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.applyrow-addr { font-weight: 600; font-size: var(--t-sm); }
+.applyrow-meta { font-size: var(--t-xs); }
+.applyrow-status {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.applyrow[data-status="secured"] .applyrow-status,
+.applyrow[data-status="accepted"] .applyrow-status { color: var(--good); }
+.applyrow[data-status="denied"] .applyrow-status { color: var(--warn); }
+.applyrow > .btn { font-size: var(--t-xs); padding: 5px 10px; white-space: nowrap; }
+@media (max-width: 560px) {
+  .applyrow { flex-wrap: wrap; }
+  .applyrow-place { flex-basis: 100%; }
+}
 
 
 /* The paste-in form: two columns of guesses, every one editable. */

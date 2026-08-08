@@ -29,7 +29,7 @@ import { usePush } from "@/lib/usePush";
 import { commuteMinutes } from "@/lib/commute";
 import { brokerHistory } from "@/lib/leverage";
 import type { AmenityKey } from "@/lib/amenities";
-import ApplicationPacket from "@/components/ApplicationPacket";
+import ApplyHub from "@/components/ApplyHub";
 import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
 import Compare from "@/components/Compare";
@@ -70,10 +70,10 @@ const TourPlanner = dynamic(() => import("@/components/TourPlanner"), { ssr: fal
  * the pipeline's own finalists in a different lens, so it's a view there
  * rather than a destination.
  */
-type Tab = "feed" | "changes" | "pipeline" | "profile" | "compare";
+type Tab = "feed" | "changes" | "pipeline" | "profile" | "compare" | "apply";
 
 /** Every valid tab, so a hand-edited hash can't put the app in a dead state. */
-const TABS: Tab[] = ["pipeline", "feed", "compare", "profile"];
+const TABS: Tab[] = ["pipeline", "feed", "compare", "apply", "profile"];
 
 /**
  * Old bookmarks and muscle memory keep working. "changes" stays a valid hash
@@ -96,6 +96,7 @@ const TAB_PATHS: Record<Tab, string> = {
   pipeline: "pipeline",
   feed: "listings",
   compare: "compare",
+  apply: "apply",
   profile: "you",
   changes: "listings",
 };
@@ -103,6 +104,7 @@ const PATH_TABS: Record<string, Tab> = {
   pipeline: "pipeline",
   listings: "feed",
   compare: "compare",
+  apply: "apply",
   you: "profile",
 };
 
@@ -130,6 +132,7 @@ const NAV_ICON: Record<string, IconName> = {
   changes: "bell",
   pipeline: "pipeline",
   compare: "compare",
+  apply: "send",
   profile: "profile",
 };
 
@@ -208,9 +211,14 @@ export default function Home() {
     const sec = window.location.hash.replace(/^#/, "");
     if (
       window.location.pathname === "/you" &&
-      ["details", "search", "messages", "crew", "packet", "api"].includes(sec)
+      ["details", "search", "messages", "crew", "api"].includes(sec)
     ) {
       setSection(sec as ProfileSection);
+    }
+    // The packet moved out of settings and onto the Apply tab; old
+    // /you#packet bookmarks and in-app links land where it lives now.
+    if (window.location.pathname === "/you" && sec === "packet") {
+      setTab("apply");
     }
     const onPop = () => {
       const next = read();
@@ -229,7 +237,7 @@ export default function Home() {
   useEffect(() => {
     // Clean paths only where the middleware serves them — everywhere the
     // shell answers at /app (local dev), the hash keeps doing the job.
-    // The account page carries its section as a hash (/you#packet), so a
+    // The account page carries its section as a hash (/you#messages), so a
     // reload lands on the same panel instead of the first one.
     const cleanUrls = window.location.pathname !== "/app";
     const want = cleanUrls
@@ -1195,6 +1203,11 @@ export default function Home() {
         .length,
       pipeline: listings.filter((l) => l.stage !== "inbox" && l.stage !== "passed").length,
       followUp: listings.filter((l) => l.needsFollowUp).length,
+      // What the Apply tab has to act on: toured places you could file for,
+      // plus applications still waiting on a verdict.
+      apply: listings.filter(
+        (l) => l.stage === "toured" || (l.stage === "applied" && l.appResult === 0)
+      ).length,
     }),
     [listings]
   );
@@ -1302,6 +1315,9 @@ export default function Home() {
               ["pipeline", "Pipeline", counts.pipeline],
               ["feed", "Listings", actions.length + unread],
               ["compare", "Compare", finalistCount],
+              // Applying promoted from a settings panel to a step of the
+              // work: find, work it, choose, then win the place.
+              ["apply", "Apply", counts.apply],
               // Phones only: the desktop rail reaches this through the account
               // button, which the bottom bar has no room for.
               ["profile", "You", 0],
@@ -1768,6 +1784,23 @@ export default function Home() {
           </div>
         )}
 
+        {/* The winning step gets its own page: which places are at the
+            applying stage, and the packet they're all waiting on. */}
+        {!loading && tab === "apply" && (
+          <div className="page-panels">
+            <ApplyHub
+              listings={listings}
+              profile={profile}
+              onSave={saveProfile}
+              onOpen={setOpen}
+              onOpenApply={(l) => {
+                setDrawerJump("sec-apply");
+                setOpen(l);
+              }}
+            />
+          </div>
+        )}
+
         {!loading && tab === "profile" && (
           <div className="page-panels">
             <div className="profilehead">
@@ -1779,7 +1812,6 @@ export default function Home() {
                     ["search", "What you're looking for"],
                     ["messages", "Your messages"],
                     ["crew", "Search together"],
-                    ["packet", "Application packet"],
                     ["api", "Data & refresh"],
                   ] as [ProfileSection, string][]
                 ).map(([key, label]) => (
@@ -1802,7 +1834,7 @@ export default function Home() {
               <ProfileForm
                 profile={profile}
                 onSave={saveProfile}
-                onGoPacket={() => setSection("packet")}
+                onGoPacket={() => setTab("apply")}
               />
             )}
             {section === "search" && (
@@ -1820,9 +1852,6 @@ export default function Home() {
                   loadFeed();
                 }}
               />
-            )}
-            {section === "packet" && (
-              <ApplicationPacket profile={profile} onSave={saveProfile} />
             )}
             {section === "api" && <ApiSettings status={api} onSaved={loadApi} />}
           </div>
@@ -2400,7 +2429,7 @@ function ProfileForm({
 }: {
   profile: Profile;
   onSave: (p: Profile) => void;
-  /** Jump to the packet tab, where the docs and situation now live. */
+  /** Jump to the Apply page, where the packet and its files now live. */
   onGoPacket: () => void;
 }) {
   const [draft, setDraft] = useState(profile);
@@ -2435,9 +2464,9 @@ function ProfileForm({
         <div style={{ fontWeight: 600 }}>Your details</div>
         <div className="muted" style={{ fontSize: 12 }}>
           These fill in every tour request, so you only write them once. How
-          you earn and your documents live in the{" "}
+          you earn and your documents live on the{" "}
           <button className="linkish" onClick={onGoPacket}>
-            application packet
+            Apply page
           </button>
           ; move-in date and costs sit with your search preferences.
         </div>

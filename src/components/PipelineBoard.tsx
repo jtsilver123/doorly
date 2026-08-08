@@ -6,6 +6,7 @@ import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
 import { googleCalendarUrl } from "@/lib/calendar";
 import { nextAction } from "@/lib/nextAction";
+import { CONTACT_LABEL } from "@/lib/outreach";
 import Icon from "@/components/Icon";
 
 /**
@@ -37,6 +38,19 @@ const LIFT_MS = 300;
 const WOBBLE_PX = 12;
 
 const money = (n: number) => `$${n.toLocaleString()}`;
+
+/** "today 2:14 PM", "yesterday 9:05 AM", then just "Aug 5". */
+function whenText(iso: string, withTime: boolean): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  if (days <= 0) return withTime ? `today ${time}` : "today";
+  if (days === 1) return withTime ? `yesterday ${time}` : "yesterday";
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return withTime && days < 7 ? `${date}, ${time}` : date;
+}
 
 /** What an empty column means, rather than a bare "Nothing here". */
 const STAGE_HINT: Record<string, string> = {
@@ -437,6 +451,22 @@ export default function PipelineBoard({
                   </span>
                   <span className="muted board-where">{l.neighborhood}</span>
                   {crewTag?.(l) && <span className="board-crew">{crewTag(l)}</span>}
+
+                  {/* The question each column actually raises. Interested:
+                      how long has this been sitting here? Contacted: when
+                      did I last poke them, and how? */}
+                  {l.stage === "interested" && (
+                    <span className="muted board-stamp">
+                      Spotted {whenText(l.firstSeenAt, false)}
+                    </span>
+                  )}
+                  {l.stage === "contacted" && (l.lastContactAt || l.stageChangedAt) && (
+                    <span className="muted board-stamp">
+                      {l.lastContactAt
+                        ? `${CONTACT_LABEL[l.lastContactChannel ?? "text"]} ${whenText(l.lastContactAt, true)}`
+                        : `Marked contacted ${whenText(l.stageChangedAt!, true)}`}
+                    </span>
+                  )}
 
                   {/* A booked tour's whole point is being somewhere at a
                       time, so the handoff to your calendar belongs on the

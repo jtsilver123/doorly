@@ -1673,7 +1673,7 @@ function PacketPulse({ profile }: { profile: Profile }) {
           ? `. Still needed: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}`
           : ". Send it with the application"}
         {" "}
-        <a className="linkish" href="/you#packet">
+        <a className="linkish" href="/apply">
           {percent < 100 ? "Finish it" : "Open it"}
         </a>
       </span>

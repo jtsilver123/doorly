@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
    * middleware, so the auth gate still sees the real path.
    */
   async rewrites() {
-    return ["/pipeline", "/listings", "/compare", "/you"].map((source) => ({
+    return ["/pipeline", "/listings", "/compare", "/apply", "/you"].map((source) => ({
       source,
       destination: "/app",
     }));
