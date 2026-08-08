@@ -207,8 +207,12 @@ export default function ListingDrawer({
    */
   useEffect(() => {
     if (!jumpTo) return;
+    // "sec-viewing@time": land on the section AND put the cursor in the
+    // control the button named. "Set the time" that ends with your cursor
+    // anywhere but the time field hasn't finished its own sentence.
+    const [sec, focusKey] = jumpTo.split("@");
     const body = bodyRef.current;
-    const el = body?.querySelector(`[data-sec="${jumpTo}"]`);
+    const el = body?.querySelector(`[data-sec="${sec}"]`);
     if (!body || !el) return;
     const top =
       el.getBoundingClientRect().top -
@@ -216,9 +220,20 @@ export default function ListingDrawer({
       body.scrollTop -
       SPY_LINE +
       8;
-    setActiveSec(jumpTo);
+    setActiveSec(sec);
     jumpUntil.current = Date.now() + 700;
     body.scrollTo({ top });
+    if (focusKey) {
+      const selector =
+        focusKey === "time" ? 'input[type="datetime-local"]' : 'input[inputmode="tel"]';
+      // Everything after the scroll settles — including opening the contact
+      // editor, because the mount-time resync effect runs after this one
+      // and would immediately close an editor opened here synchronously.
+      setTimeout(() => {
+        if (focusKey === "phone") setEditingContact(true);
+        setTimeout(() => el.querySelector<HTMLElement>(selector)?.focus(), 120);
+      }, 350);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpTo, listing.id]);
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -286,11 +301,23 @@ export default function ListingDrawer({
     setPhone(formatPhone(listing.myContactPhone));
     setWho(listing.myContactName);
     setEmail(listing.myContactEmail);
-    setTourAt(toLocalInput(listing.tourAt));
+    /*
+     * Never resync a field someone is typing in. A datetime-local fires
+     * change per segment, and snapping the input back to the server's copy
+     * between segments garbles the entry — the month you typed lands in
+     * the year. The blur that ends the edit flushes the save, and the next
+     * run of this effect reconciles.
+     */
+    if (document.activeElement !== tourAtEl.current) {
+      setTourAt(toLocalInput(listing.tourAt));
+    }
+    if (document.activeElement !== tourEndsEl.current) {
+      setTourEndsAt(toLocalInput(listing.tourEndsAt));
+    }
     setTourKind(listing.tourKind);
-    setTourEndsAt(toLocalInput(listing.tourEndsAt));
     setAppUrl(listing.applicationUrl);
     setEditingContact(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listing.id, listing.myContactPhone, listing.myContactName, listing.myContactEmail, listing.tourAt, listing.tourKind, listing.tourEndsAt, listing.applicationUrl]);
 
   useEffect(() => {
@@ -388,14 +415,52 @@ export default function ListingDrawer({
 
   /** One write for the whole plan: start, kind, and (open house only) end. */
   function saveTour(start: string, kind: TourKind, end: string) {
+    /*
+     * A half-typed date can reach here reading like "202602-09-15" — the
+     * year segment swallows stray digits — and an invalid Date's
+     * toISOString THROWS, which used to kill the save silently and read as
+     * "it won't let me set a time". Skip the write instead: the person is
+     * mid-fumble, and the next valid value (or blur) will save.
+     */
+    const startAt = start ? new Date(start) : null;
+    if (startAt && Number.isNaN(startAt.getTime())) return;
+    const endAt = kind === "open_house" && end ? new Date(end) : null;
     patch({
       action: "tourAt",
-      tourAt: start ? new Date(start).toISOString() : null,
+      tourAt: startAt ? startAt.toISOString() : null,
       tourKind: kind,
-      tourEndsAt:
-        kind === "open_house" && end ? new Date(end).toISOString() : null,
+      tourEndsAt: endAt && !Number.isNaN(endAt.getTime()) ? endAt.toISOString() : null,
     });
   }
+
+  /*
+   * The time inputs save on a beat, not a keystroke. Typing a date is six
+   * change events, and saving each one raced the optimistic update back
+   * into the input mid-edit. Blur (or unmount) flushes whatever is pending
+   * so a quick "type it and close the drawer" still sticks.
+   */
+  const tourAtEl = useRef<HTMLInputElement>(null);
+  const tourEndsEl = useRef<HTMLInputElement>(null);
+  const tourTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tourPending = useRef<{ start: string; kind: TourKind; end: string } | null>(null);
+  const queueTourSave = (start: string, kind: TourKind, end: string) => {
+    tourPending.current = { start, kind, end };
+    if (tourTimer.current) clearTimeout(tourTimer.current);
+    tourTimer.current = setTimeout(() => {
+      tourTimer.current = null;
+      const t = tourPending.current;
+      tourPending.current = null;
+      if (t) saveTour(t.start, t.kind, t.end);
+    }, 900);
+  };
+  const flushTourSave = () => {
+    if (tourTimer.current) clearTimeout(tourTimer.current);
+    tourTimer.current = null;
+    const t = tourPending.current;
+    tourPending.current = null;
+    if (t) saveTour(t.start, t.kind, t.end);
+  };
+  useEffect(() => flushTourSave, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
@@ -1097,6 +1162,10 @@ export default function ListingDrawer({
                       style={{ fontSize: 12, padding: "4px 9px" }}
                       onClick={() => {
                         setTourKind(value);
+                        // A queued keystroke-save would carry the old kind;
+                        // this click supersedes it either way.
+                        tourPending.current = null;
+                        if (tourTimer.current) clearTimeout(tourTimer.current);
                         if (tourAt) saveTour(tourAt, value, tourEndsAt);
                       }}
                     >
@@ -1109,13 +1178,15 @@ export default function ListingDrawer({
                   <span>{tourKind === "open_house" ? "Starts" : "When is it?"}</span>
                   <input
                     id="tour-at"
+                    ref={tourAtEl}
                     className="field"
                     type="datetime-local"
                     value={tourAt}
                     onChange={(e) => {
                       setTourAt(e.target.value);
-                      saveTour(e.target.value, tourKind, tourEndsAt);
+                      queueTourSave(e.target.value, tourKind, tourEndsAt);
                     }}
+                    onBlur={flushTourSave}
                   />
                   {listing.tourAt && <b>{tourWhen(listing.tourAt)}</b>}
                 </label>
@@ -1124,13 +1195,15 @@ export default function ListingDrawer({
                   <label className="tourtime">
                     <span>Until</span>
                     <input
+                      ref={tourEndsEl}
                       className="field"
                       type="datetime-local"
                       value={tourEndsAt}
                       onChange={(e) => {
                         setTourEndsAt(e.target.value);
-                        saveTour(tourAt, tourKind, e.target.value);
+                        queueTourSave(tourAt, tourKind, e.target.value);
                       }}
+                      onBlur={flushTourSave}
                     />
                     {listing.tourEndsAt && <b>{tourWhen(listing.tourEndsAt)}</b>}
                   </label>

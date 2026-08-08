@@ -150,6 +150,21 @@ export default function PipelineBoard({
   /** When the card landed in its column; discovery time before it moved. */
   const inColumnSince = (l: FeedListing) =>
     new Date(l.stageChangedAt ?? l.firstSeenAt).getTime();
+
+  /**
+   * Where the card's next-action button should land in the drawer: the
+   * control the label names, not just the neighborhood. "Set the time"
+   * opens the viewing planner with the cursor in the time field; "Add a
+   * number" lands in the phone field; anything apply-shaped opens Apply.
+   * The @suffix asks the drawer to focus that control after scrolling.
+   */
+  function jumpFor(l: FeedListing): string {
+    const kind = nextAction(l).kind;
+    if (kind === "apply" || l.stage === "applied") return "sec-apply";
+    if (l.stage === "tour") return "sec-viewing@time";
+    if (kind === "add-contact") return "sec-contact@phone";
+    return "sec-contact";
+  }
   /** A touch-lifted card: what's being dragged and where the finger is. */
   const [lifted, setLifted] = useState<{ listing: FeedListing; x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -715,15 +730,13 @@ export default function PipelineBoard({
                     title="Jump to where this happens"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const kind = nextAction(l).kind;
-                      onOpenAt(l, kind === "apply" ? "sec-apply" : "sec-contact");
+                      onOpenAt(l, jumpFor(l));
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         e.stopPropagation();
-                        const kind = nextAction(l).kind;
-                        onOpenAt(l, kind === "apply" ? "sec-apply" : "sec-contact");
+                        onOpenAt(l, jumpFor(l));
                       }
                     }}
                   >

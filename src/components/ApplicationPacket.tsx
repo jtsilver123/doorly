@@ -35,15 +35,30 @@ const MISC_SLOTS = [
   { key: "g_misc", label: "Extras, guarantor's", hint: "their extra papers" },
 ] as const;
 
-/** Where a file can be filed: every checklist slot plus the two shelves. */
-function slotOptions(profile: Profile): { key: string; label: string }[] {
-  return [
-    ...packetSlots(profile).map((s) => ({
-      key: s.key,
-      label: s.guarantor ? s.label : s.label,
-    })),
-    ...MISC_SLOTS.map((s) => ({ key: s.key, label: s.label })),
+/**
+ * Where a file can be filed, grouped by whose paper it is. The flat list
+ * read as a jumble once the guarantor's stack joined it; "whose is this"
+ * is the first question anyway, so the dropdown asks it first. Inside the
+ * guarantor group the "Guarantor " prefix drops — the group already says it.
+ */
+function slotOptions(profile: Profile): {
+  mine: { key: string; label: string }[];
+  theirs: { key: string; label: string }[];
+} {
+  const slots = packetSlots(profile);
+  const mine = [
+    ...slots.filter((s) => !s.guarantor).map((s) => ({ key: s.key, label: s.label })),
+    { key: "misc", label: "Extras" },
   ];
+  const theirs = profile.hasGuarantor
+    ? [
+        ...slots
+          .filter((s) => s.guarantor)
+          .map((s) => ({ key: s.key, label: s.label.replace(/^Guarantor\s+/, "") })),
+        { key: "g_misc", label: "Extras" },
+      ]
+    : [];
+  return { mine, theirs };
 }
 
 /** The little "file under…" control every document row carries. */
@@ -53,9 +68,10 @@ function MoveSelect({
   onMove,
 }: {
   value: string;
-  options: { key: string; label: string }[];
+  options: ReturnType<typeof slotOptions>;
   onMove: (slot: string) => void;
 }) {
+  const known = [...options.mine, ...options.theirs].some((o) => o.key === value);
   return (
     <select
       className="field packet-move"
@@ -64,11 +80,26 @@ function MoveSelect({
       onChange={(e) => onMove(e.target.value)}
     >
       {!value && <option value="">Sort into…</option>}
-      {options.map((o) => (
-        <option key={o.key} value={o.key}>
-          {o.label}
-        </option>
-      ))}
+      {/* A doc can sit in a slot the current setup no longer offers, e.g.
+          a guarantor paper after the guarantor toggle went off. Keep its
+          home listed so the select never shows blank. */}
+      {value && !known && <option value={value}>{value}</option>}
+      <optgroup label="Yours">
+        {options.mine.map((o) => (
+          <option key={o.key} value={o.key}>
+            {o.label}
+          </option>
+        ))}
+      </optgroup>
+      {options.theirs.length > 0 && (
+        <optgroup label="Guarantor's">
+          {options.theirs.map((o) => (
+            <option key={o.key} value={o.key}>
+              {o.label}
+            </option>
+          ))}
+        </optgroup>
+      )}
     </select>
   );
 }
@@ -90,7 +121,7 @@ function SlotRow({
   slot: { key: string; label: string; hint?: string; wants: number };
   docs: PacketDoc[];
   onRemove: (doc: PacketDoc) => void;
-  options: { key: string; label: string }[];
+  options: ReturnType<typeof slotOptions>;
   onMove: (doc: PacketDoc, slot: string) => void;
 }) {
   const mine = docs.filter((d) => d.slot === slot.key);
