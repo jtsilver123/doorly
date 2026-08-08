@@ -25,6 +25,55 @@ const docSize = (bytes: number | null) =>
       : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 /**
+ * The two catch-alls that hold what no checklist slot names: reference
+ * letters, credit reports, the odd W-2 — one shelf for your papers, one for
+ * the guarantor's. Neither counts toward readiness; they exist so a real
+ * folder of documents has somewhere honest to live.
+ */
+const MISC_SLOTS = [
+  { key: "misc", label: "Extras, yours", hint: "reference letters, credit report, W-2s" },
+  { key: "g_misc", label: "Extras, guarantor's", hint: "their extra papers" },
+] as const;
+
+/** Where a file can be filed: every checklist slot plus the two shelves. */
+function slotOptions(profile: Profile): { key: string; label: string }[] {
+  return [
+    ...packetSlots(profile).map((s) => ({
+      key: s.key,
+      label: s.guarantor ? s.label : s.label,
+    })),
+    ...MISC_SLOTS.map((s) => ({ key: s.key, label: s.label })),
+  ];
+}
+
+/** The little "file under…" control every document row carries. */
+function MoveSelect({
+  value,
+  options,
+  onMove,
+}: {
+  value: string;
+  options: { key: string; label: string }[];
+  onMove: (slot: string) => void;
+}) {
+  return (
+    <select
+      className="field packet-move"
+      value={value}
+      aria-label="File this document under"
+      onChange={(e) => onMove(e.target.value)}
+    >
+      {!value && <option value="">Sort into…</option>}
+      {options.map((o) => (
+        <option key={o.key} value={o.key}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
  * One checklist requirement, holding its actual files.
  *
  * "Photo ID ✓" used to be a promise; here the requirement is only met when
@@ -35,10 +84,14 @@ function SlotRow({
   slot,
   docs,
   onRemove,
+  options,
+  onMove,
 }: {
   slot: { key: string; label: string; hint?: string; wants: number };
   docs: PacketDoc[];
   onRemove: (doc: PacketDoc) => void;
+  options: { key: string; label: string }[];
+  onMove: (doc: PacketDoc, slot: string) => void;
 }) {
   const mine = docs.filter((d) => d.slot === slot.key);
   const met = mine.length >= slot.wants;
@@ -59,6 +112,7 @@ function SlotRow({
                 <a href={doc.url} target="_blank" rel="noreferrer">
                   {doc.name || doc.path.split("/").pop()}
                 </a>
+                <MoveSelect value={doc.slot} options={options} onMove={(s) => onMove(doc, s)} />
                 <button
                   className="packet-remove"
                   aria-label={`Delete ${doc.name}`}
@@ -141,6 +195,21 @@ export default function ApplicationPacket({
       loadDocs();
     }
   };
+  /** Re-file after the fact: optimistic, then the server's word is final. */
+  const moveDoc = async (doc: PacketDoc, slot: string) => {
+    setDocs((list) => list.map((d) => (d.id === doc.id ? { ...d, slot } : d)));
+    try {
+      await fetch("/api/documents", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: doc.id, slot }),
+      });
+    } finally {
+      loadDocs();
+    }
+  };
+  const [dragOver, setDragOver] = useState(false);
+  const options = slotOptions(profile);
 
   const slots = packetSlots(profile);
   const { percent, missing, satisfied } = packetReadiness(profile, docs);
@@ -163,6 +232,12 @@ export default function ApplicationPacket({
         <div className="muted" style={{ fontSize: 12 }}>
           The apartment goes to the first complete application. Have yours ready
           before the viewing, not after.
+        </div>
+        {/* True at the database: documents carry an owner-only policy, so
+            crew mates who share the pipeline still can't open these. */}
+        <div className="muted packet-privacy">
+          <Icon name="check" size={12} /> Private to you. Nobody else can open
+          these, including people searching with you.
         </div>
       </div>
 
@@ -266,6 +341,69 @@ export default function ApplicationPacket({
       </div>
 
       <div style={{ display: "grid", gap: 8 }}>
+        {/* The fast path: everything from the downloads folder in one drop,
+            sorted into slots afterward with the little selects. Deciding a
+            category per file at upload time is what makes people not upload. */}
+        <label
+          className={dragOver ? "packet-drop packet-massdrop is-over" : "packet-drop packet-massdrop"}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            if (e.dataTransfer.files?.length) enqueueUploads("packet", e.dataTransfer.files);
+          }}
+        >
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files?.length) enqueueUploads("packet", e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <Icon name="plus" size={15} />
+          Drop all your files here at once. Sort them into their spots after
+        </label>
+
+        {docs.filter((d) => !d.slot).length > 0 && (
+          <>
+            <span className="muted" style={{ fontSize: 12 }}>
+              Not sorted yet. Tell each one where it belongs
+            </span>
+            <ul className="packet-docs">
+              {docs
+                .filter((d) => !d.slot)
+                .map((doc) => (
+                  <li key={doc.id}>
+                    <a href={doc.url} target="_blank" rel="noreferrer">
+                      {doc.name || doc.path.split("/").pop()}
+                    </a>
+                    <span className="muted">
+                      {docSize(doc.size)}
+                      {doc.size != null ? " · " : ""}
+                      {new Date(doc.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                    <MoveSelect value="" options={options} onMove={(s) => moveDoc(doc, s)} />
+                    <button
+                      className="btn-icon packet-remove"
+                      aria-label={`Delete ${doc.name}`}
+                      title="Delete"
+                      onClick={() => removeDoc(doc)}
+                    >
+                      <Icon name="close" size={13} />
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
+
         <span className="muted" style={{ fontSize: 12 }}>
           Your documents. A requirement is met by a file, not a checkbox
         </span>
@@ -273,7 +411,14 @@ export default function ApplicationPacket({
           {slots
             .filter((slot) => !slot.guarantor)
             .map((slot) => (
-              <SlotRow key={slot.key} slot={slot} docs={docs} onRemove={removeDoc} />
+              <SlotRow
+                key={slot.key}
+                slot={slot}
+                docs={docs}
+                onRemove={removeDoc}
+                options={options}
+                onMove={moveDoc}
+              />
             ))}
         </ul>
         {profile.hasGuarantor && (
@@ -285,53 +430,62 @@ export default function ApplicationPacket({
               {slots
                 .filter((slot) => slot.guarantor)
                 .map((slot) => (
-                  <SlotRow key={slot.key} slot={slot} docs={docs} onRemove={removeDoc} />
+                  <SlotRow
+                    key={slot.key}
+                    slot={slot}
+                    docs={docs}
+                    onRemove={removeDoc}
+                    options={options}
+                    onMove={moveDoc}
+                  />
                 ))}
             </ul>
           </>
         )}
-        {/* The catch-all for papers no slot names: reference letters, credit
-            reports, the odd W-2. */}
-        <label className="packet-drop">
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,image/*"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              if (e.target.files?.length) enqueueUploads("packet", e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <Icon name="image" size={15} />
-          Anything else worth attaching. Reference letters, credit report
-        </label>
-        {docs.filter((d) => !d.slot).length > 0 && (
-          <ul className="packet-docs">
-            {docs
-              .filter((d) => !d.slot)
-              .map((doc) => (
-                <li key={doc.id}>
-                  <a href={doc.url} target="_blank" rel="noreferrer">
-                    {doc.name || doc.path.split("/").pop()}
-                  </a>
-                  <span className="muted">
-                    {docSize(doc.size)}
-                    {doc.size != null ? " · " : ""}
-                    {new Date(doc.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  </span>
-                  <button
-                    className="btn-icon packet-remove"
-                    aria-label={`Delete ${doc.name}`}
-                    title="Delete"
-                    onClick={() => removeDoc(doc)}
-                  >
-                    <Icon name="close" size={13} />
-                  </button>
-                </li>
-              ))}
-          </ul>
-        )}
+
+        {/* The two shelves for what no slot names. Neither moves the meter;
+            they exist so every real paper has an honest home. The guarantor
+            shelf shows once there IS a guarantor, or once it holds a file. */}
+        {MISC_SLOTS.filter(
+          (m) =>
+            m.key === "misc" ||
+            profile.hasGuarantor ||
+            docs.some((d) => d.slot === m.key)
+        ).map((m) => {
+          const mine = docs.filter((d) => d.slot === m.key);
+          return (
+            <div key={m.key} style={{ display: "grid", gap: 6 }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {m.label} · {m.hint}
+              </span>
+              {mine.length > 0 ? (
+                <ul className="packet-docs">
+                  {mine.map((doc) => (
+                    <li key={doc.id}>
+                      <a href={doc.url} target="_blank" rel="noreferrer">
+                        {doc.name || doc.path.split("/").pop()}
+                      </a>
+                      <span className="muted">{docSize(doc.size)}</span>
+                      <MoveSelect value={doc.slot} options={options} onMove={(s) => moveDoc(doc, s)} />
+                      <button
+                        className="btn-icon packet-remove"
+                        aria-label={`Delete ${doc.name}`}
+                        title="Delete"
+                        onClick={() => removeDoc(doc)}
+                      >
+                        <Icon name="close" size={13} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="muted" style={{ fontSize: 11 }}>
+                  Nothing here yet. Drop files above and sort them in
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ display: "grid", gap: 6 }}>

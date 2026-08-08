@@ -3366,6 +3366,39 @@ button.fact:hover .fact-label { color: var(--accent); }
   transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
+/* The one-drop intake: bigger, and it lights up under a dragged folder. */
+.packet-massdrop {
+  padding: 18px 16px;
+  justify-content: center;
+  font-weight: 600;
+}
+.packet-massdrop.is-over {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+/* "File under…" on every document row. Small on purpose — but no
+   !important: the touch-device 16px rule must keep winning on phones, or
+   focusing this select would zoom the whole page on iOS. */
+.packet-move {
+  width: auto;
+  max-width: 170px;
+  padding: 2px 6px;
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
+/* The honest word about who can see these: only you. */
+.packet-privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--good);
+}
+
 .packet-drop:hover {
   border-color: var(--accent);
   color: var(--text);
