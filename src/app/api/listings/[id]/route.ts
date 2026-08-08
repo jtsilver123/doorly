@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   addContact,
   loadListingDetail,
+  loadGuestListingDetail,
   recordFeedback,
   setAmenityMark,
   setListingFields,
@@ -9,6 +10,7 @@ import {
   passListing,
   undoPass,
 } from "@/lib/feed";
+import { currentUserId } from "@/lib/supabase";
 import type { ContactLog, Stage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,13 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
   try {
-    const detail = await loadListingDetail(id);
+    // Guests get the public record: corpus events and price history, no
+    // contact log — the demo drawer's chart works without an account.
+    const signedIn = await currentUserId().then(
+      () => true,
+      () => false
+    );
+    const detail = signedIn ? await loadListingDetail(id) : await loadGuestListingDetail(id);
     return NextResponse.json(detail ?? {});
   } catch (err) {
     const message = err instanceof Error ? err.message : "detail failed";

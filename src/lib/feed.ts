@@ -660,6 +660,58 @@ export async function loadListingDetail(id: string): Promise<{
   };
 }
 
+/**
+ * A listing's public record for a visitor: the corpus's events and price
+ * history, nobody's contact log. Served so the demo drawer shows the price
+ * chart and the timeline instead of a spinner that never resolves — and
+ * because none of this is personal, it was only ever behind the login by
+ * accident of plumbing.
+ */
+export async function loadGuestListingDetail(id: string): Promise<{
+  events: ListingEvent[];
+  contacts: ContactLog[];
+  priceHistory: PricePoint[];
+}> {
+  const supabase = adminDb();
+  const [events, observations] = await Promise.all([
+    supabase
+      .from("events")
+      .select("*")
+      .eq("listing_id", id)
+      .order("occurred_at", { ascending: false }),
+    supabase
+      .from("observations")
+      .select("price, observed_at")
+      .eq("listing_id", id)
+      .order("observed_at", { ascending: true }),
+  ]);
+
+  const priceHistory: PricePoint[] = [];
+  for (const row of observations.data ?? []) {
+    const price = row.price as number | null;
+    if (price == null) continue;
+    const last = priceHistory[priceHistory.length - 1];
+    if (!last || last.price !== price) {
+      priceHistory.push({ price, at: row.observed_at as string });
+    }
+  }
+
+  return {
+    events: ((events.data ?? []) as Record<string, unknown>[]).map((e) => ({
+      id: e.id as number,
+      listingId: e.listing_id as string,
+      kind: e.kind as ListingEvent["kind"],
+      oldValue: (e.old_value as string) ?? null,
+      newValue: (e.new_value as string) ?? null,
+      detail: (e.detail as string) ?? "",
+      occurredAt: e.occurred_at as string,
+      acknowledged: true,
+    })),
+    contacts: [],
+    priceHistory,
+  };
+}
+
 /** The "what changed" feed across every listing. */
 export async function loadChanges(limit = 200): Promise<
   (ListingEvent & { address: string; neighborhood: string; price: number; url: string })[]

@@ -332,7 +332,10 @@ export default function ListingDrawer({
     fetch(`/api/listings/${encodeURIComponent(listing.id)}`)
       .then((r) => r.json())
       .then((d) => {
-        if (live) setDetail(d);
+        // Only a payload shaped like a Detail gets in. An error body
+        // ({error: "not signed in"}) once landed here as-is, and the first
+        // `.length` read took the whole app down for guests.
+        if (live && d && Array.isArray(d.events)) setDetail(d);
       })
       .catch(() => {});
     // The building's public record rides in behind the details — cached a
@@ -1637,7 +1640,7 @@ export default function ListingDrawer({
           </section>
 
           {/* --- the record ---------------------------------------------- */}
-          {detail && detail.priceHistory.length > 1 && (
+          {detail && (detail.priceHistory?.length ?? 0) > 1 && (
             <section className="dsec">
               <h3 className="dsec-label">Price history</h3>
               <PriceChart points={detail.priceHistory} />

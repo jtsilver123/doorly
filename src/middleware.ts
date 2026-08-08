@@ -172,7 +172,10 @@ export async function middleware(request: NextRequest) {
     path === "/api/estimate" ||
     // The feed serves a read-only corpus view to visitors — the route picks
     // guest vs personal by session, and guests never touch personal tables.
-    path === "/api/feed";
+    path === "/api/feed" ||
+    // A single listing's public record (events, price history) reads the
+    // same corpus. GET only: the PATCH on this exact path stays gated.
+    (request.method === "GET" && /^\/api\/listings\/[^/]+$/.test(path));
 
   /*
    * The app itself is the shop window. A visitor lands straight on the
