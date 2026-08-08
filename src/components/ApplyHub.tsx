@@ -98,6 +98,8 @@ export default function ApplyHub({
    */
   const [docs, setDocs] = useState<PacketDoc[]>([]);
   const loadDocs = useCallback(async () => {
+    // A visitor has no documents; skip the guaranteed 401.
+    if (!document.cookie.includes("-auth-token")) return;
     try {
       const body = await fetch("/api/documents").then((r) => r.json());
       setDocs(body.documents ?? []);

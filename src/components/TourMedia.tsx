@@ -47,6 +47,8 @@ export default function TourMedia({ listingId }: { listingId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
+    // A visitor has no footage; skip the guaranteed 401.
+    if (!document.cookie.includes("-auth-token")) return;
     try {
       const res = await fetch(`/api/listings/${encodeURIComponent(listingId)}/media`);
       const body = await res.json();

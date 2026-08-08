@@ -430,6 +430,7 @@ export default function Compare({
   onMark,
   onNotes,
   preferredSource,
+  onBrowse,
 }: {
   listings: FeedListing[];
   onOpen: (l: FeedListing) => void;
@@ -442,6 +443,8 @@ export default function Compare({
   onNotes: (id: string, notes: string) => Promise<void> | void;
   /** Which site the lightbox's "open the listing" link favours. */
   preferredSource?: Source;
+  /** The empty state's way out: jump to the Listings page. */
+  onBrowse?: () => void;
 }) {
   const [order, setOrder] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<string[]>([]);
@@ -579,14 +582,23 @@ export default function Compare({
 
   if (candidates.length < 2) {
     return (
-      <div className="surface" style={{ padding: 24 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Nothing to compare yet</div>
-        <div className="muted" style={{ fontSize: 13 }}>
-          Compare shows what&apos;s on your board. Put two or more places into
-          the pipeline and they line up here side by side, with rent, real
-          cost, and how each stacks up against the market, for the night you
-          have to choose.
+      <div className="surface" style={{ padding: 24, display: "grid", gap: 12, justifyItems: "start" }}>
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Nothing to compare yet</div>
+          <div className="muted" style={{ fontSize: 13 }}>
+            Compare shows what&apos;s on your board. Put two or more places into
+            the pipeline and they line up here side by side, with rent, real
+            cost, and how each stacks up against the market, for the night you
+            have to choose.
+          </div>
         </div>
+        {/* An empty state that only describes the fix is half a page; the
+            button IS the fix. */}
+        {onBrowse && (
+          <button className="btn btn-primary" onClick={onBrowse}>
+            Go find places
+          </button>
+        )}
       </div>
     );
   }

@@ -347,12 +347,15 @@ export default function ListingDrawer({
         if (live && b.intel) setIntel(b.intel as BuildingIntel);
       })
       .catch(() => {});
-    // Opening the drawer counts as reading its updates.
-    fetch(`/api/listings/${encodeURIComponent(listing.id)}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "seen" }),
-    }).catch(() => {});
+    // Opening the drawer counts as reading its updates. A visitor has no
+    // read-state to stamp, so the write is skipped rather than 401ing.
+    if (document.cookie.includes("-auth-token")) {
+      fetch(`/api/listings/${encodeURIComponent(listing.id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "seen" }),
+      }).catch(() => {});
+    }
     return () => {
       live = false;
     };
@@ -861,7 +864,7 @@ export default function ListingDrawer({
                 Listed for sale
                 {listing.salePrice ? ` at ${compactPrice(listing.salePrice)}` : ""}.
                 The play here is convincing the owner to rent it to you
-                {listing.price ? ` — your opening offer is ${money(listing.price)}/mo` : ""}.
+                {listing.price ? `, opening at ${money(listing.price)}/mo` : ""}.
                 The drafts below make that pitch.
               </span>
             </div>
@@ -1799,6 +1802,11 @@ function PacketPulse({ profile }: { profile: Profile }) {
   const [docs, setDocs] = useState<{ slot: string }[] | null>(null);
   useEffect(() => {
     let alive = true;
+    // A visitor has no documents; render the empty meter without the 401.
+    if (!document.cookie.includes("-auth-token")) {
+      setDocs([]);
+      return;
+    }
     fetch("/api/documents")
       .then((r) => r.json())
       .then((b) => {

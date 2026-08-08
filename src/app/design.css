@@ -3481,8 +3481,29 @@ button.fact:hover .fact-label { color: var(--accent); }
   font-weight: 700;
 }
 @media (max-width: 860px) {
-  .guest-topcta { top: 10px; right: 10px; padding: 7px 12px; font-size: var(--t-sm); }
+  /* Top-right on a phone sits on the paste box; bottom-right floats clear
+     of everything, just above the tab bar. */
+  .guest-topcta {
+    top: auto;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    right: 12px;
+    padding: 9px 14px;
+    font-size: var(--t-sm);
+  }
 }
+
+/* The visitor's rail: the corpus, plainly, instead of a borrowed panic. */
+.railguest {
+  display: grid;
+  gap: 4px;
+  padding: var(--s3) 0;
+}
+.railguest b {
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.railguest .muted { font-size: var(--t-xs); line-height: 1.5; }
 
 @keyframes gatefade {
   from { opacity: 0; }

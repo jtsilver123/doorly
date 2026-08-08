@@ -407,6 +407,9 @@ export default function Home() {
   }, [loadFeed]);
 
   const loadNotices = useCallback(async () => {
+    // Nothing personal to notify a visitor about, and the poll would 401
+    // every two minutes forever.
+    if (!document.cookie.includes("-auth-token")) return;
     try {
       const body = await fetch("/api/notifications").then((r) => r.json());
       setNotices(body.notifications ?? []);
@@ -591,6 +594,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    /*
+     * No auth cookie means every personal endpoint would answer 401 — a
+     * dozen red lines in a visitor's console for nothing. The cookie is
+     * readable here (Supabase's SSR cookies aren't httpOnly), so its
+     * absence is a reliable, synchronous "skip the personal loads".
+     */
+    if (!document.cookie.includes("-auth-token")) return;
     loadChanges();
     loadApi();
     loadCrew();
@@ -1333,13 +1343,26 @@ export default function Home() {
               countdown here, a wide panel on Pipeline) into the rail's one
               status instrument. Hidden on phones with the rest of the rail
               chrome; the Pipeline page keeps a strip there instead. */}
-          <RailStatus
-            info={phase}
-            funnel={funnel}
-            moveInDate={profile.moveInDate}
-            live={counts.active}
-            changed={counts.changed}
-          />
+          {/* A visitor has no move-in date and no funnel; showing them a red
+              "Behind pace" computed from a default profile reads as either
+              broken or manipulative. They get the calm truth instead. */}
+          {guest ? (
+            <div className="railguest">
+              <b>{counts.active.toLocaleString()}</b>
+              <span className="muted">
+                NYC places live, checked hourly. Look around. Saving one is
+                where your own hunt starts.
+              </span>
+            </div>
+          ) : (
+            <RailStatus
+              info={phase}
+              funnel={funnel}
+              moveInDate={profile.moveInDate}
+              live={counts.active}
+              changed={counts.changed}
+            />
+          )}
         </div>
 
         <div className="mobile-nav" style={{ display: "grid", gap: 2 }}>
@@ -1785,7 +1808,10 @@ export default function Home() {
           <div className="page-pipeline">
             {/* Phones only: the rail that carries this status on desktop is
                 a bottom tab bar down there, so the strip covers for it. */}
-            <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
+            {/* Same reasoning as the rail: pace advice presumes a hunt. */}
+            {!guest && (
+              <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
+            )}
 
             <PipelineBoard
               listings={listings}
@@ -1829,6 +1855,7 @@ export default function Home() {
               onLean={setLean}
               onMark={markAmenity}
               preferredSource={profile.preferredSource}
+              onBrowse={() => setTab("feed")}
               onNotes={async (id, notes) => {
                 await patch(id, { action: "notes", notes });
                 loadFeed();
@@ -2517,8 +2544,8 @@ function ProfileForm({
    * knows: who you are in a message.
    */
   const text: [keyof Profile, string, string][] = [
-    ["name", "Your name", "Jake Silver"],
-    ["employer", owner ? "Your business" : "Where you work", "BetterCampus"],
+    ["name", "Your name", "First and last"],
+    ["employer", owner ? "Your business" : "Where you work", "Company, school, or your LLC"],
     [
       "income",
       owner ? "Income shown on your 2025 return" : "Your income",

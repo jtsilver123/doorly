@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb, currentUserId } from "@/lib/supabase";
+import { adminDb } from "@/lib/supabase";
 import { fetchBuildingIntel } from "@/lib/nycdata";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await currentUserId();
+    // Public city data about a building, cached a week server-side — the
+    // one thing on this route that was ever private was the login wall.
+    // Guests get it too; it's half the demo drawer's substance.
     const { id } = await params;
     const supabase = adminDb();
 

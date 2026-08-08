@@ -20,7 +20,7 @@ import Icon from "@/components/Icon";
 
 const CLAIMS: { stat: string; text: string }[] = [
   { stat: "5", text: "listing sites checked hourly, deduplicated into one scored list" },
-  { stat: "2", text: "taps to text an agent — the message is already written" },
+  { stat: "2", text: "taps to text an agent. The message is already written" },
   { stat: "1", text: "pipeline from first text to signed lease, saved forever" },
 ];
 
