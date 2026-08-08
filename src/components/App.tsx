@@ -816,16 +816,16 @@ export default function Home() {
       }
       return false;
     };
-    const inCorpus = async (): Promise<string | null> => {
+    const lookup = async (pull: boolean): Promise<{ id: string | null; error?: string }> => {
       try {
         const body = await fetch("/api/listings/find", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({ query, pull }),
         }).then((r) => r.json());
-        return body.id ?? null;
+        return { id: body.id ?? null, error: body.error };
       } catch {
-        return null;
+        return { id: null };
       }
     };
 
@@ -835,43 +835,21 @@ export default function Home() {
       return;
     }
 
-    const known = await inCorpus();
-    if (known && (await adopt(known, "Found it. Added to your pipeline"))) return;
+    // Two steps, cheapest first: the shared corpus costs nothing, and a miss
+    // there asks the sources for THIS place — one targeted request, not the
+    // full every-source-every-page poll a paste used to trigger.
+    const known = await lookup(false);
+    if (known.id && (await adopt(known.id, "Found it. Added to your pipeline"))) return;
 
-    if (refreshing) {
-      toast({ message: "A check is already running. Paste it again when that finishes." });
-      return;
-    }
-
-    toast({ message: "Not tracked yet. Checking the sources for it now" });
-    setRefreshing(true);
-    try {
-      const res = await checkNow();
-      const fresh = findPasted(res.listings, query);
-      if (fresh) {
-        claim(fresh, `There it is. ${fresh.address} just came in`);
-        return;
-      }
-      // The check may have pulled it into the corpus outside your criteria;
-      // the corpus-wide lookup is what can still see it there.
-      const late = await inCorpus();
-      if (late && (await adopt(late, "There it is. Added to your pipeline"))) return;
-      if (res.error) {
-        toast({ message: res.error, tone: "warn" });
-      } else {
-        toast({
-          message: `Checked just now and the sources don't have it. If it's a private tip, it won't turn up on its own.`,
-          tone: "warn",
-        });
-      }
-    } catch (err) {
-      toast({
-        message: err instanceof Error ? err.message : "The check failed. Try again in a minute.",
-        tone: "warn",
-      });
-    } finally {
-      setRefreshing(false);
-    }
+    toast({ message: "Not tracked yet. Asking the sources for that exact place" });
+    const pulled = await lookup(true);
+    if (pulled.id && (await adopt(pulled.id, "There it is. Added to your pipeline"))) return;
+    toast({
+      message:
+        pulled.error ??
+        "The sources don't have it. If it's a private tip, paste the whole post and I'll take it from the text.",
+      tone: "warn",
+    });
   };
 
   /**

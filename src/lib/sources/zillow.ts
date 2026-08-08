@@ -244,6 +244,35 @@ export async function fetchZillow(c: SearchCriteria): Promise<Listing[]> {
 }
 
 /**
+ * One place, one request: the targeted lookup behind a quick-add miss.
+ *
+ * A pasted address used to trigger a full poll — every source, every area,
+ * every page — to find one apartment. The byaddress endpoint takes a
+ * specific address as its location, so the whole hunt costs a single
+ * request against the shared budget. Criteria are wide open on purpose:
+ * a paste is a manual decision, and bounds would only hide the answer.
+ */
+export async function fetchZillowOne(address: string): Promise<Listing[]> {
+  const wide: SearchCriteria = {
+    areas: [],
+    bedMin: 0,
+    bedMax: null,
+    bathMin: 0,
+    priceMin: 0,
+    priceMax: 100_000,
+    sources: ["zillow"],
+    noFeeOnly: false,
+  };
+  const body = await realtyGet<ZillowResponse>("zillow", "/search/byaddress", {
+    location: address,
+    listingStatus: "For_Rent",
+    sortOrder: "Newest",
+    page: 1,
+  });
+  return normalizeZillow(body?.searchResults ?? [], wide, "");
+}
+
+/**
  * Zillow's own price history for one listing. Richer than our observed history
  * because it predates the first time we ever saw the place.
  */

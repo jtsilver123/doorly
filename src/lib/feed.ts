@@ -1104,6 +1104,95 @@ export async function setAmenityMark(
  * shared with the browser) does the matching — a second server-side matcher
  * would drift from the first within a month.
  */
+/**
+ * The targeted pull behind a quick-add miss: one place, one upstream
+ * request, straight into the corpus.
+ *
+ * Before this, a pasted address the corpus didn't know triggered a full
+ * poll — every source, every area, every configured page — to find one
+ * apartment. Now the paste itself is the search term: the byaddress
+ * endpoint takes a street address as its location, the results are
+ * upserted the same shape the poller writes, and the id of the closest
+ * match comes back for adoption. Returns null when the sources genuinely
+ * don't have it.
+ */
+export async function pullListingByAddress(term: string): Promise<string | null> {
+  const { fetchZillowOne } = await import("@/lib/sources/zillow");
+  const found = await fetchZillowOne(term);
+  if (!found.length) return null;
+
+  const supabase = adminDb();
+  const now = new Date().toISOString();
+  // A building query can return several units; keep a handful so the person
+  // lands on the right one even if the parse was loose.
+  const keep = found.slice(0, 5);
+  for (const listing of keep) {
+    // Insert if new, refresh if known — split on purpose, because a blanket
+    // upsert would stomp original_price and first_seen_at on a relist, and
+    // those two columns are the whole price-drop story.
+    const { error } = await supabase.from("listings").upsert(
+      {
+        id: listing.id,
+        fingerprint: fingerprint(listing),
+        address: listing.address,
+        unit: listing.unit,
+        neighborhood: listing.neighborhood,
+        borough: listing.borough,
+        lat: listing.lat,
+        lon: listing.lon,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
+        sqft: listing.sqft,
+        price: listing.price,
+        original_price: listing.price,
+        description: listing.description,
+        url: listing.url,
+        image_url: listing.imageUrl,
+        available_at: listing.availableAt,
+        no_fee: listing.noFee,
+        building_type: listing.buildingType,
+        contact_phone: listing.contactPhone,
+        contact_name: listing.contactName,
+        contact_email: listing.contactEmail,
+        is_active: true,
+        last_seen_at: now,
+      },
+      { onConflict: "id", ignoreDuplicates: true }
+    );
+    if (error) throw new Error(`pullListingByAddress: ${error.message}`);
+    await supabase
+      .from("listings")
+      .update({ price: listing.price, is_active: true, last_seen_at: now, url: listing.url })
+      .eq("id", listing.id);
+    await supabase.from("listing_sources").upsert(
+      {
+        source: listing.source,
+        source_id: listing.sourceId,
+        listing_id: listing.id,
+        url: listing.url,
+        is_active: true,
+        last_seen_at: now,
+      },
+      { onConflict: "source,source_id" }
+    );
+  }
+
+  // The paste text itself decides which of the pulled units is the one.
+  const best = findPasted(
+    keep.map((l) => ({
+      id: l.id,
+      address: l.address,
+      unit: l.unit,
+      neighborhood: l.neighborhood,
+      notes: "",
+      url: l.url,
+      alsoOn: [],
+    })) as unknown as FeedListing[],
+    term
+  );
+  return best?.id ?? keep[0].id;
+}
+
 export async function findInCorpus(query: string): Promise<string | null> {
   const supabase = await db();
   const [{ data: rows }, { data: srcs }] = await Promise.all([

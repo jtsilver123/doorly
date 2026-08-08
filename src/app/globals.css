@@ -1788,6 +1788,18 @@ kbd {
 
 .landing-cta-sub { font-size: var(--t-sm); color: rgba(244, 242, 234, 0.55); }
 
+/* The quiet second door: the demo is the live app itself, one click away,
+   no form in between. A text link on purpose, not a second button — the
+   acid stays on the one real call to action above it. */
+.landing-try {
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: rgba(244, 242, 234, 0.85);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.landing-try:hover { color: #fff; }
+
 /*
  * The proof strip.
  *

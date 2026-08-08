@@ -171,6 +171,14 @@ export default async function Home({
             <Link className="landing-go" href={go}>
               {goLabel}
             </Link>
+            {/* The demo IS the app: guests land on the live board with the
+                real corpus, and the account ask waits for their first move. */}
+            {!user && (
+              <a className="landing-try" href={appUrl("/pipeline")}>
+                Look around first
+                <span aria-hidden="true"> →</span>
+              </a>
+            )}
             <span className="landing-cta-sub">
               {user
                 ? "Your pipeline is where you left it"
