@@ -111,9 +111,13 @@ export default async function Home({
   if (place) redirect(`/app?place=${encodeURIComponent(place)}`);
 
   const [user, counts] = await Promise.all([currentUser(), corpus()]);
-  // Signed in, the product is a hostname away — link straight there rather
-  // than bouncing through a redirect the app would only issue anyway.
-  const go = user ? appUrl("/app") : "/signup";
+  /*
+   * The main CTA goes to the product, signed in or not. Guests land on the
+   * live listings feed — real inventory beats any mock demo — and the
+   * account modal meets them at their first action. The signup page still
+   * exists one quiet link below, for people who already know they're in.
+   */
+  const go = user ? appUrl("/app") : appUrl("/listings");
   const goLabel = user ? "Back to the hunt" : "Start the hunt";
 
   return (
@@ -171,18 +175,18 @@ export default async function Home({
             <Link className="landing-go" href={go}>
               {goLabel}
             </Link>
-            {/* The demo IS the app: guests land on the live board with the
-                real corpus, and the account ask waits for their first move. */}
+            {/* The button IS the demo — it opens the live app as a guest.
+                The quiet link below is for people who already know. */}
             {!user && (
-              <a className="landing-try" href={appUrl("/pipeline")}>
-                Look around first
+              <a className="landing-try" href="/signup">
+                Or create your account now
                 <span aria-hidden="true"> →</span>
               </a>
             )}
             <span className="landing-cta-sub">
               {user
                 ? "Your pipeline is where you left it"
-                : "Completely free · two minutes to set up · bring your roommate"}
+                : "Completely free · look around first, sign up when you act"}
             </span>
           </div>
         </div>
