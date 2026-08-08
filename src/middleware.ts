@@ -168,7 +168,23 @@ export async function middleware(request: NextRequest) {
    * behind a sign-up would be the joke telling itself. It returns aggregate
    * counts and a median asking price; nothing personal crosses it.
    */
-  const isPublicApi = path === "/api/estimate";
+  const isPublicApi =
+    path === "/api/estimate" ||
+    // The feed serves a read-only corpus view to visitors — the route picks
+    // guest vs personal by session, and guests never touch personal tables.
+    path === "/api/feed";
+
+  /*
+   * The app itself is the shop window. A visitor lands straight on the
+   * board and the listings — real corpus data, nobody's personal state —
+   * and the account modal appears the moment they try to DO anything (the
+   * write APIs still answer 401, and the client turns that into the
+   * create-account flow). Only viewing is free; /you stays gated since an
+   * account page for no account is a koan.
+   */
+  const isGuestShell =
+    request.method === "GET" &&
+    ["/pipeline", "/listings", "/compare", "/apply", "/app"].includes(path);
 
   /*
    * The social card rides along: link unfurlers have no session and give up
@@ -205,7 +221,7 @@ export async function middleware(request: NextRequest) {
     return finish(NextResponse.redirect(new URL(path + search, origins.marketing), 307));
   }
 
-  if (!user && !isAuthRoute && !isCron && !isPublicApi && !isLanding) {
+  if (!user && !isAuthRoute && !isCron && !isPublicApi && !isLanding && !isGuestShell) {
     /*
      * APIs answer 401, pages redirect. A fetch() that gets a 307 to /login
      * follows it silently and hands the caller a login page with a 200 on it,

@@ -53,6 +53,7 @@ import PassDialog from "@/components/PassDialog";
 import { icsFor, icsFilename } from "@/lib/calendar";
 import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
+import JoinGate from "@/components/JoinGate";
 // Client-only: Leaflet reads `window` the moment its module loads, which
 // detonates the server prerender. The map has no server-renderable form anyway.
 const CityMap = dynamic(() => import("@/components/CityMap"), {
@@ -256,6 +257,18 @@ export default function Home() {
     document.querySelector(".main")?.scrollTo?.({ top: 0 });
   }, [tab, section]);
   const [listings, setListings] = useState<FeedListing[]>([]);
+  /*
+   * A visitor with no account, browsing the live corpus through the shop
+   * window. Everything that only reads is theirs to use; the first write
+   * opens the create-account modal instead of failing quietly.
+   */
+  const [guest, setGuest] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const requireAccount = useCallback(() => {
+    if (!guest) return false;
+    setJoinOpen(true);
+    return true;
+  }, [guest]);
   const [changes, setChanges] = useState<Change[]>([]);
   /** Personal notices: crew adds, watched changes, good drops. */
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -353,6 +366,9 @@ export default function Home() {
       const res = await fetch("/api/feed?stage=everything");
       const body = await res.json();
       if (body.error) toast({ message: body.error, tone: "warn" });
+      // The feed says whether this is a visitor looking through the shop
+      // window; every mutating path checks that flag and offers an account.
+      setGuest(Boolean(body.guest));
       const fresh: FeedListing[] = body.listings ?? [];
       setListings(fresh);
       return fresh;
@@ -596,6 +612,7 @@ export default function Home() {
   };
 
   async function refresh() {
+    if (requireAccount()) return;
     setRefreshing(true);
 
     try {
@@ -622,6 +639,13 @@ export default function Home() {
 
   const patch = useCallback(
     async (id: string, body: Record<string, unknown>, reload = true) => {
+      // Every optimistic mutation funnels through here, so this one gate
+      // covers stars, stages, leans, notes, contacts — the works. The
+      // reload snaps any optimistic flourish back to the guest truth.
+      if (requireAccount()) {
+        await loadFeed();
+        return;
+      }
       await fetch(`/api/listings/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -629,7 +653,7 @@ export default function Home() {
       });
       if (reload) await loadFeed();
     },
-    [loadFeed]
+    [loadFeed, requireAccount]
   );
 
   /**
@@ -746,6 +770,8 @@ export default function Home() {
    * when the fresh feed lands. The person pasting is the person in a hurry.
    */
   const quickAdd = async (query: string) => {
+    // Pasting a place to track is the moment a visitor becomes a user.
+    if (requireAccount()) return;
     /*
      * A Facebook link or a pasted post can't be looked up — the group boards
      * have no API and their terms bar scraping — so they open the paste-in
@@ -988,6 +1014,8 @@ export default function Home() {
    */
   const reachOut = useCallback(
     async (listing: FeedListing) => {
+      // Texting an agent from the app is the product; doing it needs a you.
+      if (requireAccount()) return;
       // Anything that isn't "send them a message" belongs in the panel, where
       // the control for it lives.
       const action = nextAction(listing);
@@ -1064,7 +1092,7 @@ export default function Home() {
     },
     // listings rides along for broker memory — a stale closure would draft
     // from last render's threads.
-    [patch, profile, listings, loadFeed]
+    [patch, profile, listings, loadFeed, requireAccount]
   );
 
   // --- keyboard triage -----------------------------------------------------
@@ -1281,6 +1309,7 @@ export default function Home() {
   // for every debounced keystroke would be a metronome. Each form shows its
   // own quiet status line instead.
   async function saveProfile(next: Profile) {
+    if (requireAccount()) return;
     setProfile(next);
     await fetch("/api/profile", {
       method: "PUT",
@@ -1486,14 +1515,25 @@ export default function Home() {
             Send feedback
           </a>
 
-          <AccountMenu
-            email={email}
-            name={profile.name}
-            onOpenSection={(next) => {
-              setSection(next);
-              setTab("profile");
-            }}
-          />
+          {guest ? (
+            // The shop window's one honest ask, where the account chip
+            // would sit. Everything above it works without one.
+            <button
+              className="btn btn-primary rail-join"
+              onClick={() => setJoinOpen(true)}
+            >
+              Create your free account
+            </button>
+          ) : (
+            <AccountMenu
+              email={email}
+              name={profile.name}
+              onOpenSection={(next) => {
+                setSection(next);
+                setTab("profile");
+              }}
+            />
+          )}
         </div>
       </nav>
 
@@ -1805,6 +1845,7 @@ export default function Home() {
                 setDrawerJump("sec-apply");
                 setOpen(l);
               }}
+              onGate={requireAccount}
             />
           </div>
         )}
@@ -1940,6 +1981,10 @@ export default function Home() {
           onClose={() => setReviewing(false)}
         />
       )}
+
+      {/* The moment a visitor tried to act like a user: offer the account
+          right here, on top of the thing they were doing. */}
+      {joinOpen && <JoinGate onClose={() => setJoinOpen(false)} />}
 
       {/* A pasted post becoming a card. Lands as Interested, same as any
           manual add: your paste outranks the criteria. */}

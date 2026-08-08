@@ -117,12 +117,14 @@ function SlotRow({
   onRemove,
   options,
   onMove,
+  onGate,
 }: {
   slot: { key: string; label: string; hint?: string; wants: number };
   docs: PacketDoc[];
   onRemove: (doc: PacketDoc) => void;
   options: ReturnType<typeof slotOptions>;
   onMove: (doc: PacketDoc, slot: string) => void;
+  onGate?: () => boolean;
 }) {
   const mine = docs.filter((d) => d.slot === slot.key);
   const met = mine.length >= slot.wants;
@@ -157,7 +159,12 @@ function SlotRow({
           </div>
         )}
       </div>
-      <label className="btn packet-addbtn">
+      <label
+        className="btn packet-addbtn"
+        onClick={(e) => {
+          if (onGate?.()) e.preventDefault();
+        }}
+      >
         <input
           type="file"
           multiple
@@ -189,12 +196,15 @@ export default function ApplicationPacket({
   onSave,
   docs,
   onDocsChanged,
+  onGate,
 }: {
   profile: Profile;
   onSave: (p: Profile) => void;
   /** The papers, owned by the page so the hero and this list agree. */
   docs: PacketDoc[];
   onDocsChanged: () => void;
+  /** True when the viewer can't upload yet (guest) — and says so itself. */
+  onGate?: () => boolean;
 }) {
   const documents = profile.documents ?? [];
   const removeDoc = async (doc: PacketDoc) => {
@@ -327,6 +337,10 @@ export default function ApplicationPacket({
             category per file at upload time is what makes people not upload. */}
         <label
           className={dragOver ? "packet-drop packet-massdrop is-over" : "packet-drop packet-massdrop"}
+          // A guest's click offers the account instead of the file picker.
+          onClick={(e) => {
+            if (onGate?.()) e.preventDefault();
+          }}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -335,6 +349,7 @@ export default function ApplicationPacket({
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
+            if (onGate?.()) return;
             if (e.dataTransfer.files?.length) enqueueUploads("packet", e.dataTransfer.files);
           }}
         >
@@ -399,6 +414,7 @@ export default function ApplicationPacket({
                 onRemove={removeDoc}
                 options={options}
                 onMove={moveDoc}
+                onGate={onGate}
               />
             ))}
         </ul>
@@ -418,6 +434,7 @@ export default function ApplicationPacket({
                     onRemove={removeDoc}
                     options={options}
                     onMove={moveDoc}
+                    onGate={onGate}
                   />
                 ))}
             </ul>

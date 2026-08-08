@@ -81,6 +81,7 @@ export default function ApplyHub({
   onSave,
   onOpen,
   onOpenApply,
+  onGate,
 }: {
   listings: FeedListing[];
   profile: Profile;
@@ -88,6 +89,8 @@ export default function ApplyHub({
   onOpen: (l: FeedListing) => void;
   /** Open the drawer scrolled to its Apply section (link field lives there). */
   onOpenApply: (l: FeedListing) => void;
+  /** Returns true when the viewer can't act yet (guest) — and says so. */
+  onGate?: () => boolean;
 }) {
   /*
    * The papers, loaded once for the whole page. The packet renders them,
@@ -234,6 +237,7 @@ export default function ApplyHub({
         onSave={onSave}
         docs={docs}
         onDocsChanged={loadDocs}
+        onGate={onGate}
       />
     </div>
   );

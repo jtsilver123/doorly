@@ -3413,6 +3413,15 @@ button.fact:hover .fact-label { color: var(--accent); }
 .packet-preview[open] summary .icon { transform: rotate(0deg); }
 .packet-preview summary:hover { color: var(--text); }
 
+/* The visitor's account modal, and the rail's one honest ask. */
+.rail-join { width: 100%; }
+.joingate { display: grid; gap: var(--s3); max-width: 420px; }
+.joingate-google,
+.joingate-email-toggle { justify-content: center; }
+.joingate-email-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.joingate-form { display: grid; gap: var(--s3); }
+.joingate-alt { font-size: var(--t-sm); text-align: center; }
+
 /* The honest word about who can see these: only you. */
 .packet-privacy {
   display: inline-flex;

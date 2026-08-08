@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { loadFeed } from "@/lib/feed";
+import { loadFeed, loadGuestFeed } from "@/lib/feed";
+import { currentUserId } from "@/lib/supabase";
 import type { FeedFilterOptions, SortKey } from "@/lib/filters";
 import type { Source } from "@/types";
 
@@ -34,8 +35,18 @@ export async function GET(request: Request) {
   };
 
   try {
-    const listings = await loadFeed(filters);
-    return NextResponse.json({ listings });
+    /*
+     * No session gets the guest feed: the shared corpus rated against stock
+     * criteria, nobody's personal state. The middleware lets this route
+     * through unauthenticated for exactly this branch — it is the shop
+     * window, and windows don't ask for a login.
+     */
+    const signedIn = await currentUserId().then(
+      () => true,
+      () => false
+    );
+    const listings = signedIn ? await loadFeed(filters) : await loadGuestFeed(filters);
+    return NextResponse.json({ listings, guest: !signedIn });
   } catch (err) {
     const message = err instanceof Error ? err.message : "feed failed";
     return NextResponse.json({ error: message, listings: [] }, { status: 500 });

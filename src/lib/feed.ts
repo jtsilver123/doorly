@@ -446,6 +446,158 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   return applyFilters(out, filters);
 }
 
+/**
+ * The feed a visitor sees before they have an account.
+ *
+ * The whole pitch is "this is what hunting looks like in here", and an empty
+ * screen behind a login wall makes that pitch with its hands tied. Guests get
+ * the shared corpus — real listings, real ratings against stock criteria —
+ * and none of anyone's personal state: no stages, no contacts, no notes, no
+ * documents. Reads go through the service role because the corpus tables
+ * don't grant the anonymous role anything; the personal tables are never
+ * touched at all, so there is nothing here RLS would have protected.
+ */
+export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<FeedListing[]> {
+  const supabase = adminDb();
+
+  let query = supabase.from("listings").select("*").eq("is_active", true);
+  if (filters.priceMin != null) query = query.gte("price", filters.priceMin);
+  if (filters.priceMax != null) query = query.lte("price", filters.priceMax);
+  if (filters.bedsMin != null) query = query.gte("bedrooms", filters.bedsMin);
+  if (filters.bedsMax != null) query = query.lte("bedrooms", filters.bedsMax);
+  if (filters.bathsMin != null) query = query.gte("bathrooms", filters.bathsMin);
+  if (filters.noFeeOnly) query = query.eq("no_fee", true);
+
+  const { data: rows, error } = await query
+    .order("first_seen_at", { ascending: false })
+    .limit(400);
+  if (error) throw new Error(`loadGuestFeed: ${error.message}`);
+  const listings = (rows ?? []) as ListingRow[];
+  if (!listings.length) return [];
+
+  const ids = listings.map((r) => r.id);
+  const [sources, events] = await Promise.all([
+    supabase
+      .from("listing_sources")
+      .select("listing_id, source, url, is_active")
+      .in("listing_id", ids),
+    supabase
+      .from("events")
+      .select("listing_id, kind, occurred_at")
+      .in("listing_id", ids)
+      .order("occurred_at", { ascending: false })
+      .limit(2000),
+  ]);
+
+  const sourcesBy = new Map<string, { source: Source; url: string }[]>();
+  for (const row of sources.data ?? []) {
+    const list = sourcesBy.get(row.listing_id) ?? [];
+    list.push({ source: row.source as Source, url: row.url });
+    sourcesBy.set(row.listing_id, list);
+  }
+  const eventsBy = new Map<string, { kind: string; occurred_at: string }[]>();
+  for (const row of events.data ?? []) {
+    const list = eventsBy.get(row.listing_id) ?? [];
+    list.push({ kind: row.kind, occurred_at: row.occurred_at });
+    eventsBy.set(row.listing_id, list);
+  }
+
+  // Stock taste: no signals to learn from, stock criteria to rate against.
+  const model = train([]);
+  const costs = DEFAULT_COSTS;
+  const criteria = DEFAULT_CRITERIA;
+  const corpus = listings.map((r) => ({
+    neighborhood: r.neighborhood,
+    borough: r.borough,
+    bedrooms: r.bedrooms,
+    price: r.price,
+  }));
+
+  const out: FeedListing[] = [];
+  for (const row of listings) {
+    const alsoOn = sourcesBy.get(row.id) ?? [];
+    const listing = toListing(row, alsoOn[0]?.source ?? "streeteasy");
+    const { score: value, reasons } = score(listing, model, criteria);
+    const cost = moveInCost(listing, costs);
+    const deal = readDeal(row.price, statsFor(listing, corpus));
+
+    out.push({
+      ...listing,
+      firstSeenAt: row.first_seen_at,
+      lastSeenAt: row.last_seen_at,
+      isActive: row.is_active,
+      originalPrice: row.original_price,
+      priceChangedAt: row.price_changed_at,
+      relistedAt: row.relisted_at,
+      alsoOn,
+      hasReply: false,
+      stage: "inbox",
+      stageChangedAt: null,
+      starred: false,
+      visitedAt: null,
+      notes: "",
+      followUpAt: null,
+      myContactPhone: "",
+      myContactEmail: "",
+      myContactName: "",
+      tourAt: null,
+      myScore: null,
+      lean: 0,
+      appResult: 0,
+      secured: false,
+      amenityMarks: {},
+      tourKind: "private",
+      tourEndsAt: null,
+      passReason: "",
+      applicationUrl: "",
+      passedAt: null,
+      addedById: null,
+      pocId: null,
+      contactCount: 0,
+      lastContactAt: null,
+      lastContactChannel: null,
+      score: value,
+      scoreReasons: reasons,
+      perks: amenitiesOf(listing),
+      rating: 0,
+      grade: "fair",
+      ratingHeadline: "",
+      pros: [],
+      cons: [],
+      daysOnMarket: daysBetween(row.first_seen_at),
+      unseenEvents: 0,
+      needsFollowUp: false,
+      upfrontCost: cost.total,
+      dealVerdict: deal.verdict,
+      dealDelta: deal.percentVsMedian,
+      dealLabel: deal.label,
+      flags: [],
+      effectiveRent: effectiveRent(listing),
+      allInMonthly: allInMonthly(listing, costs),
+      timing: moveInFit(row.available_at, DEFAULT_PROFILE.moveInDate).timing,
+      timingLabel: moveInFit(row.available_at, DEFAULT_PROFILE.moveInDate).label,
+      priceHistory: [],
+    });
+  }
+
+  for (const listing of out) {
+    listing.flags = flagsFor(listing, {
+      verdict: listing.dealVerdict,
+      percentVsMedian: listing.dealDelta,
+      stats: statsFor(listing, corpus),
+      label: listing.dealLabel,
+    });
+    const verdict = verdictFor(listing, criteria);
+    listing.rating = verdict.rating;
+    listing.grade = verdict.grade;
+    listing.ratingHeadline = verdict.headline;
+    listing.pros = verdict.pros;
+    listing.cons = verdict.cons;
+  }
+
+  return applyFilters(out, filters);
+}
+
 /** Everything known about one listing, for the detail view. */
 export async function loadListingDetail(id: string): Promise<{
   events: ListingEvent[];
