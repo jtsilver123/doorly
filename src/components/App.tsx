@@ -264,6 +264,28 @@ export default function Home() {
    */
   const [guest, setGuest] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  /*
+   * Arriving with #join (the landing's "create your account" line) opens
+   * the modal over the demo — but only once we know this really is a
+   * guest, so a signed-in person following an old link isn't offered an
+   * account they already have.
+   */
+  const wantsJoin = useRef(false);
+  // Layout effect on purpose: the URL-normalizing effect below rewrites the
+  // hash away on its first run, so the read has to happen before any
+  // passive effect gets a turn.
+  useLayoutEffect(() => {
+    if (window.location.hash === "#join") {
+      wantsJoin.current = true;
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+  useEffect(() => {
+    if (guest && wantsJoin.current) {
+      wantsJoin.current = false;
+      setJoinOpen(true);
+    }
+  }, [guest]);
   const requireAccount = useCallback(() => {
     if (!guest) return false;
     setJoinOpen(true);

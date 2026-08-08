@@ -155,8 +155,27 @@ export default function Lightbox({
            * Keyed by url so switching clips tears the element down instead of
            * swapping `src` on a playing one — which leaves the old audio
            * running in some browsers.
+           *
+           * Muted, because browsers refuse unmuted autoplay — the old bare
+           * autoPlay was silently blocked, leaving a black rectangle stuck
+           * at 0:00 that read as a broken upload. Muted autoplay is allowed
+           * everywhere, the clip is moving the moment the lightbox opens,
+           * and the sound is one tap on the controls. The ref sets the
+           * property directly since the attribute alone isn't always enough
+           * for the autoplay policy check.
            */
-          <video key={item.url} src={item.url} controls autoPlay playsInline />
+          <video
+            key={item.url}
+            src={item.url}
+            controls
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            ref={(el) => {
+              if (el) el.muted = true;
+            }}
+          />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={item.url} alt={item.caption || `Photo ${at + 1}`} />

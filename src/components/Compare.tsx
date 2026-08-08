@@ -894,7 +894,9 @@ export default function Compare({
                   <div className="compare-media">
                     {(media[l.id] ?? []).slice(0, 4).map((m) =>
                       m.kind === "video" ? (
-                        <video key={m.id} src={m.url} controls playsInline preload="metadata" />
+                        // The #t fragment makes the browser paint frame one
+                        // instead of a black box waiting for play.
+                        <video key={m.id} src={`${m.url}#t=0.01`} controls playsInline preload="metadata" />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img key={m.id} src={m.url} alt="Tour photo" loading="lazy" onClick={() => onOpen(l)} />

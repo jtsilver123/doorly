@@ -199,7 +199,9 @@ export default function TourMedia({ listingId }: { listingId: string }) {
               >
                 {item.kind === "video" ? (
                   <>
-                    <video src={item.url} playsInline preload="metadata" muted />
+                    {/* #t paints frame one, so a tile is a thumbnail, not a
+                        black square. */}
+                    <video src={`${item.url}#t=0.01`} playsInline preload="metadata" muted />
                     <span className="tourmedia-play" aria-hidden="true">
                       <Icon name="play" size={16} />
                     </span>

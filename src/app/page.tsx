@@ -177,8 +177,10 @@ export default async function Home({
             </Link>
             {/* The button IS the demo — it opens the live app as a guest.
                 The quiet link below is for people who already know. */}
+            {/* Same door, account form already open on top of the demo —
+                the flow never leaves the product. */}
             {!user && (
-              <a className="landing-try" href="/signup">
+              <a className="landing-try" href={appUrl("/listings#join")}>
                 Or create your account now
                 <span aria-hidden="true"> →</span>
               </a>

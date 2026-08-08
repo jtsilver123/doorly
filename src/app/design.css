@@ -3413,14 +3413,145 @@ button.fact:hover .fact-label { color: var(--accent); }
 .packet-preview[open] summary .icon { transform: rotate(0deg); }
 .packet-preview summary:hover { color: var(--text); }
 
-/* The visitor's account modal, and the rail's one honest ask. */
+/* --- the visitor's account modal ----------------------------------------- */
+
 .rail-join { width: 100%; }
-.joingate { display: grid; gap: var(--s3); max-width: 420px; }
+
+/* A heavier scrim than other modals: the app behind it is the pitch, and
+   the blur says "still there, one close away". */
+.joingate-scrim {
+  background: rgba(14, 14, 18, 0.55);
+  backdrop-filter: blur(4px);
+  animation: gatefade 0.18s var(--ease);
+}
+
+.joingate {
+  position: relative;
+  width: min(760px, calc(100vw - 28px));
+  max-height: 88dvh;
+  overflow: auto;
+  display: grid;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  animation: gatepop 0.24s var(--ease);
+}
+@media (min-width: 720px) {
+  .joingate { grid-template-columns: 0.85fr 1fr; }
+}
+
+@keyframes gatefade {
+  from { opacity: 0; }
+}
+@keyframes gatepop {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .joingate, .joingate-scrim { animation: none; }
+}
+
+.joingate-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.joingate-close:hover { color: var(--text); background: var(--surface-2); }
+
+/* Left: what the account actually buys, in the landing's voice. */
+.joingate-pitch {
+  display: grid;
+  align-content: start;
+  gap: var(--s3);
+  padding: 26px 24px;
+  background: var(--ink, #16161c);
+  color: rgba(244, 242, 234, 0.92);
+}
+.joingate-mark {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  /* The landing's acid, not the app's accent: on this near-black panel the
+     app accent IS near-black, which is how the numbers once vanished. */
+  color: var(--action);
+  font-size: var(--t-sm);
+}
+.joingate-pitch h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.joingate-pitch p {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  color: rgba(244, 242, 234, 0.7);
+}
+.joingate-claims {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.joingate-claims li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: var(--t-sm);
+  color: rgba(244, 242, 234, 0.85);
+}
+.joingate-claims b {
+  flex: 0 0 26px;
+  font-size: 20px;
+  color: var(--action);
+  text-align: center;
+}
+.joingate-free { font-size: var(--t-xs); color: rgba(244, 242, 234, 0.55); }
+
+/* Right: the shortest path in. */
+.joingate-panel {
+  display: grid;
+  align-content: start;
+  gap: var(--s3);
+  padding: 26px 24px;
+}
+.joingate-panel-head { display: grid; gap: 2px; padding-right: 34px; }
+.joingate-panel-head b { font-size: var(--t-lg); }
+.joingate-panel-head .muted { font-size: var(--t-sm); }
 .joingate-google,
-.joingate-email-toggle { justify-content: center; }
+.joingate-email-toggle,
+.joingate-submit { justify-content: center; padding: 11px 14px; font-weight: 600; }
 .joingate-email-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.joingate-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--text-muted);
+  font-size: var(--t-xs);
+}
+.joingate-or::before,
+.joingate-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .joingate-form { display: grid; gap: var(--s3); }
-.joingate-alt { font-size: var(--t-sm); text-align: center; }
+.joingate-alt { font-size: var(--t-sm); text-align: center; color: var(--text-muted); }
+
+/* On a phone the pitch compresses to a banner above the form. */
+@media (max-width: 719px) {
+  .joingate-pitch { padding: 20px 18px; gap: 8px; }
+  .joingate-claims { display: none; }
+  .joingate-pitch h2 { font-size: 22px; }
+}
 
 /* The honest word about who can see these: only you. */
 .packet-privacy {

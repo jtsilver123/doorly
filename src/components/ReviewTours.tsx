@@ -111,7 +111,8 @@ export default function ReviewTours({
           ) : shots.length > 0 ? (
             shots.slice(0, 6).map((m) =>
               m.kind === "video" ? (
-                <video key={m.id} src={m.url} controls playsInline preload="metadata" />
+                // #t paints frame one instead of a black box awaiting play.
+                <video key={m.id} src={`${m.url}#t=0.01`} controls playsInline preload="metadata" />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={m.id} src={m.url} alt="Tour footage" loading="lazy" />
