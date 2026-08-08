@@ -20,7 +20,7 @@ import {
 import { compactPrice } from "@/lib/cost";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
-import { amenityFacts, AMENITY_ORDER } from "@/lib/amenities";
+import { amenityFacts, AMENITY_ORDER, AMENITIES, type AmenityKey } from "@/lib/amenities";
 import PhotoGallery from "@/components/PhotoGallery";
 import TourMedia from "@/components/TourMedia";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
@@ -80,6 +80,12 @@ interface Props {
    * the field it means.
    */
   jumpTo?: string | null;
+  /**
+   * Record what you know about an amenity: yes, no, or null to clear back
+   * to the listing's own word. The same marks the Compare grid edits, so
+   * a check made here shows there and vice versa.
+   */
+  onMark?: (l: FeedListing, key: AmenityKey, fact: "yes" | "no" | null) => void;
 }
 
 /**
@@ -174,6 +180,7 @@ export default function ListingDrawer({
   crew,
   all,
   jumpTo,
+  onMark,
 }: Props) {
   /*
    * Closing is animated, which means the panel has to outlive the decision to
@@ -1066,6 +1073,63 @@ export default function ListingDrawer({
               limit={10}
               showLabels
             />
+
+            {/* What YOU know beats what the listing says: you stood in the
+                kitchen, the listing didn't. Each row is the listing's word,
+                correctable with one tap; the same marks drive the Compare
+                grid, so a check made on a tour shows up on decision night. */}
+            {onMark && (
+              <div className="amencheck">
+                <span className="amencheck-title">
+                  Your amenity check
+                  <span className="muted"> · tap what you saw. Compare shows the same marks</span>
+                </span>
+                <ul>
+                  {(() => {
+                    const facts = amenityFacts(listing);
+                    return AMENITY_ORDER.map((key) => {
+                      const listed = facts[key];
+                      const mark = listing.amenityMarks?.[key];
+                      const shown = mark ?? listed;
+                      return (
+                        <li key={key} data-state={shown}>
+                          <span className="amencheck-name">{AMENITIES[key].label}</span>
+                          <span className="muted amencheck-src">
+                            {mark
+                              ? "your check"
+                              : listed === "unknown"
+                                ? "not stated"
+                                : "listing says"}
+                          </span>
+                          <span className="amencheck-btns">
+                            <button
+                              className={shown === "yes" ? "lean-btn is-on" : "lean-btn"}
+                              data-lean={1}
+                              title={mark === "yes" ? "Clear your mark" : "It has this"}
+                              aria-pressed={shown === "yes"}
+                              aria-label={`${AMENITIES[key].label}: has it`}
+                              onClick={() => onMark(listing, key, mark === "yes" ? null : "yes")}
+                            >
+                              <Icon name="check" size={13} />
+                            </button>
+                            <button
+                              className={shown === "no" ? "lean-btn is-on" : "lean-btn"}
+                              data-lean={-1}
+                              title={mark === "no" ? "Clear your mark" : "It doesn't"}
+                              aria-pressed={shown === "no"}
+                              aria-label={`${AMENITIES[key].label}: doesn't have it`}
+                              onClick={() => onMark(listing, key, mark === "no" ? null : "no")}
+                            >
+                              <Icon name="close" size={13} />
+                            </button>
+                          </span>
+                        </li>
+                      );
+                    });
+                  })()}
+                </ul>
+              </div>
+            )}
 
             {/* The 40× rule, before you fall for it. Only speaks when the
                 profile has an income to check against. */}

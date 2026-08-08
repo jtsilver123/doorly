@@ -1930,6 +1930,7 @@ export default function Home() {
           onChanged={loadFeed}
           crew={crew}
           all={listings}
+          onMark={markAmenity}
         />
       )}
 

@@ -3413,6 +3413,33 @@ button.fact:hover .fact-label { color: var(--accent); }
 .packet-preview[open] summary .icon { transform: rotate(0deg); }
 .packet-preview summary:hover { color: var(--text); }
 
+/* The drawer's amenity check: the listing's word, correctable by yours. */
+.amencheck { display: grid; gap: 8px; }
+.amencheck-title { font-size: var(--t-sm); font-weight: 600; }
+.amencheck-title .muted { font-weight: 400; font-size: var(--t-xs); }
+.amencheck ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px;
+}
+.amencheck li {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.amencheck-name { flex: 1; min-width: 0; font-size: var(--t-sm); }
+.amencheck-src { font-size: 10px; white-space: nowrap; }
+.amencheck-btns { display: inline-flex; gap: 4px; }
+.amencheck li[data-state="yes"] { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.amencheck li[data-state="no"] .amencheck-name { color: var(--text-muted); text-decoration: line-through; }
+
 /* --- the visitor's account modal ----------------------------------------- */
 
 .rail-join { width: 100%; }
