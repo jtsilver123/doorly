@@ -303,9 +303,13 @@ export default function FilterBar({
               </div>
 
               <div className="panel-group">
-                <span className="panel-label">Listing sites</span>
-                <div className="sourcefilter" role="group" aria-label="Filter by listing site">
-                  {ALL_SOURCES.map((source) => {
+                <span className="panel-label">Posted on</span>
+                {/* Named, not just logos: five grayscale marks in a row read
+                    as decoration, and the one filter people ask for by name
+                    ("just show me Craigslist") went unfound. Your own
+                    intakes (Facebook pastes, hand adds) filter here too. */}
+                <div className="sourcefilter" role="group" aria-label="Filter by where it was posted">
+                  {([...ALL_SOURCES, "facebook", "manual"] as Source[]).map((source) => {
                     const on = filters.sources.includes(source);
                     return (
                       <button
@@ -314,12 +318,13 @@ export default function FilterBar({
                         onClick={() => toggleSource(source)}
                         title={
                           on
-                            ? `Showing only ${SOURCE_LABEL[source]}`
-                            : `Show only ${SOURCE_LABEL[source]}`
+                            ? `Showing ${SOURCE_LABEL[source]}. Tap to stop filtering by it`
+                            : `Only show places posted on ${SOURCE_LABEL[source]}`
                         }
                         aria-pressed={on}
                       >
-                        <SourceMark source={source} size={17} />
+                        <SourceMark source={source} size={15} />
+                        <span>{SOURCE_LABEL[source]}</span>
                       </button>
                     );
                   })}
