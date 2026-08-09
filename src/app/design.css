@@ -3762,9 +3762,105 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /* Review mode: one toured place at a time, footage front and center,
    a thumb per place. Wider than the chase panel because video needs room. */
-.review-panel { width: min(820px, 94vw); }
+/* --- review mode: a screening room --------------------------------------
+   Footage owns the left on a dark stage; the call happens on the right. */
+.review-panel {
+  width: min(1020px, 94vw);
+  padding: 0;
+  overflow: hidden;
+}
+
+.review-grid { display: grid; }
+@media (min-width: 760px) {
+  .review-grid { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+}
+
+.review-stage {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: #101216;
+  min-height: 320px;
+}
+.review-stage > video,
+.review-stage > img {
+  width: 100%;
+  max-height: min(58dvh, 560px);
+  object-fit: contain;
+  border-radius: var(--r-md);
+  background: #000;
+  align-self: center;
+}
+.review-stage-note {
+  align-self: center;
+  justify-self: center;
+  font-size: var(--t-xs);
+  color: rgba(244, 242, 234, 0.6);
+  text-align: center;
+}
+
+/* The filmstrip: every clip one tap away, the current one lit. */
+.review-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.review-still {
+  position: relative;
+  flex: 0 0 64px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+  opacity: 0.65;
+}
+.review-still.is-on { border-color: var(--action); opacity: 1; }
+.review-still:hover { opacity: 1; }
+.review-still video,
+.review-still img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.review-still-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.review-rail {
+  display: grid;
+  align-content: start;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+.review-rail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.review-dots { display: flex; gap: 5px; margin-top: 4px; font-size: var(--t-xs); }
+.review-dots .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--border-strong);
+}
+.review-dots .dot.is-on { background: var(--accent); }
 
 .review-place { display: grid; gap: 4px; }
+.review-place-top { display: flex; align-items: center; gap: var(--s2); }
 
 .review-addr {
   background: none;
@@ -3779,6 +3875,8 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 .review-addr:hover { text-decoration: underline; }
 
+.review-headline { font-size: var(--t-sm); font-weight: 600; }
+
 .review-notes {
   margin: 2px 0 0;
   font-size: var(--t-sm);
@@ -3786,55 +3884,34 @@ button.fact:hover .fact-label { color: var(--accent); }
   font-style: italic;
 }
 
-.review-media {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--s2);
-  min-height: 160px;
-  align-content: start;
-}
-
-.review-media video,
-.review-media img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: #000;
-}
-
-.review-nofootage { grid-column: 1 / -1; font-size: var(--t-xs); }
-
+/* The verdicts, stacked and full width: they are the point of the room. */
 .review-verdict {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s3);
+  display: grid;
+  gap: var(--s2);
   border-top: 1px solid var(--border);
   padding-top: var(--s3);
 }
-
-/* The card's little thumb, grown into the main event. */
 .review-thumb {
-  width: auto;
+  width: 100%;
   height: auto;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 12px 18px;
   border-radius: var(--r-md);
-  font-size: var(--t-sm);
+  font-size: var(--t-md);
   font-weight: 700;
 }
 
-.review-nav { display: flex; gap: var(--s1); }
+.review-nav { display: flex; align-items: center; gap: var(--s2); }
 .review-nav .btn { font-size: var(--t-xs); padding: 6px 10px; }
+.review-keys { font-size: var(--t-xs); margin-left: auto; }
 
-@media (max-width: 640px) {
-  .review-media { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .review-verdict { flex-wrap: wrap; }
-  .review-nav { order: 3; width: 100%; justify-content: center; }
+@media (max-width: 759px) {
+  .review-stage { min-height: 0; }
+  .review-stage > video,
+  .review-stage > img { max-height: 42dvh; }
 }
 
 /* The situation row: how you earn, and who signs with you. */
