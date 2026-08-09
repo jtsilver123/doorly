@@ -640,7 +640,7 @@ export default function ListingDrawer({
               onClick={share}
               aria-label={`Share ${listing.address}`}
             >
-              <Icon name={shared ? "check" : "external"} size={14} />
+              <Icon name={shared ? "check" : "share"} size={14} />
               <span className="drawer-share-label">{shared ? "Link copied" : "Share"}</span>
             </button>
             <button className="btn drawer-close" onClick={onClose} aria-label="Close">

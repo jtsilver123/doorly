@@ -41,8 +41,12 @@ export default function Lightbox({
   onClose: () => void;
 }) {
   const [at, setAt] = useState(start);
+  const [shareState, setShareState] = useState<"idle" | "busy" | "done">("idle");
   const panel = useRef<HTMLDivElement>(null);
   const touchX = useRef<number | null>(null);
+
+  // The button's "Sent"/"Saved" belongs to the file it was pressed on.
+  useEffect(() => setShareState("idle"), [at]);
 
   const go = useCallback(
     (delta: number) => {
@@ -91,6 +95,83 @@ export default function Lightbox({
   useEffect(() => setMounted(true), []);
 
   const item = items[at];
+
+  /**
+   * The file itself, not a link to it.
+   *
+   * Your footage lives behind the session cookie, so a copied URL is a dead
+   * end for anyone you'd send it to. Sharing hands over the actual bytes:
+   * the native sheet with the file attached where one exists (a phone,
+   * which is where forwarding happens), a plain download where it doesn't
+   * (desktop, where the file lands ready to drop into any thread). Listing
+   * photos ride the same button; when their host refuses a cross-origin
+   * read, the public URL goes instead, which works fine for those.
+   */
+  async function shareCurrent() {
+    if (!item || shareState === "busy") return;
+    const done = () => {
+      setShareState("done");
+      setTimeout(() => setShareState("idle"), 1800);
+    };
+    setShareState("busy");
+    const cleanUrl = item.url.split("#")[0];
+    try {
+      const res = await fetch(cleanUrl, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+
+      let name =
+        decodeURIComponent(cleanUrl.split("?")[0].split("/").pop() ?? "") ||
+        (item.kind === "video" ? "tour-video" : "photo");
+      if (!/\.[a-z0-9]{2,5}$/i.test(name)) {
+        const sub = (blob.type.split("/")[1] || (item.kind === "video" ? "mp4" : "jpg"))
+          .replace("jpeg", "jpg")
+          .replace("quicktime", "mov");
+        name += `.${sub}`;
+      }
+      const file = new File([blob], name, {
+        type: blob.type || (item.kind === "video" ? "video/mp4" : "image/jpeg"),
+      });
+
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          setShareState("idle");
+          return;
+        } catch (err) {
+          // Closing the sheet is an answer, not an error.
+          if ((err as DOMException)?.name === "AbortError") {
+            setShareState("idle");
+            return;
+          }
+          // The sheet refused the file (some browsers balk at big videos);
+          // fall through to handing it over as a download.
+        }
+      }
+
+      const obj = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = obj;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoking immediately can race the download in Firefox.
+      setTimeout(() => URL.revokeObjectURL(obj), 10_000);
+      done();
+    } catch {
+      // Couldn't read the bytes: a listing site photo refusing a
+      // cross-origin fetch. Those URLs are public, so the link itself works.
+      try {
+        if (navigator.share) await navigator.share({ url: cleanUrl });
+        else await navigator.clipboard.writeText(cleanUrl);
+        done();
+      } catch {
+        setShareState("idle");
+      }
+    }
+  }
+
   if (!item || !mounted) return null;
 
   return createPortal(
@@ -125,6 +206,17 @@ export default function Lightbox({
             {at + 1} / {items.length}
           </span>
         )}
+        <button
+          className="lightbox-share"
+          onClick={shareCurrent}
+          disabled={shareState === "busy"}
+          aria-label={item.kind === "video" ? "Share this video" : "Share this photo"}
+        >
+          <Icon name={shareState === "done" ? "check" : "share"} size={16} />
+          <span>
+            {shareState === "busy" ? "Preparing…" : shareState === "done" ? "Done" : "Share"}
+          </span>
+        </button>
         <button className="lightbox-x" onClick={onClose} aria-label="Close viewer">
           <Icon name="close" size={18} />
         </button>

@@ -46,7 +46,8 @@ export type IconName =
   | "plus"
   | "calendar"
   | "people"
-  | "bell";
+  | "bell"
+  | "share";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // A door with an arch — the same shape as the mark, so the home tab and the
@@ -130,6 +131,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M14 4h6v6" />
       <path d="m20 4-8.5 8.5" />
       <path d="M18 14.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V8a1.5 1.5 0 0 1 1.5-1.5H10" />
+    </>
+  ),
+  // The arrow leaving the box — the shape every phone's own share sheet uses.
+  share: (
+    <>
+      <path d="M12 14V3.5" />
+      <path d="m8.2 6.8 3.8-3.6 3.8 3.6" />
+      <path d="M8.5 10.5h-2A1.5 1.5 0 0 0 5 12v7a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-7a1.5 1.5 0 0 0-1.5-1.5h-2" />
     </>
   ),
   star: (
