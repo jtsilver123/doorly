@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { stationsWithin } from "@/lib/subway";
 
@@ -12,10 +12,12 @@ import { stationsWithin } from "@/lib/subway";
  * park, how far from the water, whether "East Village" means Avenue A or
  * Avenue D. A name is a category; a pin is a place.
  *
- * Deliberately small and static — no dragging, no zoom buttons, no scroll
- * hijack. It's an illustration of one address, and a map you can lose your
- * place in inside a scrolling panel is worse than no map. Tapping it opens
- * the full map view on that spot.
+ * Interactive on purpose: drag to see what's around, pinch or use the
+ * buttons to zoom. The one interaction deliberately left off is wheel
+ * zoom, because this map lives inside a panel that scrolls, and a wheel
+ * that sometimes scrolls the page and sometimes dives into the map is how
+ * people lose their place. Wander off and a "Back to the pin" button
+ * appears, so exploring is never a one-way trip.
  *
  * The nearby stations are drawn too, because "6 min to Grand Central" and
  * *which direction* Grand Central is in are different facts, and the second
@@ -35,6 +37,9 @@ export default function SpotMap({
   label: string;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const [wandered, setWandered] = useState(false);
+  const HOME_ZOOM = 15;
 
   useEffect(() => {
     const box = boxRef.current;
@@ -42,18 +47,18 @@ export default function SpotMap({
 
     const map = L.map(box, {
       center: [lat, lon],
-      zoom: 15,
-      // Every interaction off: this is a picture, and a panel that scrolls
-      // shouldn't fight a map that also scrolls.
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
+      zoom: HOME_ZOOM,
+      dragging: true,
+      touchZoom: true,
+      doubleClickZoom: true,
       boxZoom: false,
-      keyboard: false,
-      zoomControl: false,
+      keyboard: true,
+      zoomControl: true,
       attributionControl: false,
-      touchZoom: false,
+      // See the header comment: the wheel stays with the page, not the map.
+      scrollWheelZoom: false,
     });
+    mapRef.current = map;
 
     L.tileLayer(TILES, { maxZoom: 19 }).addTo(map);
 
@@ -84,6 +89,18 @@ export default function SpotMap({
       interactive: false,
     }).addTo(map);
 
+    // The way home appears only once you've left: a control that is always
+    // there is noise; one that shows up when needed is an answer.
+    const onMove = () => {
+      const c = map.getCenter();
+      setWandered(
+        Math.abs(c.lat - lat) > 0.0004 ||
+          Math.abs(c.lng - lon) > 0.0004 ||
+          map.getZoom() !== HOME_ZOOM
+      );
+    };
+    map.on("moveend zoomend", onMove);
+
     // Leaflet measures the container on creation; inside a drawer that is
     // still animating in, that measurement is wrong and the tiles land
     // offset. One resize after the animation settles fixes it.
@@ -91,13 +108,28 @@ export default function SpotMap({
 
     return () => {
       clearTimeout(settle);
+      map.off("moveend zoomend", onMove);
       map.remove();
+      mapRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lon]);
 
   return (
     <div className="spotmap">
-      <div className="spotmap-canvas" ref={boxRef} role="img" aria-label={`Map showing ${label}`} />
+      <div
+        className="spotmap-canvas"
+        ref={boxRef}
+        aria-label={`Map around ${label}. Drag to pan, use the buttons to zoom.`}
+      />
+      {wandered && (
+        <button
+          className="spotmap-recenter"
+          onClick={() => mapRef.current?.setView([lat, lon], HOME_ZOOM)}
+        >
+          Back to the pin
+        </button>
+      )}
       <span className="spotmap-credit">© OpenStreetMap, CARTO</span>
     </div>
   );
