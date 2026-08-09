@@ -41,6 +41,13 @@ export async function generateMetadata({
     if (!row) return {};
 
     const title = `${row.address}${row.unit ? ` #${row.unit}` : ""}`;
+    /*
+     * The name rides in the title, not only in site_name: some chat apps
+     * show site_name, some only the domain, and a few show neither — the
+     * title is the one line every unfurl renders, and every share is the
+     * app introducing itself to someone mid-hunt.
+     */
+    const cardTitle = `${title} · DamnLease`;
     const beds = row.bedrooms === 0 ? "Studio" : `${row.bedrooms} bed`;
     const where = row.neighborhood || row.borough || "NYC";
     const description = `$${Number(row.price).toLocaleString()}/mo · ${beds} · ${where}. Shared from a DamnLease apartment hunt.`;
@@ -50,7 +57,7 @@ export async function generateMetadata({
       title,
       description,
       openGraph: {
-        title,
+        title: cardTitle,
         description,
         siteName: "DamnLease",
         type: "website",
@@ -58,7 +65,7 @@ export async function generateMetadata({
       },
       twitter: {
         card: image ? "summary_large_image" : "summary",
-        title,
+        title: cardTitle,
         description,
         ...(image ? { images: [image] } : {}),
       },
