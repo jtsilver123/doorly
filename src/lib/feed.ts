@@ -145,6 +145,41 @@ function daysBetween(from: string, to = new Date().toISOString()): number {
   return Math.max(0, Math.floor(ms / 86_400_000));
 }
 
+/*
+ * Supabase answers every query with at most 1,000 rows, and it trims
+ * silently: a .limit(4000) comes back as 1,000 with no error. The corpus
+ * outgrew that, so bulk reads either walk pages (listings) or go out in
+ * id-batches too small to hit the ceiling (per-listing child rows).
+ */
+const DB_PAGE = 1000;
+
+async function allPages<T>(
+  want: number,
+  label: string,
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < want; from += DB_PAGE) {
+    const to = Math.min(from + DB_PAGE, want) - 1;
+    const { data, error } = await fetchPage(from, to);
+    if (error) throw new Error(`${label}: ${error.message}`);
+    const page = (data as T[] | null) ?? [];
+    out.push(...page);
+    if (page.length < to - from + 1) break;
+  }
+  return out;
+}
+
+async function forListings<T>(
+  ids: string[],
+  fetchBatch: (batch: string[]) => PromiseLike<{ data: unknown }>
+): Promise<T[]> {
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) batches.push(ids.slice(i, i + 150));
+  const results = await Promise.all(batches.map((b) => fetchBatch(b)));
+  return results.flatMap((r) => (r.data as T[] | null) ?? []);
+}
+
 /**
  * Loads the feed: every listing, joined with your CRM state, scored by the
  * model trained on your own feedback, then filtered and sorted.
@@ -170,12 +205,10 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   if (filters.bathsMin != null) query = query.gte("bathrooms", filters.bathsMin);
   if (filters.noFeeOnly) query = query.eq("no_fee", true);
 
-  const { data: rows, error } = await query
-    .order("first_seen_at", { ascending: false })
-    .limit(1500);
-  if (error) throw new Error(`loadFeed: ${error.message}`);
+  const ordered = query.order("first_seen_at", { ascending: false });
+  const rows = await allPages<ListingRow>(2000, "loadFeed", (from, to) => ordered.range(from, to));
 
-  let listings = (rows ?? []) as ListingRow[];
+  let listings = rows;
 
   /*
    * What you're pursuing never vanishes.
@@ -208,14 +241,22 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
 
   const ids = listings.map((r) => r.id);
 
-  const [states, sources, events, contacts, feedbackRows] = await Promise.all([
+  const [states, sourceRows, eventRows, contacts, feedbackRows] = await Promise.all([
     supabase.from("user_listing_state").select("*").eq("user_id", ownerId),
-    supabase.from("listing_sources").select("listing_id, source, url, is_active"),
-    supabase
-      .from("events")
-      .select("listing_id, kind, occurred_at, old_value, new_value")
-      .order("occurred_at", { ascending: false })
-      .limit(4000),
+    forListings<{ listing_id: string; source: string; url: string; is_active: boolean }>(ids, (batch) =>
+      supabase
+        .from("listing_sources")
+        .select("listing_id, source, url, is_active")
+        .in("listing_id", batch)
+    ),
+    forListings<{ listing_id: string; kind: string; occurred_at: string }>(ids, (batch) =>
+      supabase
+        .from("events")
+        .select("listing_id, kind, occurred_at, old_value, new_value")
+        .in("listing_id", batch)
+        .order("occurred_at", { ascending: false })
+        .limit(DB_PAGE)
+    ),
     supabase
       .from("contact_log")
       .select("listing_id, occurred_at, channel, direction")
@@ -228,14 +269,14 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   );
 
   const sourcesBy = new Map<string, { source: Source; url: string }[]>();
-  for (const row of sources.data ?? []) {
+  for (const row of sourceRows) {
     const list = sourcesBy.get(row.listing_id) ?? [];
     list.push({ source: row.source as Source, url: row.url });
     sourcesBy.set(row.listing_id, list);
   }
 
   const eventsBy = new Map<string, { kind: string; occurred_at: string }[]>();
-  for (const row of events.data ?? []) {
+  for (const row of eventRows) {
     const list = eventsBy.get(row.listing_id) ?? [];
     list.push({ kind: row.kind, occurred_at: row.occurred_at });
     eventsBy.set(row.listing_id, list);
@@ -476,27 +517,31 @@ export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<Fe
   if (!listings.length) return [];
 
   const ids = listings.map((r) => r.id);
-  const [sources, events] = await Promise.all([
-    supabase
-      .from("listing_sources")
-      .select("listing_id, source, url, is_active")
-      .in("listing_id", ids),
-    supabase
-      .from("events")
-      .select("listing_id, kind, occurred_at")
-      .in("listing_id", ids)
-      .order("occurred_at", { ascending: false })
-      .limit(2000),
+  const [sourceRows, eventRows] = await Promise.all([
+    forListings<{ listing_id: string; source: string; url: string }>(ids, (batch) =>
+      supabase
+        .from("listing_sources")
+        .select("listing_id, source, url, is_active")
+        .in("listing_id", batch)
+    ),
+    forListings<{ listing_id: string; kind: string; occurred_at: string }>(ids, (batch) =>
+      supabase
+        .from("events")
+        .select("listing_id, kind, occurred_at")
+        .in("listing_id", batch)
+        .order("occurred_at", { ascending: false })
+        .limit(DB_PAGE)
+    ),
   ]);
 
   const sourcesBy = new Map<string, { source: Source; url: string }[]>();
-  for (const row of sources.data ?? []) {
+  for (const row of sourceRows) {
     const list = sourcesBy.get(row.listing_id) ?? [];
     list.push({ source: row.source as Source, url: row.url });
     sourcesBy.set(row.listing_id, list);
   }
   const eventsBy = new Map<string, { kind: string; occurred_at: string }[]>();
-  for (const row of events.data ?? []) {
+  for (const row of eventRows) {
     const list = eventsBy.get(row.listing_id) ?? [];
     list.push({ kind: row.kind, occurred_at: row.occurred_at });
     eventsBy.set(row.listing_id, list);
@@ -1247,22 +1292,31 @@ export async function pullListingByAddress(term: string): Promise<string | null>
 
 export async function findInCorpus(query: string): Promise<string | null> {
   const supabase = await db();
-  const [{ data: rows }, { data: srcs }] = await Promise.all([
+  const rows = await allPages<{
+    id: string;
+    address: string | null;
+    unit: string | null;
+    neighborhood: string | null;
+    url: string | null;
+  }>(4000, "findInCorpus", (from, to) =>
     supabase
       .from("listings")
       .select("id, address, unit, neighborhood, url")
       .eq("is_active", true)
       .order("first_seen_at", { ascending: false })
-      .limit(4000),
-    supabase.from("listing_sources").select("listing_id, source, url"),
-  ]);
+      .range(from, to)
+  );
+  const srcs = await forListings<{ listing_id: string; source: string; url: string }>(
+    rows.map((r) => r.id),
+    (batch) => supabase.from("listing_sources").select("listing_id, source, url").in("listing_id", batch)
+  );
   const alsoBy = new Map<string, { source: Source; url: string }[]>();
-  for (const s of srcs ?? []) {
+  for (const s of srcs) {
     const list = alsoBy.get(s.listing_id) ?? [];
     list.push({ source: s.source as Source, url: s.url });
     alsoBy.set(s.listing_id, list);
   }
-  const stubs = (rows ?? []).map((r) => ({
+  const stubs = rows.map((r) => ({
     id: r.id,
     address: r.address ?? "",
     unit: r.unit ?? "",
