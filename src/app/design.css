@@ -5752,6 +5752,116 @@ button.fact:hover .fact-label { color: var(--accent); }
   }
 }
 
+/* --- insights: what happens between the columns --------------------------- */
+
+/* The rail's quiet door to the full read. */
+.railstatus-insights {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-size: var(--t-xs);
+  font-weight: 650;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.railstatus-insights:hover { color: var(--text); }
+
+/* The funnel numbers were a div; as the door to insights they keep their
+   layout and gain nothing but a cursor. */
+button.timeline-funnel {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+button.timeline-funnel:disabled { cursor: default; }
+.timeline-funnel-more {
+  font-size: var(--t-xs);
+  font-weight: 650;
+  align-self: center;
+}
+
+.insights-panel { width: min(560px, 94vw); padding: var(--s5); gap: var(--s4); }
+
+.insights-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.insights-head > div { display: grid; gap: 2px; }
+.insights-head b { font-size: var(--t-xl); }
+.insights-head .muted { font-size: var(--t-sm); }
+
+.insights-funnel { display: grid; gap: var(--s2); }
+.insights-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 128px;
+  align-items: center;
+  gap: var(--s3);
+}
+.insights-stage {
+  font-size: var(--t-sm);
+  font-weight: 650;
+}
+.insights-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+.insights-bar i {
+  display: block;
+  height: 18px;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  transition: width 0.4s var(--ease);
+}
+.insights-bar i[data-zero] { border-color: var(--border); background: var(--surface-2); }
+.insights-bar b { font-variant-numeric: tabular-nums; }
+.insights-rate {
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+  text-align: right;
+}
+.insights-rate b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.insights-reads { display: grid; gap: var(--s2); }
+.insights-card {
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.insights-card[data-tone="push"] { border-left: 3px solid var(--warn); }
+.insights-card[data-tone="win"] { border-left: 3px solid var(--good); }
+.insights-card b { font-size: var(--t-md); }
+.insights-card p {
+  margin: 4px 0 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.insights-card-mark { margin-top: 2px; color: var(--text-muted); }
+
+.insights-note { font-size: var(--t-xs); margin: 0; }
+
+/* Phones hide the strip's funnel numbers for space; the door to insights
+   stays, shrunk to just its label. */
+@media (max-width: 860px) {
+  .page-pipeline button.timeline-funnel { display: flex; }
+  .page-pipeline .timeline-funnel .timeline-stat { display: none; }
+  .insights-row { grid-template-columns: 68px 1fr; }
+  .insights-rate { grid-column: 2; text-align: left; }
+}
+
 /* --- touch targets -------------------------------------------------------- */
 
 /*

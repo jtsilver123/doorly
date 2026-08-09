@@ -55,6 +55,7 @@ import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
 import JoinGate from "@/components/JoinGate";
 import Tour from "@/components/Tour";
+import Insights from "@/components/Insights";
 // Client-only: Leaflet reads `window` the moment its module loads, which
 // detonates the server prerender. The map has no server-renderable form anyway.
 const CityMap = dynamic(() => import("@/components/CityMap"), {
@@ -382,6 +383,8 @@ export default function Home() {
   /** The bulk-outreach run: opening pitches or follow-ups, or closed. */
   const [bulkMode, setBulkMode] = useState<"first" | "chase" | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  /** The insights read: funnel rates and what they suggest changing. */
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
@@ -1436,6 +1439,7 @@ export default function Home() {
               moveInDate={profile.moveInDate}
               live={counts.active}
               changed={counts.changed}
+              onInsights={() => setInsightsOpen(true)}
             />
           )}
         </div>
@@ -1886,7 +1890,12 @@ export default function Home() {
                 a bottom tab bar down there, so the strip covers for it. */}
             {/* Same reasoning as the rail: pace advice presumes a hunt. */}
             {!guest && (
-              <Timeline info={phase} funnel={funnel} moveInDate={profile.moveInDate} />
+              <Timeline
+                info={phase}
+                funnel={funnel}
+                moveInDate={profile.moveInDate}
+                onInsights={() => setInsightsOpen(true)}
+              />
             )}
 
             <PipelineBoard
@@ -2094,6 +2103,10 @@ export default function Home() {
       {/* The moment a visitor tried to act like a user: offer the account
           right here, on top of the thing they were doing. */}
       {joinOpen && <JoinGate onClose={() => setJoinOpen(false)} />}
+
+      {insightsOpen && (
+        <Insights listings={listings} onClose={() => setInsightsOpen(false)} />
+      )}
 
       {tourAt != null && (
         <Tour

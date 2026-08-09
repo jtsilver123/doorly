@@ -21,12 +21,14 @@ export default function RailStatus({
   moveInDate,
   live,
   changed,
+  onInsights,
 }: {
   info: PhaseInfo;
   funnel: Funnel;
   moveInDate: string;
   live: number;
   changed: number;
+  onInsights?: () => void;
 }) {
   const date = moveInDate
     ? new Date(`${moveInDate}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -83,6 +85,14 @@ export default function RailStatus({
           </>
         )}
       </span>
+
+      {/* The door to the full read: rates between the stages, and what
+          they suggest doing differently. */}
+      {onInsights && (
+        <button className="railstatus-insights" onClick={onInsights}>
+          How it&apos;s going →
+        </button>
+      )}
     </div>
   );
 }

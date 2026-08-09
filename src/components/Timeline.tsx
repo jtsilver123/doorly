@@ -14,10 +14,12 @@ export default function Timeline({
   info,
   funnel,
   moveInDate,
+  onInsights,
 }: {
   info: PhaseInfo;
   funnel: Funnel;
   moveInDate: string;
+  onInsights?: () => void;
 }) {
   const bands = phaseBands();
   const target = moveInDate
@@ -39,7 +41,14 @@ export default function Timeline({
               : `${target} has passed`}
           </div>
         </div>
-        <div className="timeline-funnel">
+        {/* The numbers double as the door to the full read: rates between
+            the stages, and what they suggest changing. */}
+        <button
+          className="timeline-funnel"
+          onClick={onInsights}
+          disabled={!onInsights}
+          aria-label="Open hunt insights"
+        >
           {(
             [
               ["Contacted", funnel.contacted],
@@ -53,7 +62,8 @@ export default function Timeline({
               <span className="muted">{label}</span>
             </div>
           ))}
-        </div>
+          {onInsights && <span className="timeline-funnel-more muted">Insights →</span>}
+        </button>
       </header>
 
       <div className="timeline-bar" role="img" aria-label={`${info.label}, ${info.daysLeft} days left`}>

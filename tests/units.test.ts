@@ -29,6 +29,7 @@ import {
 import { neighborhoodAt, withinAreas, locate } from "@/lib/geo";
 import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
+import { readHunt } from "@/lib/insights";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
@@ -656,6 +657,75 @@ test("your own reply rate replaces the assumption once there's data", () => {
   assert.equal(f.contacted, 12);
   // A dismal reply rate means many more contacts are needed than the default.
   assert.ok(f.targetContacts > funnelFor([], 20).targetContacts);
+});
+
+test("insights count the funnel from stages and logs together", () => {
+  const listings = [
+    feed({ id: "a", stage: "interested", starred: true }),
+    feed({ id: "b", stage: "contacted", contactCount: 1 }),
+    feed({ id: "c", stage: "toured", contactCount: 1, hasReply: true, lastContactChannel: "text" }),
+    feed({ id: "d", stage: "applied", contactCount: 1, hasReply: true, lastContactChannel: "text" }),
+    feed({ id: "e", stage: "no_go", contactCount: 1, lastContactChannel: "text" }),
+    // A booked tour whose time has passed counts as toured.
+    feed({
+      id: "f",
+      stage: "tour",
+      contactCount: 1,
+      hasReply: true,
+      tourAt: new Date(Date.now() - 3600_000).toISOString(),
+    }),
+    // Inbox noise never counts.
+    feed({ id: "g", stage: "inbox" }),
+  ];
+  const { steps } = readHunt(listings);
+  assert.equal(steps.saved, 6);
+  assert.equal(steps.contacted, 5);
+  assert.equal(steps.replied, 4); // c, d, f explicit; e implied by moving past contacted
+  assert.equal(steps.toured, 4); // c, d, e (no_go means toured), f (time passed)
+  assert.equal(steps.applied, 1);
+  assert.equal(steps.won, 0);
+});
+
+test("touring a lot while applying to little earns the strictness nudge", () => {
+  const listings = [
+    ...Array.from({ length: 6 }, (_, i) =>
+      feed({
+        id: `t${i}`,
+        stage: "toured",
+        contactCount: 1,
+        hasReply: true,
+        lastContactChannel: "text",
+      })
+    ),
+    feed({ id: "ap", stage: "applied", contactCount: 1, hasReply: true, lastContactChannel: "text" }),
+  ];
+  const { insights } = readHunt(listings);
+  assert.ok(insights.some((i) => i.key === "sightseeing"), insights.map((i) => i.key).join(","));
+});
+
+test("hoarding saved places without outreach is the first leak flagged", () => {
+  const listings = Array.from({ length: 10 }, (_, i) =>
+    feed({ id: `s${i}`, stage: "interested", starred: true })
+  );
+  const { insights, rates } = readHunt(listings);
+  assert.equal(insights[0].key, "hoarding");
+  assert.equal(rates.contactRate, 0);
+});
+
+test("a thin hunt gets patience, not a lecture", () => {
+  const { insights } = readHunt([feed({ id: "one", stage: "interested" })]);
+  assert.equal(insights.length, 1);
+  assert.equal(insights[0].key, "early");
+});
+
+test("a win leads the insights regardless of leaks", () => {
+  const listings = [
+    feed({ id: "w", stage: "closed", secured: true, contactCount: 1, hasReply: true }),
+    ...Array.from({ length: 9 }, (_, i) => feed({ id: `s${i}`, stage: "interested", starred: true })),
+  ];
+  const { steps, insights } = readHunt(listings);
+  assert.equal(steps.won, 1);
+  assert.equal(insights[0].key, "won");
 });
 
 test("today's actions lead with what's rotting", () => {
