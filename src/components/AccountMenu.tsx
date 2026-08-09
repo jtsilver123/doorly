@@ -40,10 +40,12 @@ export default function AccountMenu({
   email,
   name,
   onOpenSection,
+  onTour,
 }: {
   email: string;
   name: string;
   onOpenSection: (section: ProfileSection) => void;
+  onTour?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -103,6 +105,19 @@ export default function AccountMenu({
               <span>{item.hint}</span>
             </button>
           ))}
+          {onTour && (
+            <button
+              role="menuitem"
+              className="accountmenu-item"
+              onClick={() => {
+                onTour();
+                setOpen(false);
+              }}
+            >
+              <b>Show me around</b>
+              <span>The quick tour, any time</span>
+            </button>
+          )}
           <form action={signOut} className="accountmenu-out">
             <button type="submit" role="menuitem" className="accountmenu-item">
               <b>Sign out</b>

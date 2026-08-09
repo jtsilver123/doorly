@@ -5671,6 +5671,87 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* The second toast action reads as the quieter of the two. */
 .toast-action-2 { opacity: 0.72; font-weight: 550; }
 
+/* --- the welcome walk ------------------------------------------------------
+
+   Dim the room, light the one thing being explained. The spotlight is a
+   hole: one element with a shadow big enough to darken everything else,
+   so moving between stops is a slide instead of a re-render. */
+
+.tour { position: fixed; inset: 0; z-index: 1300; }
+
+.tour-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 12, 18, 0.55);
+  animation: gatefade 0.2s ease;
+}
+
+.tour-spot {
+  position: fixed;
+  border-radius: var(--r-lg);
+  box-shadow: 0 0 0 200vmax rgba(12, 12, 18, 0.55);
+  transition:
+    top 0.3s var(--ease),
+    left 0.3s var(--ease),
+    width 0.3s var(--ease),
+    height 0.3s var(--ease);
+  pointer-events: none;
+}
+
+.tour-card {
+  position: fixed;
+  width: min(340px, calc(100vw - 24px));
+  display: grid;
+  gap: 6px;
+  padding: var(--s5);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  animation: gatepop 0.22s var(--ease);
+}
+.tour-card[data-centered] {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.tour-card b { font-size: var(--t-lg); }
+.tour-card p {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.tour-count {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.tour-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-top: var(--s2);
+}
+.tour-steps { display: flex; gap: var(--s2); }
+.tour-skip { color: var(--text-muted); font-size: var(--t-sm); }
+
+/* Phones: the card lives above the tab bar, one steady spot for thumbs,
+   instead of chasing each target around the screen. */
+@media (max-width: 640px) {
+  .tour-card {
+    top: auto !important;
+    left: 12px;
+    right: 12px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+  }
+}
+
 /* --- touch targets -------------------------------------------------------- */
 
 /*

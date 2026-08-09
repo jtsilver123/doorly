@@ -139,7 +139,9 @@ export default function Welcome() {
   }
 
   function finish() {
-    router.push("/app");
+    // The tour flag rides along so the app shows a first-timer around;
+    // the shell reads it once and strips it from the address.
+    router.push("/app?tour=1");
     router.refresh();
   }
 

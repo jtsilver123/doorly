@@ -54,6 +54,7 @@ import { icsFor, icsFilename } from "@/lib/calendar";
 import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
 import JoinGate from "@/components/JoinGate";
+import Tour from "@/components/Tour";
 // Client-only: Leaflet reads `window` the moment its module loads, which
 // detonates the server prerender. The map has no server-renderable form anyway.
 const CityMap = dynamic(() => import("@/components/CityMap"), {
@@ -108,6 +109,44 @@ const PATH_TABS: Record<string, Tab> = {
   apply: "apply",
   you: "profile",
 };
+
+/**
+ * The welcome walk's five stops, on the real interface. Each names the tab
+ * it lives on so advancing can carry the person there; a target that isn't
+ * on screen (the rail's refresh block on a phone) just centers the card.
+ */
+const TOUR_STOPS: { tab: Tab; target?: string; title: string; body: string }[] = [
+  {
+    tab: "pipeline",
+    target: ".board",
+    title: "The board is the method",
+    body: "Every place you save starts in Interested and moves right as you work it. Contact, tour, decide. The red button on a card is always your next move.",
+  },
+  {
+    tab: "feed",
+    target: ".searchfield",
+    title: "Finding places",
+    body: "Five listing sites, checked hourly, scored against what you told us. Spot a place anywhere else? Paste its link here and it joins the hunt.",
+  },
+  {
+    tab: "feed",
+    target: ".card",
+    title: "Star what's worth chasing",
+    body: "A star saves a place to your pipeline. Click a card for everything else: the price check, the building's record, a message ready to send.",
+  },
+  {
+    tab: "feed",
+    target: ".mobile-nav",
+    title: "Compare, then apply",
+    body: "After a few tours, Compare lines your finalists up side by side. Apply keeps your documents in one packet so a yes can't catch you unprepared.",
+  },
+  {
+    tab: "pipeline",
+    target: ".refresh",
+    title: "Speed wins apartments",
+    body: "Good places go in a day here. The sites are checked hourly on their own, and Check for new runs one on the spot. That's the tour. Go find your place.",
+  },
+];
 
 interface ApiStatus {
   usage: {
@@ -291,6 +330,25 @@ export default function Home() {
     setJoinOpen(true);
     return true;
   }, [guest]);
+
+  /*
+   * The welcome walk. Setup hands a brand-new account here with ?tour=1,
+   * read the same way as #join: in a layout effect, before the
+   * URL-normalizing effect wipes the query away. It only ever auto-runs on
+   * that flag plus a clean localStorage slate, so nobody who has already
+   * seen the app gets toured against their will; "Show me around" in the
+   * account menu replays it on request.
+   */
+  const wantsTour = useRef(false);
+  const [tourAt, setTourAt] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("tour")) {
+      wantsTour.current = true;
+      url.searchParams.delete("tour");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+  }, []);
   const [changes, setChanges] = useState<Change[]>([]);
   /** Personal notices: crew adds, watched changes, good drops. */
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -298,6 +356,23 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Auto-run only once the feed has answered: before that we don't know
+  // whether this is a signed-in newcomer or a guest, and a guest's first
+  // sight of the app should be the app, not a tour of it.
+  useEffect(() => {
+    if (loading || !wantsTour.current) return;
+    wantsTour.current = false;
+    if (guest || localStorage.getItem("damnlease.tourDone")) return;
+    setTab(TOUR_STOPS[0].tab);
+    setTourAt(0);
+  }, [loading, guest]);
+
+  const startTour = useCallback(() => {
+    setOpen(null);
+    setTab(TOUR_STOPS[0].tab);
+    setTourAt(0);
+  }, []);
 
   const [open, setOpen] = useState<FeedListing | null>(null);
   /** The tour-day route planner, opened from the pipeline's Tour column. */
@@ -1560,6 +1635,7 @@ export default function Home() {
                 setSection(next);
                 setTab("profile");
               }}
+              onTour={startTour}
             />
           )}
         </div>
@@ -2018,6 +2094,26 @@ export default function Home() {
       {/* The moment a visitor tried to act like a user: offer the account
           right here, on top of the thing they were doing. */}
       {joinOpen && <JoinGate onClose={() => setJoinOpen(false)} />}
+
+      {tourAt != null && (
+        <Tour
+          stops={TOUR_STOPS}
+          at={tourAt}
+          onAt={(n) => {
+            setOpen(null);
+            if (TOUR_STOPS[n].tab !== tab) setTab(TOUR_STOPS[n].tab);
+            setTourAt(n);
+          }}
+          onClose={() => {
+            // Skipped or finished, the answer is the same: never auto-run
+            // again. The account menu can always replay it.
+            setTourAt(null);
+            try {
+              localStorage.setItem("damnlease.tourDone", "1");
+            } catch {}
+          }}
+        />
+      )}
 
       {/* The standing offer, top right of every page a guest visits. It
           sits below the drawer and the modal in the stack, so it never
