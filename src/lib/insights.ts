@@ -25,7 +25,9 @@ export interface FunnelSteps {
   /** Actually stood in the place (or a tour time now in the past). */
   toured: number;
   applied: number;
-  /** Accepted and taken, the flag the hunt exists to set. */
+  /** Approved by the landlord but not yet taken: a yes waiting on yours. */
+  approved: number;
+  /** Signed and taken, the flag the hunt exists to set. */
   won: number;
 }
 
@@ -91,13 +93,21 @@ export function countSteps(listings: FeedListing[], now = new Date()): FunnelSte
   for (const id of toured) replied.add(id);
   for (const id of replied) contacted.add(id);
 
-  const won = tracked.filter((l) => l.secured || l.appResult === 1);
+  /*
+   * An approval is the landlord's yes; signed is yours. Only `secured`
+   * counts as won — calling a place signed while the person is still
+   * deciding overstates the hunt and understates the decision in front
+   * of them.
+   */
+  const approved = tracked.filter((l) => l.appResult === 1 && !l.secured);
+  const won = tracked.filter((l) => l.secured);
   return {
     saved: tracked.length,
     contacted: contacted.size,
     replied: replied.size,
     toured: toured.size,
     applied: applied.size,
+    approved: approved.length,
     won: won.length,
   };
 }
@@ -122,6 +132,15 @@ export function readHunt(listings: FeedListing[], now = new Date()): HuntInsight
       tone: "win",
       title: "You landed one",
       body: `${steps.contacted} reached out, ${steps.toured} toured, ${steps.applied} applied, one signed. That's the whole funnel doing its job.`,
+    });
+  } else if (steps.approved > 0) {
+    // The most time-sensitive state on the board: their yes is in, and
+    // it only holds until a better application shows up behind yours.
+    insights.push({
+      key: "approved",
+      tone: "win",
+      title: "They said yes",
+      body: `You're approved on ${steps.approved === 1 ? "a place" : `${steps.approved} places`}. An approval is not a lease: it holds only until the next application looks better. Decide while it's still yours to decide, then mark it taken here.`,
     });
   }
 
@@ -163,6 +182,7 @@ export function readHunt(listings: FeedListing[], now = new Date()): HuntInsight
   }
   if (
     steps.won === 0 &&
+    steps.approved === 0 &&
     rates.applyRate != null &&
     steps.applied >= 3 &&
     rates.applyRate >= 0.7

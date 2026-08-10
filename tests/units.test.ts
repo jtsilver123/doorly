@@ -728,6 +728,25 @@ test("a win leads the insights regardless of leaks", () => {
   assert.equal(insights[0].key, "won");
 });
 
+test("a landlord's approval is not a signing", () => {
+  // Application accepted, but the person hasn't taken the place.
+  const listings = [
+    feed({ id: "ok", stage: "applied", appResult: 1, contactCount: 1, hasReply: true }),
+  ];
+  const { steps, insights } = readHunt(listings);
+  assert.equal(steps.won, 0);
+  assert.equal(steps.approved, 1);
+  assert.equal(steps.applied, 1);
+  // The yes-in-hand card leads, and nothing claims a signed lease.
+  assert.equal(insights[0].key, "approved");
+  assert.ok(!insights.some((i) => i.key === "won"));
+  // Taking it flips approval into the win.
+  const after = readHunt([feed({ id: "ok", stage: "closed", appResult: 1, secured: true })]);
+  assert.equal(after.steps.won, 1);
+  assert.equal(after.steps.approved, 0);
+  assert.equal(after.insights[0].key, "won");
+});
+
 test("today's actions lead with what's rotting", () => {
   const listings = [
     feed({ id: "a", needsFollowUp: true, stage: "contacted" }),

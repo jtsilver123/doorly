@@ -40,7 +40,12 @@ export default function Insights({
     { label: "Toured", count: steps.toured, of: steps.replied, hint: "of replied" },
     { label: "Applied", count: steps.applied, of: steps.toured, hint: "of toured" },
   ];
-  if (steps.won > 0) rows.push({ label: "Signed", count: steps.won, of: steps.applied, hint: "of applied" });
+  // Approved is the landlord's yes, signed is yours; only rows with
+  // something in them earn a line.
+  if (steps.approved > 0)
+    rows.push({ label: "Approved", count: steps.approved, of: steps.applied, hint: "of applied" });
+  if (steps.won > 0)
+    rows.push({ label: "Signed", count: steps.won, of: steps.applied, hint: "of applied" });
 
   const max = Math.max(steps.saved, 1);
 
