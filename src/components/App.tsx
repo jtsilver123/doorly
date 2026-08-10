@@ -375,6 +375,13 @@ export default function Home() {
     setTourAt(0);
   }, []);
 
+  // Stable on purpose: effects in the drawer key off this prop, and a
+  // fresh arrow per render made them re-run mid-interaction.
+  const closeDrawer = useCallback(() => {
+    setOpen(null);
+    setDrawerJump(null);
+  }, []);
+
   const [open, setOpen] = useState<FeedListing | null>(null);
   /** The tour-day route planner, opened from the pipeline's Tour column. */
   const [planning, setPlanning] = useState(false);
@@ -2040,10 +2047,7 @@ export default function Home() {
           listing={openListing}
           profile={profile}
           jumpTo={drawerJump}
-          onClose={() => {
-            setOpen(null);
-            setDrawerJump(null);
-          }}
+          onClose={closeDrawer}
           onChanged={loadFeed}
           crew={crew}
           all={listings}

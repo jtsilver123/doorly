@@ -366,14 +366,27 @@ export default function ListingDrawer({
    * and Tab is kept inside while it's up. Without this a keyboard user tabs
    * straight out of the dialog into the grid behind it, which is disorienting
    * sighted and unusable unsighted.
+   *
+   * Installed ONCE per open, with onClose read through a ref. This effect
+   * used to depend on onClose — an inline arrow from the parent, fresh
+   * every render — so any re-render while the panel was up re-ran it, and
+   * the re-run's panel.focus() yanked focus out of whatever field you were
+   * typing in. A datetime-local discards its half-typed segments the
+   * moment it loses focus, which surfaced as "it won't let me set a time":
+   * the debounced tour save re-rendered the app 900ms into your typing and
+   * the field went blank mid-entry.
    */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   useEffect(() => {
     returnFocusTo.current = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !panelRef.current) return;
@@ -399,7 +412,8 @@ export default function ListingDrawer({
       window.removeEventListener("keydown", onKey);
       returnFocusTo.current?.focus();
     };
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function patch(body: Record<string, unknown>) {
     setSaving(true);
