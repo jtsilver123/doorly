@@ -94,7 +94,33 @@ export interface BuildingIntel {
     count: number;
     top: string[];
   } | null;
+  /** The tax lot's own facts, and what they imply about stabilization. */
+  lot: {
+    yearBuilt: number;
+    unitsRes: number;
+    stabilizedLikely: boolean;
+  } | null;
 }
+
+/**
+ * The classic rent stabilization presumption: built before 1974 with six or
+ * more units. Not a per-unit verdict — the only definitive answer is the
+ * unit's own DHCR rent history, which anyone can request for free — but the
+ * rule covers the great majority of stabilized stock, and a place that fits
+ * it deserves the question asked out loud.
+ */
+export function stabilizedLikely(yearBuilt: number, unitsRes: number): boolean {
+  return yearBuilt > 0 && yearBuilt < 1974 && unitsRes >= 6;
+}
+
+/** PLUTO spells boroughs its own way. */
+const PLUTO_BORO: Record<string, string> = {
+  manhattan: "MN",
+  bronx: "BX",
+  brooklyn: "BK",
+  queens: "QN",
+  "staten island": "SI",
+};
 
 const TIMEOUT_MS = 9_000;
 
@@ -147,7 +173,18 @@ export async function fetchBuildingIntel(
         )
       : Promise.reject(new Error("no coordinates"));
 
-  const [v, b, n] = await Promise.allSettled([violationsQ, bedbugsQ, noiseQ]);
+  // PLUTO keys on the same city spelling as HPD, so the parser is shared.
+  const plutoBoro = PLUTO_BORO[borough.toLowerCase()] ?? "";
+  const lotQ =
+    parsed && plutoBoro
+      ? soda<Record<string, string>[]>(
+          `https://data.cityofnewyork.us/resource/64uk-42ks.json?$select=yearbuilt,unitsres&$where=${encodeURIComponent(
+            `address='${parsed.houseNumber} ${parsed.street}' AND borough='${plutoBoro}'`
+          )}&$limit=1`
+        )
+      : Promise.reject(new Error("no address"));
+
+  const [v, b, n, lotR] = await Promise.allSettled([violationsQ, bedbugsQ, noiseQ, lotQ]);
 
   let violations: BuildingIntel["violations"] = null;
   if (v.status === "fulfilled") {
@@ -197,5 +234,15 @@ export async function fetchBuildingIntel(
     };
   }
 
-  return { violations, bedbugs, noise };
+  let lot: BuildingIntel["lot"] = null;
+  if (lotR.status === "fulfilled" && lotR.value.length) {
+    const row = lotR.value[0];
+    const yearBuilt = Number(row.yearbuilt) || 0;
+    const unitsRes = Number(row.unitsres) || 0;
+    if (yearBuilt > 0 || unitsRes > 0) {
+      lot = { yearBuilt, unitsRes, stabilizedLikely: stabilizedLikely(yearBuilt, unitsRes) };
+    }
+  }
+
+  return { violations, bedbugs, noise, lot };
 }

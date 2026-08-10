@@ -275,25 +275,29 @@ export async function fetchZillowOne(address: string): Promise<Listing[]> {
 /**
  * Zillow's own price history for one listing. Richer than our observed history
  * because it predates the first time we ever saw the place.
+ *
+ * Throws on failure rather than returning [] — the caller caches answers,
+ * and "the record is empty" and "the fetch never happened" must not share a
+ * value, or one keyless visitor poisons the cache for everyone after them.
+ * "Listing removed" rows arrive with price null and are dropped; the price
+ * facts live on the listed/price-change rows.
  */
 export async function fetchZillowPriceHistory(
   zpid: string
-): Promise<{ date: string; price: number; event: string }[]> {
-  try {
-    const body = await realtyGet<{ priceHistory?: unknown[] }>(
-      "zillow",
-      "/pricehistory",
-      { byzpid: zpid }
-    );
-    const rows = (body?.priceHistory ?? []) as Record<string, unknown>[];
-    return rows
-      .map((r) => ({
-        date: String(r.date ?? r.time ?? ""),
-        price: Number(r.price ?? r.priceChangeRate ?? 0),
-        event: String(r.event ?? ""),
-      }))
-      .filter((r) => r.date && r.price > 0);
-  } catch {
-    return [];
-  }
+): Promise<{ date: string; price: number; event: string; rental: boolean }[]> {
+  const body = await realtyGet<{ priceHistory?: unknown[] }>(
+    "zillow",
+    "/pricehistory",
+    { byzpid: zpid }
+  );
+  const rows = (body?.priceHistory ?? []) as Record<string, unknown>[];
+  return rows
+    .map((r) => ({
+      date: String(r.date ?? ""),
+      price: Number(r.price ?? 0),
+      event: String(r.event ?? ""),
+      // The source's own word on rental vs sale, when it gives one.
+      rental: r.postingIsRental !== false,
+    }))
+    .filter((r) => r.date && r.price > 0);
 }

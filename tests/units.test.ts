@@ -30,6 +30,7 @@ import { neighborhoodAt, withinAreas, locate } from "@/lib/geo";
 import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { readHunt } from "@/lib/insights";
+import { readRentPast } from "@/lib/rentHistory";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
@@ -55,7 +56,7 @@ import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { nearAreas } from "@/lib/geo";
 import { safeNext } from "@/lib/nextPath";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
-import { hpdAddress } from "@/lib/nycdata";
+import { hpdAddress, stabilizedLikely } from "@/lib/nycdata";
 import {
   negotiationScript,
   incomeToAnnual,
@@ -745,6 +746,73 @@ test("a landlord's approval is not a signing", () => {
   assert.equal(after.steps.won, 1);
   assert.equal(after.steps.approved, 0);
   assert.equal(after.insights[0].key, "won");
+});
+
+test("the stabilization presumption is pre-1974 with six or more units", () => {
+  assert.equal(stabilizedLikely(1910, 31), true);
+  assert.equal(stabilizedLikely(1973, 6), true);
+  assert.equal(stabilizedLikely(1974, 60), false); // the cutoff year itself is out
+  assert.equal(stabilizedLikely(1950, 5), false); // too few units
+  assert.equal(stabilizedLikely(0, 40), false); // unknown year proves nothing
+});
+
+test("the source's own rental flag outranks the price heuristic", () => {
+  const past = readRentPast(
+    [
+      // A cheap parking-space sale would pass the price band; the flag stops it.
+      { date: "2020-01-01", price: 25_000, event: "Listed", rental: false },
+      { date: "2021-01-01", price: 3000, event: "Listed for rent", rental: true },
+    ],
+    3000
+  );
+  assert.equal(past.rents.length, 1);
+  assert.equal(past.rents[0].price, 3000);
+});
+
+test("past rents keep rentals, drop sales, and fold repeats", () => {
+  const past = readRentPast(
+    [
+      { date: "2021-03-01", price: 2800, event: "Listed for rent" },
+      { date: "2019-06-01", price: 1_250_000, event: "Sold" },
+      { date: "2023-04-01", price: 3100, event: "Listed for rent" },
+      // A relist at the same ask is the same fact.
+      { date: "2023-05-15", price: 3100, event: "Listing removed" },
+      { date: "2025-03-01", price: 3400, event: "Listed for rent" },
+    ],
+    3600
+  );
+  assert.equal(past.rents.length, 3);
+  assert.deepEqual(
+    past.rents.map((e) => e.price),
+    [2800, 3100, 3400]
+  );
+  // 2800 -> 3400 over ~4 years is about 5% a year.
+  assert.ok(past.annualPct != null && past.annualPct > 4 && past.annualPct < 6, `${past.annualPct}`);
+  // Asking 3600 against the 2025 listing of 3400 is about +6%.
+  assert.ok(past.vsPast && past.vsPast.price === 3400);
+  assert.ok(past.vsPast && Math.round(past.vsPast.pct) === 6, `${past.vsPast?.pct}`);
+});
+
+test("under a year of history earns no annual rate", () => {
+  const past = readRentPast(
+    [
+      { date: new Date(Date.now() - 120 * 86_400_000).toISOString(), price: 3000, event: "Listed for rent" },
+      { date: new Date().toISOString(), price: 3200, event: "Price change" },
+    ],
+    3200
+  );
+  assert.equal(past.annualPct, null);
+  assert.equal(past.rents.length, 2);
+});
+
+test("an empty or sales-only record reads as no rental past", () => {
+  const past = readRentPast(
+    [{ date: "2020-01-01", price: 900_000, event: "Listed for sale" }],
+    3000
+  );
+  assert.equal(past.rents.length, 0);
+  assert.equal(past.annualPct, null);
+  assert.equal(past.vsPast, null);
 });
 
 test("today's actions lead with what's rotting", () => {

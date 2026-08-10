@@ -29,7 +29,10 @@ export async function GET(
       .maybeSingle();
     if (
       cached &&
-      Date.now() - new Date(cached.fetched_at as string).getTime() < TTL_MS
+      Date.now() - new Date(cached.fetched_at as string).getTime() < TTL_MS &&
+      // A payload from before the tax-lot facts shipped refreshes early
+      // instead of hiding the stabilization line for a week.
+      "lot" in ((cached.payload ?? {}) as Record<string, unknown>)
     ) {
       return NextResponse.json({ intel: cached.payload, cached: true });
     }

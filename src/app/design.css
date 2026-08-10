@@ -5853,6 +5853,36 @@ button.timeline-funnel:disabled { cursor: default; }
 
 .insights-note { font-size: var(--t-xs); margin: 0; }
 
+/* --- past rents: the place's own record ----------------------------------- */
+
+.pastrents-empty { display: grid; gap: var(--s2); justify-items: start; }
+.pastrents-empty p { margin: 0; font-size: var(--t-sm); line-height: 1.5; }
+
+.pastrents-read {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  font-weight: 600;
+}
+
+.pastrents {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.pastrents li {
+  display: grid;
+  grid-template-columns: 82px 76px 1fr;
+  gap: var(--s3);
+  align-items: baseline;
+  font-size: var(--t-sm);
+  padding: 3px 0;
+}
+.pastrents b { font-variant-numeric: tabular-nums; }
+.pastrents-date { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
 /* Phones hide the strip's funnel numbers for space; the door to insights
    stays, shrunk to just its label. */
 @media (max-width: 860px) {

@@ -39,6 +39,7 @@ import { formatPhone, isCompletePhone } from "@/lib/phone";
 import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
 import { packetReadiness } from "@/lib/packet";
+import { readRentPast } from "@/lib/rentHistory";
 // Leaflet reads `window` on import, which detonates the server render.
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
@@ -201,6 +202,32 @@ export default function ListingDrawer({
 
   const [detail, setDetail] = useState<Detail | null>(null);
   const [intel, setIntel] = useState<BuildingIntel | null>(null);
+  /** Past rents: undefined = cache check in flight, null = none cached. */
+  const [pastRents, setPastRents] = useState<
+    { date: string; price: number; event: string }[] | null | undefined
+  >(undefined);
+  const [pastRentsError, setPastRentsError] = useState("");
+  const [pullingPast, setPullingPast] = useState(false);
+  // Render-time gate for the pull button; document isn't there on the server.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => setSignedIn(document.cookie.includes("-auth-token")), []);
+
+  async function pullPastRents() {
+    if (pullingPast) return;
+    setPullingPast(true);
+    setPastRentsError("");
+    try {
+      const res = await fetch(`/api/listings/${encodeURIComponent(listing.id)}/history`, {
+        method: "POST",
+      });
+      const body = await res.json();
+      if (Array.isArray(body.events)) setPastRents(body.events);
+      else setPastRentsError(body.error || "Couldn't reach the record. Try again in a minute.");
+    } catch {
+      setPastRentsError("Couldn't reach the record. Try again in a minute.");
+    }
+    setPullingPast(false);
+  }
   const [negCopied, setNegCopied] = useState(false);
   /** Which section the quick tabs should light up, from scroll position. */
   const [activeSec, setActiveSec] = useState("sec-costs");
@@ -347,6 +374,19 @@ export default function ListingDrawer({
         if (live && b.intel) setIntel(b.intel as BuildingIntel);
       })
       .catch(() => {});
+    // Past rents: cache-only on open, never a spend. The pull button below
+    // is the only thing that costs a request.
+    setPastRents(undefined);
+    setPastRentsError("");
+    setPullingPast(false);
+    fetch(`/api/listings/${encodeURIComponent(listing.id)}/history`)
+      .then((r) => r.json())
+      .then((b) => {
+        if (live) setPastRents(Array.isArray(b.events) ? b.events : null);
+      })
+      .catch(() => {
+        if (live) setPastRents(null);
+      });
     // Opening the drawer counts as reading its updates. A visitor has no
     // read-state to stamp, so the write is skipped rather than 401ing.
     if (document.cookie.includes("-auth-token")) {
@@ -799,7 +839,7 @@ export default function ListingDrawer({
                 ["sec-costs", "Costs", true],
                 ["sec-around", "Around", listing.lat != null],
                 ["sec-score", "Score", true],
-                ["sec-record", "Building", Boolean(intel && (intel.violations || intel.bedbugs || intel.noise))],
+                ["sec-record", "Building", Boolean(intel && (intel.violations || intel.bedbugs || intel.noise || intel.lot))],
                 ["sec-viewing", "Viewing", stage === "tour"],
                 ["sec-contact", "Contact", true],
                 ["sec-footage", "Footage", true],
@@ -1186,7 +1226,7 @@ export default function ListingDrawer({
           {/* What the listing will never tell you: does the landlord fix
               things, has the building filed bedbugs, what do the neighbors
               call 311 about. Public record, cited as such. */}
-          {intel && (intel.violations || intel.bedbugs || intel.noise) && (
+          {intel && (intel.violations || intel.bedbugs || intel.noise || intel.lot) && (
             <section className="dsec" data-sec="sec-record">
               <h3 className="dsec-label">The building&apos;s record</h3>
               <ul className="intel">
@@ -1218,10 +1258,35 @@ export default function ListingDrawer({
                       : `${intel.noise.count} noise complaint${intel.noise.count === 1 ? "" : "s"} to 311 on this block in six months${intel.noise.top.length ? `, mostly ${intel.noise.top.join(" and ").toLowerCase()}` : ""}.`}
                   </li>
                 )}
+                {/* Stabilization is money on the table: capped renewals for
+                    as long as you stay. The rule can't see the unit's own
+                    paperwork, so the copy asks the question instead of
+                    answering it. */}
+                {intel.lot?.stabilizedLikely && (
+                  <li className="is-ok">
+                    <b>Possibly rent stabilized:</b> built {intel.lot.yearBuilt} with{" "}
+                    {intel.lot.unitsRes} apartments, which fits the classic rule
+                    (before 1974, six or more units). If it is, renewal increases
+                    are capped by law. Confirm free: request the unit&apos;s rent
+                    history from DHCR, or ask the agent directly.
+                  </li>
+                )}
+                {intel.lot && !intel.lot.stabilizedLikely && intel.lot.yearBuilt > 0 && (
+                  <li>
+                    Built {intel.lot.yearBuilt}
+                    {intel.lot.unitsRes > 0
+                      ? `, ${intel.lot.unitsRes} apartment${intel.lot.unitsRes === 1 ? "" : "s"} on the lot`
+                      : ""}
+                    . Doesn&apos;t fit the classic rent stabilization rule; newer
+                    buildings can still be stabilized through tax programs, so
+                    asking costs nothing.
+                  </li>
+                )}
               </ul>
               <p className="muted drawer-fineprint">
-                NYC Open Data: HPD violations, the bedbug registry and 311, matched
-                to this address. Public record, not a judgment.
+                NYC Open Data: HPD violations, the bedbug registry, 311 and the
+                city&apos;s tax lot records, matched to this address. Public
+                record, not a judgment.
               </p>
             </section>
           )}
@@ -1663,6 +1728,81 @@ export default function ListingDrawer({
               <PriceChart points={detail.priceHistory} />
             </section>
           )}
+
+          {/* --- what it rented for before -------------------------------- */}
+          <section className="dsec">
+            <h3 className="dsec-label">Past rents</h3>
+            {pastRents == null ? (
+              <div className="pastrents-empty">
+                <p className="muted">
+                  What this exact place listed for over the years, from the
+                  listing site&apos;s own record. Negotiation material: how hard
+                  this landlord raises, and whether today&apos;s ask is a step
+                  or a leap.
+                </p>
+                {pastRents === null &&
+                  (signedIn ? (
+                    <button className="btn" onClick={pullPastRents} disabled={pullingPast}>
+                      {pullingPast ? "Pulling the record…" : "Pull its past rents"}
+                      {!pullingPast && <span className="muted"> · 1 check</span>}
+                    </button>
+                  ) : (
+                    <span className="muted">
+                      Sign in and pulling it costs one check; once anyone has,
+                      it&apos;s here for everyone.
+                    </span>
+                  ))}
+                {pastRentsError && <p className="warn-text">{pastRentsError}</p>}
+              </div>
+            ) : (
+              (() => {
+                const past = readRentPast(pastRents, listing.price);
+                if (!past.rents.length) {
+                  return (
+                    <p className="muted">
+                      The record has no prior rental listings for this exact
+                      place. Newer buildings and first-time rentals often
+                      don&apos;t.
+                    </p>
+                  );
+                }
+                const trend =
+                  past.annualPct != null && past.yearsSpanned != null
+                    ? `Rents here have moved ${past.annualPct >= 0 ? "up " : "down "}about ${Math.abs(past.annualPct).toFixed(1)}% a year across ${past.yearsSpanned < 1.5 ? "the last year" : `${Math.round(past.yearsSpanned)} years`} of listings.`
+                    : null;
+                const vs = past.vsPast
+                  ? Math.abs(past.vsPast.pct) < 0.5
+                    ? `Today's ask matches its ${past.vsPast.year} listing.`
+                    : `Today's ask is ${Math.abs(past.vsPast.pct).toFixed(0)}% ${past.vsPast.pct > 0 ? "over" : "under"} its ${past.vsPast.year} listing of ${money(past.vsPast.price)}.`
+                  : null;
+                return (
+                  <>
+                    {(trend || vs) && (
+                      <p className="pastrents-read">
+                        {trend}
+                        {trend && vs ? " " : ""}
+                        {vs}
+                      </p>
+                    )}
+                    <ul className="pastrents">
+                      {[...past.rents].reverse().map((e) => (
+                        <li key={`${e.date}-${e.price}`}>
+                          <span className="pastrents-date">
+                            {new Date(e.date).toLocaleDateString("en-US", {
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <b>{money(e.price)}</b>
+                          <span className="muted">{(e.event || "listed").toLowerCase()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                );
+              })()
+            )}
+          </section>
 
           <section className="dsec" data-sec="sec-notes">
             <h3 className="dsec-label">Notes</h3>
