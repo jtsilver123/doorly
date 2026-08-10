@@ -17,6 +17,7 @@ import {
   STAGES,
   STAGE_LABEL,
 } from "@/types";
+import { addressSearchUrl } from "@/lib/siteLinks";
 import { compactPrice } from "@/lib/cost";
 import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
@@ -420,6 +421,16 @@ export default function ListingDrawer({
       .filter((so) => so.url)
       .sort((a, b) => order.indexOf(a.source) - order.indexOf(b.source));
     if (!found.length && listing.url) found.push({ source: listing.source, url: listing.url });
+    /*
+     * A hand-added or Facebook place publishes no link of its own, and those
+     * are exactly the ones you most want to check against a real listing
+     * site. Fall back to a search for the address on the site you prefer,
+     * so the header always offers a way out to the open web.
+     */
+    if (!found.length && listing.address) {
+      const site = profile.preferredSource || "streeteasy";
+      found.push({ source: site, url: addressSearchUrl(site, listing.address) });
+    }
     return found;
   })();
 

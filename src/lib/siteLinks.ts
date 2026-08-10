@@ -70,3 +70,27 @@ export function siteJumps(c: SearchCriteria): SiteJump[] {
     { source: "zillow", label: "Zillow", url: zillowSearchUrl(c) },
   ];
 }
+
+/**
+ * The same address, looked up on a listing site.
+ *
+ * A place you pasted from a Facebook group or typed in by hand has no
+ * published URL of its own, so the panel had nothing external to offer for
+ * exactly the listings you most want a second opinion on. A site search for
+ * the address is the next best thing, and it's what you'd type anyway.
+ */
+export function addressSearchUrl(source: Source, address: string): string {
+  const q = encodeURIComponent(`${address}, New York, NY`);
+  switch (source) {
+    case "zillow":
+      return `https://www.zillow.com/homes/${q}_rb/`;
+    case "hotpads":
+      return `https://hotpads.com/search?q=${q}`;
+    case "apartments":
+      return `https://www.apartments.com/${encodeURIComponent(address.replace(/\s+/g, "-").toLowerCase())}/`;
+    case "craigslist":
+      return `https://newyork.craigslist.org/search/apa?query=${q}`;
+    default:
+      return `https://streeteasy.com/search?search%5Bquery%5D=${q}`;
+  }
+}
