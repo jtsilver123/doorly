@@ -103,11 +103,17 @@ function toLocalInput(iso: string | null): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
-/** Half-hour viewing slots, 8:00 AM through 9:00 PM. */
+/**
+ * Quarter-hour viewing slots, 7:00 AM through 10:00 PM. Agents really do
+ * say "come at 11:45", and a list that can't hold the time you were given
+ * is a list you work around.
+ */
 const TOUR_SLOTS: string[] = [];
-for (let h = 8; h <= 21; h++) {
-  TOUR_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
-  if (h < 21) TOUR_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
+for (let h = 7; h <= 22; h++) {
+  for (const m of ["00", "15", "30", "45"]) {
+    if (h === 22 && m !== "00") break;
+    TOUR_SLOTS.push(`${String(h).padStart(2, "0")}:${m}`);
+  }
 }
 
 function slotLabel(time: string): string {
@@ -712,15 +718,6 @@ export default function ListingDrawer({
    * The chosen chips stay in the window: strips scroll sideways, and a
    * selection three weeks out would otherwise sit invisibly off-screen.
    */
-  const timeStripRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const strip = timeStripRef.current;
-    const chip = strip?.querySelector<HTMLElement>(".is-on");
-    if (strip && chip) {
-      strip.scrollLeft = chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2;
-    }
-  }, [tourTime, stage]);
-
   /** The footer CTAs and the board's red buttons land on exact sections. */
   const goToSection = useCallback((sec: string, focusSel?: string) => {
     const body = bodyRef.current;
@@ -1640,37 +1637,35 @@ export default function ListingDrawer({
                       }}
                     />
                   </div>
-                  <div
-                    className="pickstrip"
+                  {/* A dropdown, not a strip: sixty quarter-hour slots
+                      scan far better in a menu, and a select is still
+                      atomic — one change is one complete answer. */}
+                  <select
+                    className="field tourpick"
                     data-tour-pick="time"
-                    ref={timeStripRef}
-                    role="radiogroup"
                     aria-label="Viewing time"
+                    value={tourTime}
+                    onChange={(e) => {
+                      const t = e.target.value;
+                      setTourTime(t);
+                      if (t) saveTourParts(tourDay, t, tourKind, tourEndTime);
+                    }}
                   >
+                    <option value="">Pick a time</option>
                     {tourTimeOptions(tourTime).map((t) => (
-                      <button
-                        key={t}
-                        className={t === tourTime ? "pickchip pickchip-time is-on" : "pickchip pickchip-time"}
-                        data-tour-time={t}
-                        role="radio"
-                        aria-checked={t === tourTime}
-                        onClick={() => {
-                          setTourTime(t);
-                          saveTourParts(tourDay, t, tourKind, tourEndTime);
-                        }}
-                      >
+                      <option key={t} value={t}>
                         {slotLabel(t)}
-                      </button>
+                      </option>
                     ))}
-                  </div>
+                  </select>
                   {tourDay && !tourTime && (
                     <span className="muted" style={{ fontSize: 11 }}>
-                      Now tap a time and it saves.
+                      Now pick a time and it saves.
                     </span>
                   )}
                   {!tourDay && !listing.tourAt && (
                     <span className="muted" style={{ fontSize: 11 }}>
-                      Tap a day, then a time. It saves itself.
+                      Pick a day, then a time. It saves itself.
                     </span>
                   )}
                   {listing.tourAt && (
@@ -1694,28 +1689,24 @@ export default function ListingDrawer({
                 {tourKind === "open_house" && (
                   <div className="tourtime">
                     <span>Until</span>
-                    <div
-                      className="pickstrip"
+                    <select
+                      className="field tourpick"
                       data-tour-pick="end"
-                      role="radiogroup"
                       aria-label="Open house end time"
+                      value={tourEndTime}
+                      onChange={(e) => {
+                        const t = e.target.value;
+                        setTourEndTime(t);
+                        saveTourParts(tourDay, tourTime, tourKind, t);
+                      }}
                     >
+                      <option value="">Ends at…</option>
                       {tourTimeOptions(tourEndTime).map((t) => (
-                        <button
-                          key={t}
-                          className={t === tourEndTime ? "pickchip pickchip-time is-on" : "pickchip pickchip-time"}
-                          data-tour-end={t}
-                          role="radio"
-                          aria-checked={t === tourEndTime}
-                          onClick={() => {
-                            setTourEndTime(t);
-                            saveTourParts(tourDay, tourTime, tourKind, t);
-                          }}
-                        >
+                        <option key={t} value={t}>
                           {slotLabel(t)}
-                        </button>
+                        </option>
                       ))}
-                    </div>
+                    </select>
                     {listing.tourEndsAt && <b>{tourWhen(listing.tourEndsAt)}</b>}
                   </div>
                 )}

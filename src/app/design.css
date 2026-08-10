@@ -5888,6 +5888,14 @@ button.timeline-funnel:disabled { cursor: default; }
 }
 .tourcal .rdp-chevron { fill: var(--text-muted); }
 
+/* The time menu sits under the calendar at a readable width, not stretched
+   across the whole panel like a text field. */
+.tourpick {
+  width: 100%;
+  max-width: 240px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Time slots as a sideways strip of tappable chips. */
 .pickstrip {
   display: flex;
