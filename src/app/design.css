@@ -5855,6 +5855,24 @@ button.timeline-funnel:disabled { cursor: default; }
 
 /* --- past rents: the place's own record ----------------------------------- */
 
+.renttimeline { display: block; height: auto; }
+.renttimeline-grid { stroke: var(--border); stroke-width: 1; }
+.renttimeline-tick {
+  fill: var(--text-muted);
+  font-size: 9px;
+  font-family: inherit;
+}
+.renttimeline-past { stroke: var(--border-strong); }
+.renttimeline-now { stroke: var(--accent); }
+.renttimeline-end { fill: var(--border-strong); }
+.renttimeline-dot { fill: var(--accent); }
+.renttimeline-nowlabel {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
 .pastrents-empty { display: grid; gap: var(--s2); justify-items: start; }
 .pastrents-empty p { margin: 0; font-size: var(--t-sm); line-height: 1.5; }
 

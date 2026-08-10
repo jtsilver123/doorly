@@ -92,3 +92,65 @@ export function readRentPast(raw: RentEvent[], askingNow: number): RentPast {
     vsPast,
   };
 }
+
+export interface RentPoint {
+  at: number;
+  price: number;
+}
+
+/** Nine months of silence separates two listing cycles. */
+const CYCLE_GAP_MS = 270 * 86_400_000;
+
+/**
+ * The whole life of the rent as listing cycles, ready to draw.
+ *
+ * The pulled record and the app's own observations are one series in one
+ * unit; this merges them and splits on long gaps, because a line that runs
+ * through two years of not-being-listed would claim a continuity the
+ * market never had. The final cycle always ends at now, at today's ask,
+ * so the chart's last mark is the number under negotiation.
+ */
+export function rentCycles(
+  rents: RentEvent[],
+  observed: { at: string; price: number }[] = [],
+  askingNow = 0,
+  now = Date.now()
+): RentPoint[][] {
+  const pts: RentPoint[] = rents
+    .filter((e) => e.rental !== false && e.price >= RENT_MIN && e.price <= RENT_MAX)
+    .map((e) => ({ at: new Date(e.date).getTime(), price: e.price }))
+    .concat(
+      observed
+        .map((o) => ({ at: new Date(o.at).getTime(), price: o.price }))
+        .filter((p) => p.price >= RENT_MIN && p.price <= RENT_MAX)
+    )
+    .filter((p) => !Number.isNaN(p.at) && p.at <= now)
+    .sort((a, b) => a.at - b.at);
+
+  // The same ask restated inside one cycle is one fact.
+  const dedup: RentPoint[] = [];
+  for (const p of pts) {
+    const last = dedup[dedup.length - 1];
+    if (last && last.price === p.price && p.at - last.at < CYCLE_GAP_MS) continue;
+    dedup.push(p);
+  }
+
+  const cycles: RentPoint[][] = [];
+  for (const p of dedup) {
+    const current = cycles[cycles.length - 1];
+    if (!current || p.at - current[current.length - 1].at > CYCLE_GAP_MS) cycles.push([p]);
+    else current.push(p);
+  }
+
+  if (askingNow > 0) {
+    const lastCycle = cycles[cycles.length - 1];
+    const lastPoint = lastCycle?.[lastCycle.length - 1];
+    if (!lastPoint || now - lastPoint.at > CYCLE_GAP_MS) {
+      cycles.push([{ at: now, price: askingNow }]);
+    } else {
+      lastCycle.push({ at: now, price: askingNow });
+    }
+  }
+
+  return cycles.filter((c) => c.length > 0);
+}

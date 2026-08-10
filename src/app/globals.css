@@ -361,7 +361,11 @@ textarea {
   top: 0;
   right: 0;
   height: 100dvh;
-  width: min(560px, 100vw);
+  /* Roomy on purpose: this panel is where decisions happen — photos, the
+     rent timeline, the building record — and 560px made all of it read
+     through a letterbox. The viewport cap keeps a sliver of scrim on
+     tablets so it still reads as a panel over the app, not a new page. */
+  width: min(720px, 94vw);
   background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-lg);

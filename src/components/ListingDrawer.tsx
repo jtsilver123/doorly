@@ -39,7 +39,7 @@ import { formatPhone, isCompletePhone } from "@/lib/phone";
 import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
 import { packetReadiness } from "@/lib/packet";
-import { readRentPast } from "@/lib/rentHistory";
+import { readRentPast, rentCycles } from "@/lib/rentHistory";
 // Leaflet reads `window` on import, which detonates the server render.
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
@@ -167,6 +167,104 @@ function PriceChart({ points }: { points: PricePoint[] }) {
 }
 
 /**
+ * The rent's whole life on one axis: every listing cycle from the pulled
+ * record, the app's own observations folded into the tail, today's ask as
+ * the final mark. Steps, not slopes — a rent holds a value until someone
+ * changes it — and a gap between cycles stays a gap, because a line
+ * through two unlisted years would claim a continuity the market never
+ * had. The current cycle draws in accent; history recedes to muted.
+ */
+function RentTimeline({ cycles }: { cycles: { at: number; price: number }[][] }) {
+  const all = cycles.flat();
+  if (all.length < 2) return null;
+  const minT = Math.min(...all.map((p) => p.at));
+  const maxT = Math.max(...all.map((p) => p.at));
+  const minP = Math.min(...all.map((p) => p.price));
+  const maxP = Math.max(...all.map((p) => p.price));
+  const spanT = Math.max(maxT - minT, 1);
+  const spanP = Math.max(maxP - minP, 1);
+  const W = 320;
+  const H = 96;
+  const TOP = 10;
+  const BOTTOM = 16;
+  const x = (t: number) => 2 + ((t - minT) / spanT) * (W - 8);
+  const y = (p: number) => TOP + (1 - (p - minP) / spanP) * (H - TOP - BOTTOM);
+
+  const path = (cycle: { at: number; price: number }[]) => {
+    // A one-event cycle still deserves a mark you can see: a short dash at
+    // its price, not a zero-length path.
+    if (cycle.length === 1) {
+      const cx = x(cycle[0].at);
+      const cy = y(cycle[0].price).toFixed(1);
+      return `M ${Math.max(2, cx - 5).toFixed(1)} ${cy} H ${Math.min(W - 2, cx + 5).toFixed(1)}`;
+    }
+    let d = `M ${x(cycle[0].at).toFixed(1)} ${y(cycle[0].price).toFixed(1)}`;
+    for (let i = 1; i < cycle.length; i++) {
+      d += ` H ${x(cycle[i].at).toFixed(1)} V ${y(cycle[i].price).toFixed(1)}`;
+    }
+    return d;
+  };
+
+  const y0 = new Date(minT).getUTCFullYear();
+  const y1 = new Date(maxT).getUTCFullYear();
+  const step = Math.max(1, Math.ceil((y1 - y0) / 4));
+  const ticks: number[] = [];
+  for (let yr = Math.ceil(y0 / step) * step; yr <= y1; yr += step) ticks.push(yr);
+
+  const last = cycles[cycles.length - 1];
+  const nowPt = last[last.length - 1];
+
+  return (
+    <svg
+      className="renttimeline"
+      width="100%"
+      viewBox={`0 0 ${W} ${H}`}
+      role="img"
+      aria-label={`Rent history from ${y0} to now, ${money(minP)} to ${money(maxP)}`}
+    >
+      {ticks.map((yr) => {
+        const tx = x(Date.UTC(yr, 0, 1));
+        if (tx < 14 || tx > W - 14) return null;
+        return (
+          <g key={yr}>
+            <line x1={tx} y1={TOP} x2={tx} y2={H - BOTTOM} className="renttimeline-grid" />
+            <text x={tx} y={H - 4} textAnchor="middle" className="renttimeline-tick">
+              {yr}
+            </text>
+          </g>
+        );
+      })}
+      {cycles.map((cycle, i) => (
+        <path
+          key={cycle[0].at}
+          d={path(cycle)}
+          fill="none"
+          strokeWidth={i === cycles.length - 1 ? 2.2 : 1.8}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          className={i === cycles.length - 1 ? "renttimeline-now" : "renttimeline-past"}
+        />
+      ))}
+      {cycles
+        .slice(0, -1)
+        .map((cycle) => cycle[cycle.length - 1])
+        .map((p) => (
+          <circle key={p.at} cx={x(p.at)} cy={y(p.price)} r="2.2" className="renttimeline-end" />
+        ))}
+      <circle cx={x(nowPt.at)} cy={y(nowPt.price)} r="3.4" className="renttimeline-dot" />
+      <text
+        x={Math.min(x(nowPt.at), W - 4)}
+        y={Math.max(y(nowPt.price) - 7, 9)}
+        textAnchor="end"
+        className="renttimeline-nowlabel"
+      >
+        {money(nowPt.price)}
+      </text>
+    </svg>
+  );
+}
+
+/**
  * The reading line: how far below the panel's top edge a section has to climb
  * before its chip lights. Shared by the scrollspy and the jump-to handler, so
  * tapping a chip always leaves that chip lit.
@@ -228,6 +326,17 @@ export default function ListingDrawer({
     }
     setPullingPast(false);
   }
+
+  const pastRead = pastRents ? readRentPast(pastRents, listing.price) : null;
+  const pastTrend =
+    pastRead && pastRead.annualPct != null && pastRead.yearsSpanned != null
+      ? `Rents here have moved ${pastRead.annualPct >= 0 ? "up " : "down "}about ${Math.abs(pastRead.annualPct).toFixed(1)}% a year across ${pastRead.yearsSpanned < 1.5 ? "the last year" : `${Math.round(pastRead.yearsSpanned)} years`} of listings.`
+      : null;
+  const pastVs = pastRead?.vsPast
+    ? Math.abs(pastRead.vsPast.pct) < 0.5
+      ? `Today's ask matches its ${pastRead.vsPast.year} listing.`
+      : `Today's ask is ${Math.abs(pastRead.vsPast.pct).toFixed(0)}% ${pastRead.vsPast.pct > 0 ? "over" : "under"} its ${pastRead.vsPast.year} listing of ${money(pastRead.vsPast.price)}.`
+    : null;
   const [negCopied, setNegCopied] = useState(false);
   /** Which section the quick tabs should light up, from scroll position. */
   const [activeSec, setActiveSec] = useState("sec-costs");
@@ -1722,7 +1831,11 @@ export default function ListingDrawer({
           </section>
 
           {/* --- the record ---------------------------------------------- */}
-          {detail && (detail.priceHistory?.length ?? 0) > 1 && (
+          {/* Kept only until a pulled record exists: our own observations
+              are the current cycle up close, and once the years are on
+              screen they fold into that one timeline instead of telling
+              half the story twice. */}
+          {detail && (detail.priceHistory?.length ?? 0) > 1 && !pastRead?.rents.length && (
             <section className="dsec">
               <h3 className="dsec-label">Price history</h3>
               <PriceChart points={detail.priceHistory} />
@@ -1754,53 +1867,41 @@ export default function ListingDrawer({
                   ))}
                 {pastRentsError && <p className="warn-text">{pastRentsError}</p>}
               </div>
+            ) : !pastRead?.rents.length ? (
+              <p className="muted">
+                The record has no prior rental listings for this exact place.
+                Newer buildings and first-time rentals often don&apos;t.
+              </p>
             ) : (
-              (() => {
-                const past = readRentPast(pastRents, listing.price);
-                if (!past.rents.length) {
-                  return (
-                    <p className="muted">
-                      The record has no prior rental listings for this exact
-                      place. Newer buildings and first-time rentals often
-                      don&apos;t.
-                    </p>
-                  );
-                }
-                const trend =
-                  past.annualPct != null && past.yearsSpanned != null
-                    ? `Rents here have moved ${past.annualPct >= 0 ? "up " : "down "}about ${Math.abs(past.annualPct).toFixed(1)}% a year across ${past.yearsSpanned < 1.5 ? "the last year" : `${Math.round(past.yearsSpanned)} years`} of listings.`
-                    : null;
-                const vs = past.vsPast
-                  ? Math.abs(past.vsPast.pct) < 0.5
-                    ? `Today's ask matches its ${past.vsPast.year} listing.`
-                    : `Today's ask is ${Math.abs(past.vsPast.pct).toFixed(0)}% ${past.vsPast.pct > 0 ? "over" : "under"} its ${past.vsPast.year} listing of ${money(past.vsPast.price)}.`
-                  : null;
-                return (
-                  <>
-                    {(trend || vs) && (
-                      <p className="pastrents-read">
-                        {trend}
-                        {trend && vs ? " " : ""}
-                        {vs}
-                      </p>
-                    )}
-                    <ul className="pastrents">
-                      {[...past.rents].reverse().map((e) => (
-                        <li key={`${e.date}-${e.price}`}>
-                          <span className="pastrents-date">
-                            {new Date(e.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                          <b>{money(e.price)}</b>
-                          <span className="muted">{(e.event || "listed").toLowerCase()}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                );
-              })()
+              <>
+                {/* One timeline, both sources: the pulled record is the
+                    years, our own observations are the current cycle up
+                    close, today's ask is the final mark. */}
+                <RentTimeline
+                  cycles={rentCycles(pastRents, detail?.priceHistory ?? [], listing.price)}
+                />
+                {(pastTrend || pastVs) && (
+                  <p className="pastrents-read">
+                    {pastTrend}
+                    {pastTrend && pastVs ? " " : ""}
+                    {pastVs}
+                  </p>
+                )}
+                <ul className="pastrents">
+                  {[...pastRead.rents].reverse().map((e) => (
+                    <li key={`${e.date}-${e.price}`}>
+                      <span className="pastrents-date">
+                        {new Date(e.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <b>{money(e.price)}</b>
+                      <span className="muted">{(e.event || "listed").toLowerCase()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </section>
 

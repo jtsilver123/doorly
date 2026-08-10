@@ -30,7 +30,7 @@ import { neighborhoodAt, withinAreas, locate } from "@/lib/geo";
 import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { readHunt } from "@/lib/insights";
-import { readRentPast } from "@/lib/rentHistory";
+import { readRentPast, rentCycles } from "@/lib/rentHistory";
 import { statsFor, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
@@ -767,6 +767,35 @@ test("the source's own rental flag outranks the price heuristic", () => {
   );
   assert.equal(past.rents.length, 1);
   assert.equal(past.rents[0].price, 3000);
+});
+
+test("rent cycles split on long gaps and end at today's ask", () => {
+  const now = Date.UTC(2026, 7, 10);
+  const cycles = rentCycles(
+    [
+      { date: "2020-04-26", price: 3695, event: "Listed for rent" },
+      { date: "2020-06-03", price: 3495, event: "Price change" },
+      // Two years dark, then relisted: a new cycle, not a line across the gap.
+      { date: "2024-05-29", price: 3995, event: "Listed for rent" },
+    ],
+    [{ at: "2026-08-01T00:00:00Z", price: 4295 }],
+    4295,
+    now
+  );
+  assert.equal(cycles.length, 3);
+  assert.deepEqual(cycles[0].map((p) => p.price), [3695, 3495]);
+  assert.deepEqual(cycles[1].map((p) => p.price), [3995]);
+  // The observed point and today's ask share a cycle; the flat repeat folds.
+  const last = cycles[2];
+  assert.equal(last[last.length - 1].at, now);
+  assert.equal(last[last.length - 1].price, 4295);
+});
+
+test("a fresh listing with no record still charts as one cycle", () => {
+  const now = Date.UTC(2026, 7, 10);
+  const cycles = rentCycles([], [{ at: "2026-07-20T00:00:00Z", price: 3400 }], 3300, now);
+  assert.equal(cycles.length, 1);
+  assert.deepEqual(cycles[0].map((p) => p.price), [3400, 3300]);
 });
 
 test("past rents keep rentals, drop sales, and fold repeats", () => {
