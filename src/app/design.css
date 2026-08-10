@@ -5855,10 +5855,79 @@ button.timeline-funnel:disabled { cursor: default; }
 
 /* --- past rents: the place's own record ----------------------------------- */
 
-/* The viewing's day and time picks sit side by side; each is a full-width
-   tap target on its half. */
-.tourwhen { display: flex; gap: var(--s2); }
-.tourwhen select { flex: 1; min-width: 0; }
+/* --- the viewing picker: calendar plus time chips ------------------------- */
+
+/* react-day-picker, dressed in this app's tokens. */
+.tourcal {
+  display: flex;
+  justify-content: center;
+  padding: var(--s2) 0;
+}
+.tourcal .rdp-root {
+  --rdp-accent-color: var(--accent);
+  --rdp-accent-background-color: var(--accent-soft);
+  --rdp-today-color: var(--accent);
+  --rdp-day-width: 40px;
+  --rdp-day-height: 38px;
+  --rdp-nav-height: 34px;
+  font-size: var(--t-sm);
+}
+.tourcal .rdp-month_caption { font-weight: 700; font-size: var(--t-md); }
+.tourcal .rdp-day_button { border-radius: var(--r-md); font-variant-numeric: tabular-nums; }
+.tourcal .rdp-selected .rdp-day_button {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+.tourcal .rdp-weekday {
+  font-size: var(--t-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.tourcal .rdp-chevron { fill: var(--text-muted); }
+
+/* Time slots as a sideways strip of tappable chips. */
+.pickstrip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pickstrip::-webkit-scrollbar { display: none; }
+
+.pickchip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 8px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pickchip:hover { border-color: var(--border-strong); color: var(--text); }
+.pickchip.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tourtime-set {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.tourtime-set .linkish { font-size: var(--t-xs); color: var(--text-muted); }
 
 .renttimeline-box { width: 100%; }
 .renttimeline { display: block; }

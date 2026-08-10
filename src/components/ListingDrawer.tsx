@@ -40,6 +40,8 @@ import { nearestStation, stationsWithin } from "@/lib/subway";
 import { siteUrl } from "@/lib/site";
 import { packetReadiness } from "@/lib/packet";
 import { readRentPast, rentCycles } from "@/lib/rentHistory";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 // Leaflet reads `window` on import, which detonates the server render.
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
@@ -112,31 +114,6 @@ function slotLabel(time: string): string {
   const [h, m] = time.split(":").map(Number);
   const h12 = ((h + 11) % 12) + 1;
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-}
-
-function dayOptionLabel(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-/**
- * The next three weeks of days, which is the whole horizon a viewing gets
- * booked inside — plus whatever day is already saved, so an existing plan
- * outside the window still shows itself instead of a blank.
- */
-function tourDayOptions(current: string): string[] {
-  const days: string[] = [];
-  const cursor = new Date();
-  for (let i = 0; i < 21; i++) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    days.push(`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`);
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  if (current && !days.includes(current)) days.push(current);
-  return days.sort();
 }
 
 /** The slot grid plus the saved time when it falls off it (5:45 stays 5:45). */
@@ -466,7 +443,9 @@ export default function ListingDrawer({
     body.scrollTo({ top });
     if (focusKey) {
       const selector =
-        focusKey === "time" ? 'select[data-tour-pick="day"]' : 'input[inputmode="tel"]';
+        focusKey === "time"
+          ? '[data-tour-pick="day"] .rdp-day_button'
+          : 'input[inputmode="tel"]';
       // Everything after the scroll settles — including opening the contact
       // editor, because the mount-time resync effect runs after this one
       // and would immediately close an editor opened here synchronously.
@@ -552,18 +531,11 @@ export default function ListingDrawer({
     setPhone(formatPhone(listing.myContactPhone));
     setWho(listing.myContactName);
     setEmail(listing.myContactEmail);
-    /*
-     * Don't resync the viewing picks while one of their menus is open —
-     * a select mid-choice keeps its answer; the next run reconciles.
-     */
-    const inTourPick =
-      document.activeElement instanceof HTMLSelectElement &&
-      document.activeElement.hasAttribute("data-tour-pick");
-    if (!inTourPick) {
-      setTourDay(toLocalInput(listing.tourAt).slice(0, 10));
-      setTourTime(toLocalInput(listing.tourAt).slice(11));
-      setTourEndTime(toLocalInput(listing.tourEndsAt).slice(11));
-    }
+    // Calendar taps and chips are atomic, so the server's copy can land
+    // any time without eating anything mid-entry.
+    setTourDay(toLocalInput(listing.tourAt).slice(0, 10));
+    setTourTime(toLocalInput(listing.tourAt).slice(11));
+    setTourEndTime(toLocalInput(listing.tourEndsAt).slice(11));
     setTourKind(listing.tourKind);
     setAppUrl(listing.applicationUrl);
     setEditingContact(false);
@@ -717,7 +689,7 @@ export default function ListingDrawer({
   }
 
   /**
-   * A pick is a save. Selects deliver complete values, so there is no
+   * A pick is a save. Chips deliver complete values, so there is no
    * debounce, no flush, no pending state: day and time both chosen means
    * write it now, and clearing the day clears the plan.
    */
@@ -730,6 +702,41 @@ export default function ListingDrawer({
     const end = kind === "open_house" && endTime ? `${day}T${endTime}` : "";
     saveTour(`${day}T${time}`, kind, end);
   };
+
+  /*
+   * The chosen chips stay in the window: strips scroll sideways, and a
+   * selection three weeks out would otherwise sit invisibly off-screen.
+   */
+  const timeStripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = timeStripRef.current;
+    const chip = strip?.querySelector<HTMLElement>(".is-on");
+    if (strip && chip) {
+      strip.scrollLeft = chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2;
+    }
+  }, [tourTime, stage]);
+
+  /** The footer's "Set the time" and the board's red CTA both land here. */
+  const goToViewing = useCallback(() => {
+    const body = bodyRef.current;
+    const el = body?.querySelector('[data-sec="sec-viewing"]');
+    if (!body || !el) return;
+    const top =
+      el.getBoundingClientRect().top -
+      body.getBoundingClientRect().top +
+      body.scrollTop -
+      SPY_LINE +
+      8;
+    setActiveSec("sec-viewing");
+    jumpUntil.current = Date.now() + 700;
+    body.scrollTo({ top, behavior: "smooth" });
+    setTimeout(() => {
+      const cal = el.querySelector<HTMLElement>(
+        '[data-tour-pick="day"] .rdp-selected .rdp-day_button:not([disabled]), [data-tour-pick="day"] .rdp-today .rdp-day_button:not([disabled]), [data-tour-pick="day"] .rdp-day_button:not([disabled])'
+      );
+      cal?.focus({ preventScroll: true });
+    }, 400);
+  }, []);
 
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
@@ -1521,82 +1528,105 @@ export default function ListingDrawer({
                   ))}
                 </div>
 
-                {/* Two selects, not one segmented widget: a pick is atomic,
-                    saves on the spot, and there is no half-typed state for
-                    a re-render to eat. Three separate time-entry bugs died
-                    on that widget before this. */}
+                {/* A booking strip, not a form: tap a day, tap a time, done.
+                    Custom-drawn on purpose — the native datetime widget ate
+                    three rounds of fixes with fragile mid-entry state, and
+                    chips have none: a tap is atomic and saves on the spot. */}
                 <div className="tourtime">
                   <span>{tourKind === "open_house" ? "Starts" : "When is it?"}</span>
-                  <div className="tourwhen">
-                    <select
-                      className="field"
-                      data-tour-pick="day"
-                      aria-label="Viewing day"
-                      value={tourDay}
-                      onChange={(e) => {
-                        const day = e.target.value;
+                  {/* The calendar is react-day-picker — the same component
+                      shadcn's date picker wraps, used bare so it wears this
+                      design system instead of dragging in another one. */}
+                  <div className="tourcal" data-tour-pick="day">
+                    <DayPicker
+                      mode="single"
+                      selected={tourDay ? new Date(`${tourDay}T12:00:00`) : undefined}
+                      defaultMonth={tourDay ? new Date(`${tourDay}T12:00:00`) : new Date()}
+                      disabled={{ before: new Date() }}
+                      onSelect={(d) => {
+                        if (!d) return;
+                        const pad = (n: number) => String(n).padStart(2, "0");
+                        const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                         setTourDay(day);
-                        if (!day) setTourTime("");
                         saveTourParts(day, tourTime, tourKind, tourEndTime);
                       }}
-                    >
-                      <option value="">Pick a day</option>
-                      {tourDayOptions(tourDay).map((d) => (
-                        <option key={d} value={d}>
-                          {dayOptionLabel(d)}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="field"
-                      data-tour-pick="time"
-                      aria-label="Viewing time"
-                      value={tourTime}
-                      onChange={(e) => {
-                        const time = e.target.value;
-                        setTourTime(time);
-                        if (time) saveTourParts(tourDay, time, tourKind, tourEndTime);
-                        else if (listing.tourAt) saveTour("", tourKind, "");
-                      }}
-                    >
-                      <option value="">Pick a time</option>
-                      {tourTimeOptions(tourTime).map((t) => (
-                        <option key={t} value={t}>
-                          {slotLabel(t)}
-                        </option>
-                      ))}
-                    </select>
+                    />
+                  </div>
+                  <div
+                    className="pickstrip"
+                    data-tour-pick="time"
+                    ref={timeStripRef}
+                    role="radiogroup"
+                    aria-label="Viewing time"
+                  >
+                    {tourTimeOptions(tourTime).map((t) => (
+                      <button
+                        key={t}
+                        className={t === tourTime ? "pickchip pickchip-time is-on" : "pickchip pickchip-time"}
+                        data-tour-time={t}
+                        role="radio"
+                        aria-checked={t === tourTime}
+                        onClick={() => {
+                          setTourTime(t);
+                          saveTourParts(tourDay, t, tourKind, tourEndTime);
+                        }}
+                      >
+                        {slotLabel(t)}
+                      </button>
+                    ))}
                   </div>
                   {tourDay && !tourTime && (
                     <span className="muted" style={{ fontSize: 11 }}>
-                      Now pick a time and it saves.
+                      Now tap a time and it saves.
                     </span>
                   )}
-                  {listing.tourAt && <b>{tourWhen(listing.tourAt)}</b>}
+                  {!tourDay && !listing.tourAt && (
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      Tap a day, then a time. It saves itself.
+                    </span>
+                  )}
+                  {listing.tourAt && (
+                    <div className="tourtime-set">
+                      <b>{tourWhen(listing.tourAt)}</b>
+                      <button
+                        className="linkish"
+                        onClick={() => {
+                          setTourDay("");
+                          setTourTime("");
+                          setTourEndTime("");
+                          saveTour("", tourKind, "");
+                        }}
+                      >
+                        Clear the plan
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {tourKind === "open_house" && (
                   <div className="tourtime">
                     <span>Until</span>
-                    <div className="tourwhen">
-                      <select
-                        className="field"
-                        data-tour-pick="end"
-                        aria-label="Open house end time"
-                        value={tourEndTime}
-                        onChange={(e) => {
-                          const end = e.target.value;
-                          setTourEndTime(end);
-                          saveTourParts(tourDay, tourTime, tourKind, end);
-                        }}
-                      >
-                        <option value="">Same day, ends…</option>
-                        {tourTimeOptions(tourEndTime).map((t) => (
-                          <option key={t} value={t}>
-                            {slotLabel(t)}
-                          </option>
-                        ))}
-                      </select>
+                    <div
+                      className="pickstrip"
+                      data-tour-pick="end"
+                      role="radiogroup"
+                      aria-label="Open house end time"
+                    >
+                      {tourTimeOptions(tourEndTime).map((t) => (
+                        <button
+                          key={t}
+                          className={t === tourEndTime ? "pickchip pickchip-time is-on" : "pickchip pickchip-time"}
+                          data-tour-end={t}
+                          role="radio"
+                          aria-checked={t === tourEndTime}
+                          onClick={() => {
+                            setTourEndTime(t);
+                            saveTourParts(tourDay, tourTime, tourKind, t);
+                          }}
+                        >
+                          {slotLabel(t)}
+                        </button>
+                      ))}
                     </div>
                     {listing.tourEndsAt && <b>{tourWhen(listing.tourEndsAt)}</b>}
                   </div>
@@ -2122,10 +2152,7 @@ export default function ListingDrawer({
               <i className="cta-sub">{action.hint}</i>
             </button>
           ) : action.kind === "schedule" ? (
-            <button
-              className="btn btn-primary btn-block"
-              onClick={() => document.getElementById("tour-at")?.focus()}
-            >
+            <button className="btn btn-primary btn-block" onClick={goToViewing}>
               {action.label}
               <i className="cta-sub">{action.hint}</i>
             </button>
