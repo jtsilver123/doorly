@@ -5855,6 +5855,11 @@ button.timeline-funnel:disabled { cursor: default; }
 
 /* --- past rents: the place's own record ----------------------------------- */
 
+/* The viewing's day and time picks sit side by side; each is a full-width
+   tap target on its half. */
+.tourwhen { display: flex; gap: var(--s2); }
+.tourwhen select { flex: 1; min-width: 0; }
+
 .renttimeline-box { width: 100%; }
 .renttimeline { display: block; }
 .renttimeline-grid { stroke: var(--border); stroke-width: 1; }

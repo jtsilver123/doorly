@@ -101,6 +101,50 @@ function toLocalInput(iso: string | null): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
+/** Half-hour viewing slots, 8:00 AM through 9:00 PM. */
+const TOUR_SLOTS: string[] = [];
+for (let h = 8; h <= 21; h++) {
+  TOUR_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
+  if (h < 21) TOUR_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
+}
+
+function slotLabel(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+function dayOptionLabel(day: string): string {
+  return new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
+ * The next three weeks of days, which is the whole horizon a viewing gets
+ * booked inside — plus whatever day is already saved, so an existing plan
+ * outside the window still shows itself instead of a blank.
+ */
+function tourDayOptions(current: string): string[] {
+  const days: string[] = [];
+  const cursor = new Date();
+  for (let i = 0; i < 21; i++) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    days.push(`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  if (current && !days.includes(current)) days.push(current);
+  return days.sort();
+}
+
+/** The slot grid plus the saved time when it falls off it (5:45 stays 5:45). */
+function tourTimeOptions(current: string): string[] {
+  if (!current || TOUR_SLOTS.includes(current)) return TOUR_SLOTS;
+  return [...TOUR_SLOTS, current].sort();
+}
+
 /**
  * "2026-08-03" is a database's idea of a date. If the source string parses,
  * show "Aug 3"; anything human-written ("Immediate") passes through.
@@ -422,7 +466,7 @@ export default function ListingDrawer({
     body.scrollTo({ top });
     if (focusKey) {
       const selector =
-        focusKey === "time" ? 'input[type="datetime-local"]' : 'input[inputmode="tel"]';
+        focusKey === "time" ? 'select[data-tour-pick="day"]' : 'input[inputmode="tel"]';
       // Everything after the scroll settles — including opening the contact
       // editor, because the mount-time resync effect runs after this one
       // and would immediately close an editor opened here synchronously.
@@ -457,9 +501,19 @@ export default function ListingDrawer({
   const [phone, setPhone] = useState(formatPhone(listing.myContactPhone));
   const [who, setWho] = useState(listing.myContactName);
   const [email, setEmail] = useState(listing.myContactEmail);
-  const [tourAt, setTourAt] = useState(toLocalInput(listing.tourAt));
+  /*
+   * The viewing time as two atomic picks, not one segmented widget. Three
+   * separate bugs lived in the native datetime-local — segment entry
+   * garbled by resyncs, focus steals discarding half-typed dates,
+   * controlled-value writes resetting the editor — because that widget
+   * holds fragile mid-entry state the app can't see. A select has none: a
+   * change event is a complete answer, so every pick saves instantly and
+   * there is nothing to race.
+   */
+  const [tourDay, setTourDay] = useState(toLocalInput(listing.tourAt).slice(0, 10));
+  const [tourTime, setTourTime] = useState(toLocalInput(listing.tourAt).slice(11));
   const [tourKind, setTourKind] = useState<TourKind>(listing.tourKind);
-  const [tourEndsAt, setTourEndsAt] = useState(toLocalInput(listing.tourEndsAt));
+  const [tourEndTime, setTourEndTime] = useState(toLocalInput(listing.tourEndsAt).slice(11));
   const [appUrl, setAppUrl] = useState(listing.applicationUrl);
   /**
    * Stage moves paint immediately and reconcile behind the scenes.
@@ -499,19 +553,16 @@ export default function ListingDrawer({
     setWho(listing.myContactName);
     setEmail(listing.myContactEmail);
     /*
-     * Never resync a field someone is typing in, and never through React.
-     * The time inputs are uncontrolled (see them below for why), so the
-     * server's copy lands by writing the DOM directly — and only when the
-     * cursor is elsewhere. The state mirrors ride along for the handlers
-     * that need the last complete value.
+     * Don't resync the viewing picks while one of their menus is open —
+     * a select mid-choice keeps its answer; the next run reconciles.
      */
-    if (document.activeElement !== tourAtEl.current && tourAtEl.current) {
-      tourAtEl.current.value = toLocalInput(listing.tourAt);
-      setTourAt(toLocalInput(listing.tourAt));
-    }
-    if (document.activeElement !== tourEndsEl.current && tourEndsEl.current) {
-      tourEndsEl.current.value = toLocalInput(listing.tourEndsAt);
-      setTourEndsAt(toLocalInput(listing.tourEndsAt));
+    const inTourPick =
+      document.activeElement instanceof HTMLSelectElement &&
+      document.activeElement.hasAttribute("data-tour-pick");
+    if (!inTourPick) {
+      setTourDay(toLocalInput(listing.tourAt).slice(0, 10));
+      setTourTime(toLocalInput(listing.tourAt).slice(11));
+      setTourEndTime(toLocalInput(listing.tourEndsAt).slice(11));
     }
     setTourKind(listing.tourKind);
     setAppUrl(listing.applicationUrl);
@@ -665,34 +716,20 @@ export default function ListingDrawer({
     });
   }
 
-  /*
-   * The time inputs save on a beat, not a keystroke. Typing a date is six
-   * change events, and saving each one raced the optimistic update back
-   * into the input mid-edit. Blur (or unmount) flushes whatever is pending
-   * so a quick "type it and close the drawer" still sticks.
+  /**
+   * A pick is a save. Selects deliver complete values, so there is no
+   * debounce, no flush, no pending state: day and time both chosen means
+   * write it now, and clearing the day clears the plan.
    */
-  const tourAtEl = useRef<HTMLInputElement>(null);
-  const tourEndsEl = useRef<HTMLInputElement>(null);
-  const tourTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tourPending = useRef<{ start: string; kind: TourKind; end: string } | null>(null);
-  const queueTourSave = (start: string, kind: TourKind, end: string) => {
-    tourPending.current = { start, kind, end };
-    if (tourTimer.current) clearTimeout(tourTimer.current);
-    tourTimer.current = setTimeout(() => {
-      tourTimer.current = null;
-      const t = tourPending.current;
-      tourPending.current = null;
-      if (t) saveTour(t.start, t.kind, t.end);
-    }, 900);
+  const saveTourParts = (day: string, time: string, kind: TourKind, endTime: string) => {
+    if (!day) {
+      if (listing.tourAt) saveTour("", kind, "");
+      return;
+    }
+    if (!time) return; // half an answer; the hint below asks for the rest
+    const end = kind === "open_house" && endTime ? `${day}T${endTime}` : "";
+    saveTour(`${day}T${time}`, kind, end);
   };
-  const flushTourSave = () => {
-    if (tourTimer.current) clearTimeout(tourTimer.current);
-    tourTimer.current = null;
-    const t = tourPending.current;
-    tourPending.current = null;
-    if (t) saveTour(t.start, t.kind, t.end);
-  };
-  useEffect(() => flushTourSave, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
@@ -1476,11 +1513,7 @@ export default function ListingDrawer({
                       style={{ fontSize: 12, padding: "4px 9px" }}
                       onClick={() => {
                         setTourKind(value);
-                        // A queued keystroke-save would carry the old kind;
-                        // this click supersedes it either way.
-                        tourPending.current = null;
-                        if (tourTimer.current) clearTimeout(tourTimer.current);
-                        if (tourAt) saveTour(tourAt, value, tourEndsAt);
+                        saveTourParts(tourDay, tourTime, value, tourEndTime);
                       }}
                     >
                       {label}
@@ -1488,46 +1521,85 @@ export default function ListingDrawer({
                   ))}
                 </div>
 
-                {/* Uncontrolled ON PURPOSE, both of them. A controlled
-                    datetime-local loses its half-typed segments whenever
-                    React reconciles the value prop, and the debounced save
-                    guarantees a re-render about a second into typing — so
-                    entering a date at human speed could never finish. React
-                    never writes these inputs; the resync effect updates
-                    them through the ref, and only while you're not in
-                    them. Proven by typing under a real renderer: fill()
-                    never catches it, keystrokes do. */}
-                <label className="tourtime">
+                {/* Two selects, not one segmented widget: a pick is atomic,
+                    saves on the spot, and there is no half-typed state for
+                    a re-render to eat. Three separate time-entry bugs died
+                    on that widget before this. */}
+                <div className="tourtime">
                   <span>{tourKind === "open_house" ? "Starts" : "When is it?"}</span>
-                  <input
-                    id="tour-at"
-                    ref={tourAtEl}
-                    className="field"
-                    type="datetime-local"
-                    onChange={(e) => {
-                      setTourAt(e.target.value);
-                      queueTourSave(e.target.value, tourKind, tourEndsAt);
-                    }}
-                    onBlur={flushTourSave}
-                  />
+                  <div className="tourwhen">
+                    <select
+                      className="field"
+                      data-tour-pick="day"
+                      aria-label="Viewing day"
+                      value={tourDay}
+                      onChange={(e) => {
+                        const day = e.target.value;
+                        setTourDay(day);
+                        if (!day) setTourTime("");
+                        saveTourParts(day, tourTime, tourKind, tourEndTime);
+                      }}
+                    >
+                      <option value="">Pick a day</option>
+                      {tourDayOptions(tourDay).map((d) => (
+                        <option key={d} value={d}>
+                          {dayOptionLabel(d)}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="field"
+                      data-tour-pick="time"
+                      aria-label="Viewing time"
+                      value={tourTime}
+                      onChange={(e) => {
+                        const time = e.target.value;
+                        setTourTime(time);
+                        if (time) saveTourParts(tourDay, time, tourKind, tourEndTime);
+                        else if (listing.tourAt) saveTour("", tourKind, "");
+                      }}
+                    >
+                      <option value="">Pick a time</option>
+                      {tourTimeOptions(tourTime).map((t) => (
+                        <option key={t} value={t}>
+                          {slotLabel(t)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {tourDay && !tourTime && (
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      Now pick a time and it saves.
+                    </span>
+                  )}
                   {listing.tourAt && <b>{tourWhen(listing.tourAt)}</b>}
-                </label>
+                </div>
 
                 {tourKind === "open_house" && (
-                  <label className="tourtime">
+                  <div className="tourtime">
                     <span>Until</span>
-                    <input
-                      ref={tourEndsEl}
-                      className="field"
-                      type="datetime-local"
-                      onChange={(e) => {
-                        setTourEndsAt(e.target.value);
-                        queueTourSave(tourAt, tourKind, e.target.value);
-                      }}
-                      onBlur={flushTourSave}
-                    />
+                    <div className="tourwhen">
+                      <select
+                        className="field"
+                        data-tour-pick="end"
+                        aria-label="Open house end time"
+                        value={tourEndTime}
+                        onChange={(e) => {
+                          const end = e.target.value;
+                          setTourEndTime(end);
+                          saveTourParts(tourDay, tourTime, tourKind, end);
+                        }}
+                      >
+                        <option value="">Same day, ends…</option>
+                        {tourTimeOptions(tourEndTime).map((t) => (
+                          <option key={t} value={t}>
+                            {slotLabel(t)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     {listing.tourEndsAt && <b>{tourWhen(listing.tourEndsAt)}</b>}
-                  </label>
+                  </div>
                 )}
 
                 {tourKind === "open_house" && (
