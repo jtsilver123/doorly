@@ -115,13 +115,42 @@ export function nextAction(listing: FeedListing): NextAction {
           }
         : { kind: "wait", label: "Waiting on reply", hint: "You've reached out" };
 
-    case "toured":
+    case "toured": {
+      /*
+       * "Still deciding" is a commitment with an expiry, not a parking
+       * spot. While the check-back day holds, the card waits quietly with
+       * the reason on it; the moment it passes, deciding becomes the next
+       * action and renders warm — an apartment doesn't wait for you to
+       * finish thinking.
+       */
+      if (listing.followUpAt) {
+        const at = new Date(listing.followUpAt);
+        const overdue = at.getTime() <= Date.now();
+        if (!overdue) {
+          return {
+            kind: "wait",
+            label: "Deciding",
+            hint:
+              listing.followUpNote ||
+              `You gave yourself until ${at.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`,
+          };
+        }
+        return {
+          kind: "decide",
+          label: "Decide on this one",
+          hint: listing.followUpNote
+            ? `You were waiting on: ${listing.followUpNote}`
+            : "Your check-back day has passed. Yes or no",
+          urgent: true,
+        };
+      }
       return {
         kind: "apply",
         label: "Apply for it",
         hint: "You've seen it — the first complete application usually wins",
         becomes: "applied",
       };
+    }
 
     case "applied":
       return { kind: "wait", label: "Application in", hint: "Waiting on the landlord" };

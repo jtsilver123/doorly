@@ -52,45 +52,82 @@ function bedLabel(beds: number): string {
   return beds === 0 ? "studios" : `${beds}-beds`;
 }
 
+type CorpusRow = { neighborhood: string; borough: string; bedrooms: number; price: number };
+
+/**
+ * The corpus, pre-bucketed by the three comparison scopes.
+ *
+ * This exists because the naive version was quadratic and it cost the app
+ * an outage. `statsFor` used to scan the whole corpus three times *per
+ * listing*; at 1,300 tracked listings that's five million comparisons and
+ * a thousand sorts to render one feed, which is how a Worker meets its CPU
+ * ceiling and answers 1102 instead of a page. Bucketing once per request
+ * makes each lookup a map hit, and the sorts happen once per bucket rather
+ * than once per listing.
+ */
+export interface CompIndex {
+  byArea: Map<string, number[]>;
+  byBorough: Map<string, number[]>;
+  byBeds: Map<number, number[]>;
+}
+
+export function buildCompIndex(corpus: CorpusRow[]): CompIndex {
+  const byArea = new Map<string, number[]>();
+  const byBorough = new Map<string, number[]>();
+  const byBeds = new Map<number, number[]>();
+  const push = <K,>(map: Map<K, number[]>, key: K, price: number) => {
+    const list = map.get(key);
+    if (list) list.push(price);
+    else map.set(key, [price]);
+  };
+  for (const row of corpus) {
+    push(byArea, `${row.neighborhood}|${row.bedrooms}`, row.price);
+    push(byBorough, `${row.borough}|${row.bedrooms}`, row.price);
+    push(byBeds, row.bedrooms, row.price);
+  }
+  // Sorted once here, read many times below.
+  for (const map of [byArea, byBorough, byBeds]) {
+    for (const list of map.values()) list.sort((a, b) => a - b);
+  }
+  return { byArea, byBorough, byBeds };
+}
+
+function statsFrom(prices: number[] | undefined, scope: string): MarketStats | null {
+  if (!prices || prices.length < MIN_COMPS) return null;
+  return {
+    median: percentile(prices, 0.5),
+    p25: percentile(prices, 0.25),
+    p75: percentile(prices, 0.75),
+    count: prices.length,
+    scope,
+  };
+}
+
 /**
  * Comparable listings, narrowest first: same neighborhood and bed count, then
  * the borough, then the same bed count anywhere we're tracking.
+ *
+ * Takes either a prepared index (what every bulk caller should pass) or a
+ * raw corpus, which it indexes on the spot — convenient for a one-off, and
+ * the reason a hot loop must never hand it an array.
  */
 export function statsFor(
   listing: Pick<Listing, "neighborhood" | "borough" | "bedrooms">,
-  corpus: { neighborhood: string; borough: string; bedrooms: number; price: number }[]
+  corpus: CorpusRow[] | CompIndex
 ): MarketStats | null {
-  const sets: { rows: typeof corpus; scope: string }[] = [
-    {
-      rows: corpus.filter(
-        (l) => l.neighborhood === listing.neighborhood && l.bedrooms === listing.bedrooms
-      ),
-      scope: `${listing.neighborhood} ${bedLabel(listing.bedrooms)}`,
-    },
-    {
-      rows: corpus.filter(
-        (l) => l.borough === listing.borough && l.bedrooms === listing.bedrooms
-      ),
-      scope: `${listing.borough} ${bedLabel(listing.bedrooms)}`,
-    },
-    {
-      rows: corpus.filter((l) => l.bedrooms === listing.bedrooms),
-      scope: `all tracked ${bedLabel(listing.bedrooms)}`,
-    },
-  ];
-
-  for (const set of sets) {
-    if (set.rows.length < MIN_COMPS) continue;
-    const prices = set.rows.map((l) => l.price).sort((a, b) => a - b);
-    return {
-      median: percentile(prices, 0.5),
-      p25: percentile(prices, 0.25),
-      p75: percentile(prices, 0.75),
-      count: prices.length,
-      scope: set.scope,
-    };
-  }
-  return null;
+  const index = Array.isArray(corpus) ? buildCompIndex(corpus) : corpus;
+  const beds = listing.bedrooms;
+  return (
+    statsFrom(
+      index.byArea.get(`${listing.neighborhood}|${beds}`),
+      `${listing.neighborhood} ${bedLabel(beds)}`
+    ) ??
+    statsFrom(
+      index.byBorough.get(`${listing.borough}|${beds}`),
+      `${listing.borough} ${bedLabel(beds)}`
+    ) ??
+    statsFrom(index.byBeds.get(beds), `all tracked ${bedLabel(beds)}`)
+  );
 }
 
 export function readDeal(price: number, stats: MarketStats | null): DealRead {

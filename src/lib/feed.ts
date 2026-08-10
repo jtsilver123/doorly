@@ -26,7 +26,7 @@ import {
   allInMonthly,
   DEFAULT_COSTS,
 } from "@/lib/cost";
-import { statsFor, readDeal, flagsFor } from "@/lib/market";
+import { statsFor, buildCompIndex, readDeal, flagsFor } from "@/lib/market";
 import { applyFilters, findPasted, type FeedFilterOptions } from "@/lib/filters";
 import { amenitiesOf } from "@/lib/amenities";
 import { verdictFor } from "@/lib/verdict";
@@ -77,6 +77,7 @@ interface StateRow {
   visited_at: string | null;
   notes: string;
   follow_up_at: string | null;
+  follow_up_note: string | null;
   events_seen_at: string | null;
   contact_phone: string | null;
   contact_email: string | null;
@@ -350,6 +351,9 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     bedrooms: r.bedrooms,
     price: r.price,
   }));
+  // Bucketed once, read once per listing below. Handing the raw array to
+  // statsFor in a loop is quadratic and has taken the Worker down before.
+  const comps = buildCompIndex(corpus);
 
   /*
    * Your feed is your searches.
@@ -393,7 +397,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     const contact = contactStats.get(row.id);
     const cost = moveInCost(listing, costs);
     const fit = moveInFit(row.available_at, profile.moveInDate);
-    const deal = readDeal(row.price, statsFor(listing, corpus));
+    const deal = readDeal(row.price, statsFor(listing, comps));
 
     // The CRM chases itself: anything still parked at "contacted" with no
     // inbound reply after a couple of days gets flagged, so silence surfaces
@@ -423,6 +427,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
       visitedAt: state?.visited_at ?? null,
       notes: state?.notes ?? "",
       followUpAt: state?.follow_up_at ?? null,
+      followUpNote: state?.follow_up_note ?? "",
       myContactPhone: state?.contact_phone ?? "",
       myContactEmail: state?.contact_email ?? "",
       myContactName: state?.contact_name ?? "",
@@ -473,7 +478,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     listing.flags = flagsFor(listing, {
       verdict: listing.dealVerdict,
       percentVsMedian: listing.dealDelta,
-      stats: statsFor(listing, corpus),
+      stats: statsFor(listing, comps),
       label: listing.dealLabel,
     });
     const verdict = verdictFor(listing, criteria);
@@ -557,6 +562,9 @@ export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<Fe
     bedrooms: r.bedrooms,
     price: r.price,
   }));
+  // Bucketed once, read once per listing below. Handing the raw array to
+  // statsFor in a loop is quadratic and has taken the Worker down before.
+  const comps = buildCompIndex(corpus);
 
   const out: FeedListing[] = [];
   for (const row of listings) {
@@ -564,7 +572,7 @@ export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<Fe
     const listing = toListing(row, alsoOn[0]?.source ?? "streeteasy");
     const { score: value, reasons } = score(listing, model, criteria);
     const cost = moveInCost(listing, costs);
-    const deal = readDeal(row.price, statsFor(listing, corpus));
+    const deal = readDeal(row.price, statsFor(listing, comps));
 
     out.push({
       ...listing,
@@ -582,6 +590,7 @@ export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<Fe
       visitedAt: null,
       notes: "",
       followUpAt: null,
+      followUpNote: "",
       myContactPhone: "",
       myContactEmail: "",
       myContactName: "",
@@ -629,7 +638,7 @@ export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<Fe
     listing.flags = flagsFor(listing, {
       verdict: listing.dealVerdict,
       percentVsMedian: listing.dealDelta,
-      stats: statsFor(listing, corpus),
+      stats: statsFor(listing, comps),
       label: listing.dealLabel,
     });
     const verdict = verdictFor(listing, criteria);

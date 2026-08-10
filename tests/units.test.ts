@@ -31,7 +31,7 @@ import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { readHunt } from "@/lib/insights";
 import { readRentPast, rentCycles } from "@/lib/rentHistory";
-import { statsFor, readDeal, flagsFor } from "@/lib/market";
+import { statsFor, buildCompIndex, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
 import { DEFAULT_CONFIG, keyHint, loadConfig, withConfig } from "@/lib/apikey";
 import { amenitiesOf, qualityScore, amenityFacts } from "@/lib/amenities";
@@ -345,6 +345,7 @@ function feed(over: Partial<FeedListing> = {}): FeedListing {
     visitedAt: null,
     notes: "",
     followUpAt: null,
+    followUpNote: "",
     myContactPhone: "",
     myContactEmail: "",
     myContactName: "",
@@ -842,6 +843,42 @@ test("an empty or sales-only record reads as no rental past", () => {
   assert.equal(past.rents.length, 0);
   assert.equal(past.annualPct, null);
   assert.equal(past.vsPast, null);
+});
+
+test("the comp index answers exactly like a raw corpus scan", () => {
+  const corpus = Array.from({ length: 400 }, (_, i) => ({
+    neighborhood: i % 3 === 0 ? "East Village" : "Bushwick",
+    borough: i % 3 === 0 ? "Manhattan" : "Brooklyn",
+    bedrooms: i % 4,
+    price: 2000 + (i % 37) * 55,
+  }));
+  const index = buildCompIndex(corpus);
+  for (const probe of [
+    { neighborhood: "East Village", borough: "Manhattan", bedrooms: 1 },
+    { neighborhood: "Bushwick", borough: "Brooklyn", bedrooms: 2 },
+    // Nowhere in the corpus: falls through to the bed-count scope.
+    { neighborhood: "Nowhere", borough: "Queens", bedrooms: 3 },
+    // A bed count nobody lists: no comparison at all.
+    { neighborhood: "Nowhere", borough: "Queens", bedrooms: 9 },
+  ]) {
+    assert.deepEqual(statsFor(probe, index), statsFor(probe, corpus), JSON.stringify(probe));
+  }
+});
+
+test("scoring a big corpus stays linear enough to survive a Worker", () => {
+  // The regression that caused a 1102: three corpus scans per listing.
+  // Indexed, 1,400 listings must cost far less than a second.
+  const corpus = Array.from({ length: 1400 }, (_, i) => ({
+    neighborhood: `Area ${i % 40}`,
+    borough: i % 2 ? "Brooklyn" : "Manhattan",
+    bedrooms: i % 4,
+    price: 1800 + (i % 50) * 60,
+  }));
+  const started = Date.now();
+  const index = buildCompIndex(corpus);
+  for (const row of corpus) statsFor(row, index);
+  const ms = Date.now() - started;
+  assert.ok(ms < 400, `indexed pass took ${ms}ms`);
 });
 
 test("today's actions lead with what's rotting", () => {

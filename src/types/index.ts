@@ -198,6 +198,8 @@ export interface FeedListing extends Listing {
   notes: string;
   /** Next thing you told yourself to do, and when. */
   followUpAt: string | null;
+  /** What the deciding is waiting on, in your own words. "" until said. */
+  followUpNote: string;
   /**
    * Contact details you supplied yourself, which win over whatever the listing
    * published — usually because the listing published nothing.

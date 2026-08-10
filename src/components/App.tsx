@@ -806,6 +806,32 @@ export default function Home() {
   );
 
   /**
+   * "Still deciding" on a toured card: one tap commits to a check-back
+   * day (tomorrow morning), a second tap clears it. The reason and a
+   * different day live in the panel; the card is for the commitment.
+   */
+  const toggleDeciding = useCallback(
+    (listing: FeedListing) => {
+      let followUpAt: string | null = null;
+      if (!listing.followUpAt) {
+        const at = new Date();
+        at.setDate(at.getDate() + 1);
+        at.setHours(9, 0, 0, 0);
+        followUpAt = at.toISOString();
+      }
+      setListings((list) =>
+        list.map((l) =>
+          l.id === listing.id
+            ? { ...l, followUpAt, followUpNote: followUpAt ? l.followUpNote : "" }
+            : l
+        )
+      );
+      patch(listing.id, { action: "followUp", followUpAt }, false).catch(() => loadFeed());
+    },
+    [patch, loadFeed]
+  );
+
+  /**
    * Move a listing along the pipeline, from a drag or an arrow key.
    *
    * Optimistic like star and pass: a drag that snaps back while a round trip
@@ -1917,6 +1943,7 @@ export default function Home() {
               onReviewTours={() => setReviewing(true)}
               onReplied={logReply}
               onLean={setLean}
+              onDeciding={toggleDeciding}
               onAppResult={setAppResult}
               onSecured={setSecured}
               onOpenAt={(l, sec) => {

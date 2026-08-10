@@ -1698,6 +1698,7 @@ button.fact:hover .fact-label { color: var(--accent); }
 .board-lean {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--s1);
   margin-top: 6px;
 }
@@ -5928,6 +5929,44 @@ button.timeline-funnel:disabled { cursor: default; }
   gap: var(--s3);
 }
 .tourtime-set .linkish { font-size: var(--t-xs); color: var(--text-muted); }
+
+/* --- still deciding: the third state after a tour ------------------------- */
+
+.deciding {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+}
+.deciding.is-set { border-style: solid; background: var(--surface-2); }
+.deciding-title { font-size: var(--t-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.deciding .field { font-size: var(--t-sm); }
+
+/* The card's chip: quiet ask when unset, a stamped commitment when set. */
+.decide-chip {
+  align-self: center;
+  flex: 1 1 100%;
+  text-align: center;
+  padding: 2px 9px;
+  border-radius: var(--r-full);
+  border: 1px dashed var(--border-strong);
+  font-size: var(--t-2xs);
+  font-weight: 650;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.decide-chip:hover { color: var(--text); border-color: var(--text-muted); }
+.decide-chip.is-on {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 
 .renttimeline-box { width: 100%; }
 .renttimeline { display: block; }

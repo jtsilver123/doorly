@@ -494,6 +494,7 @@ export default function ListingDrawer({
   const [tourKind, setTourKind] = useState<TourKind>(listing.tourKind);
   const [tourEndTime, setTourEndTime] = useState(toLocalInput(listing.tourEndsAt).slice(11));
   const [appUrl, setAppUrl] = useState(listing.applicationUrl);
+  const [decidingNote, setDecidingNote] = useState(listing.followUpNote);
   /**
    * Stage moves paint immediately and reconcile behind the scenes.
    *
@@ -537,6 +538,10 @@ export default function ListingDrawer({
     setTourTime(toLocalInput(listing.tourAt).slice(11));
     setTourEndTime(toLocalInput(listing.tourEndsAt).slice(11));
     setTourKind(listing.tourKind);
+    if (!(document.activeElement instanceof HTMLInputElement) ||
+        !document.activeElement.hasAttribute("data-deciding-note")) {
+      setDecidingNote(listing.followUpNote);
+    }
     setAppUrl(listing.applicationUrl);
     setEditingContact(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -716,10 +721,10 @@ export default function ListingDrawer({
     }
   }, [tourTime, stage]);
 
-  /** The footer's "Set the time" and the board's red CTA both land here. */
-  const goToViewing = useCallback(() => {
+  /** The footer CTAs and the board's red buttons land on exact sections. */
+  const goToSection = useCallback((sec: string, focusSel?: string) => {
     const body = bodyRef.current;
-    const el = body?.querySelector('[data-sec="sec-viewing"]');
+    const el = body?.querySelector(`[data-sec="${sec}"]`);
     if (!body || !el) return;
     const top =
       el.getBoundingClientRect().top -
@@ -727,16 +732,23 @@ export default function ListingDrawer({
       body.scrollTop -
       SPY_LINE +
       8;
-    setActiveSec("sec-viewing");
+    setActiveSec(sec);
     jumpUntil.current = Date.now() + 700;
     body.scrollTo({ top, behavior: "smooth" });
-    setTimeout(() => {
-      const cal = el.querySelector<HTMLElement>(
-        '[data-tour-pick="day"] .rdp-selected .rdp-day_button:not([disabled]), [data-tour-pick="day"] .rdp-today .rdp-day_button:not([disabled]), [data-tour-pick="day"] .rdp-day_button:not([disabled])'
-      );
-      cal?.focus({ preventScroll: true });
-    }, 400);
+    if (focusSel) {
+      setTimeout(() => {
+        el.querySelector<HTMLElement>(focusSel)?.focus({ preventScroll: true });
+      }, 400);
+    }
   }, []);
+  const goToViewing = useCallback(
+    () =>
+      goToSection(
+        "sec-viewing",
+        '[data-tour-pick="day"] .rdp-selected .rdp-day_button:not([disabled]), [data-tour-pick="day"] .rdp-today .rdp-day_button:not([disabled]), [data-tour-pick="day"] .rdp-day_button:not([disabled])'
+      ),
+    [goToSection]
+  );
 
   /**
    * Reaching out is one action, not two: log the contact, advance the pipeline,
@@ -1302,6 +1314,82 @@ export default function ListingDrawer({
           {/* --- one judgment: the score, the price, the catches, yours -- */}
           <section className="dsec" data-sec="sec-score">
             <h3 className="dsec-label">Why {listing.rating} out of 100</h3>
+
+            {/* The third state after a tour, made deliberate: not yes, not
+                no, but committed to a day you'll answer by. The reason
+                rides along so the card can say what the wait is for. */}
+            {stage === "toured" && (
+              <div className={listing.followUpAt ? "deciding is-set" : "deciding"}>
+                <span className="deciding-title">
+                  {listing.followUpAt ? "Still deciding" : "Not ready to call it?"}
+                </span>
+                <input
+                  className="field"
+                  data-deciding-note
+                  placeholder="What are you waiting on? Pets answer, second look, payday…"
+                  value={decidingNote}
+                  onChange={(e) => setDecidingNote(e.target.value)}
+                  onBlur={() => {
+                    if (listing.followUpAt && decidingNote !== listing.followUpNote) {
+                      patch({
+                        action: "followUp",
+                        followUpAt: listing.followUpAt,
+                        note: decidingNote,
+                      });
+                    }
+                  }}
+                />
+                <div className="pickstrip">
+                  {([
+                    ["Tomorrow", 1],
+                    ["In 2 days", 2],
+                    ["In 3 days", 3],
+                    ["Next week", 7],
+                  ] as const).map(([label, days]) => {
+                    const at = new Date();
+                    at.setDate(at.getDate() + days);
+                    at.setHours(9, 0, 0, 0);
+                    const on =
+                      listing.followUpAt != null &&
+                      new Date(listing.followUpAt).toDateString() === at.toDateString();
+                    return (
+                      <button
+                        key={label}
+                        className={on ? "pickchip is-on" : "pickchip"}
+                        data-deciding-days={days}
+                        onClick={() =>
+                          patch({
+                            action: "followUp",
+                            followUpAt: at.toISOString(),
+                            note: decidingNote,
+                          })
+                        }
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {listing.followUpAt && (
+                  <div className="tourtime-set">
+                    <b>
+                      Answer by{" "}
+                      {new Date(listing.followUpAt).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </b>
+                    <button
+                      className="linkish"
+                      onClick={() => patch({ action: "followUp", followUpAt: null })}
+                    >
+                      Called it, clear this
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div
               className={
@@ -2153,6 +2241,14 @@ export default function ListingDrawer({
             </button>
           ) : action.kind === "schedule" ? (
             <button className="btn btn-primary btn-block" onClick={goToViewing}>
+              {action.label}
+              <i className="cta-sub">{action.hint}</i>
+            </button>
+          ) : action.kind === "decide" ? (
+            <button
+              className="btn btn-primary btn-block"
+              onClick={() => goToSection("sec-score", "[data-deciding-note]")}
+            >
               {action.label}
               <i className="cta-sub">{action.hint}</i>
             </button>

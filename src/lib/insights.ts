@@ -172,6 +172,24 @@ export function readHunt(listings: FeedListing[], now = new Date()): HuntInsight
       body: `Agents answer and then the thread goes quiet: ${steps.toured} tours from ${steps.replied} replies. Offer two concrete times instead of asking what works. Specific gets booked, polite gets queued.`,
     });
   }
+  /*
+   * Expired "still deciding" cards: each one is a place you toured, gave
+   * yourself a deadline on, and let the deadline pass. Two of those is a
+   * pattern, and the pattern costs apartments.
+   */
+  const stalled = listings.filter(
+    (l) =>
+      l.stage === "toured" && l.followUpAt != null && new Date(l.followUpAt) < now
+  ).length;
+  if (stalled >= 2) {
+    insights.push({
+      key: "stalled",
+      tone: "push",
+      title: "Decisions are piling up",
+      body: `${stalled} toured places are past the check-back day you gave them. A yes goes to Applied, a no to Not applying; either beats a queue, because the apartment isn't waiting with you.`,
+    });
+  }
+
   if (rates.applyRate != null && steps.toured >= 4 && rates.applyRate < 0.34) {
     insights.push({
       key: "sightseeing",

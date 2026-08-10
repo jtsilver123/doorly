@@ -76,6 +76,7 @@ export default function PipelineBoard({
   crewTag,
   onPass,
   onLean,
+  onDeciding,
   onAppResult,
   onSecured,
   onOpenAt,
@@ -88,6 +89,8 @@ export default function PipelineBoard({
   onQuickAdd: (query: string) => void;
   /** Thumb on a tour-stage card: 1 leaning yes, -1 leaning no, 0 to clear. */
   onLean: (listing: FeedListing, lean: number) => void;
+  /** Toggle the still-deciding state: sets a check-back day, or clears it. */
+  onDeciding: (listing: FeedListing) => void;
   /** The landlord's answer on an applied card: 1 accepted, -1 denied, 0 waiting. */
   onAppResult: (listing: FeedListing, result: number) => void;
   /** Accepted and taken — the hunt's finish line. */
@@ -169,6 +172,7 @@ export default function PipelineBoard({
    */
   function jumpFor(l: FeedListing): string {
     const kind = nextAction(l).kind;
+    if (kind === "decide" || (kind === "wait" && l.stage === "toured")) return "sec-score";
     if (kind === "apply" || l.stage === "applied") return "sec-apply";
     if (l.stage === "tour") return "sec-viewing@time";
     if (kind === "add-contact") return "sec-contact@phone";
@@ -661,6 +665,34 @@ export default function PipelineBoard({
                           {l.lean === 1 ? "leaning yes" : "leaning no"}
                         </span>
                       )}
+                      {/* The third state, made deliberate: not yes, not no,
+                          but committed to a day you'll answer by. One tap
+                          books tomorrow; the panel takes the reason. */}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className={l.followUpAt ? "decide-chip is-on" : "decide-chip"}
+                        title={
+                          l.followUpAt
+                            ? "You set a check-back day. Tap to clear it"
+                            : "Not ready to call it? Tap to check back tomorrow"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeciding(l);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDeciding(l);
+                          }
+                        }}
+                      >
+                        {l.followUpAt
+                          ? `deciding by ${new Date(l.followUpAt).toLocaleDateString("en-US", { weekday: "short" })}${l.followUpNote ? ` · ${l.followUpNote.slice(0, 24)}` : ""}`
+                          : "still deciding?"}
+                      </span>
                     </span>
                   )}
                   {/* The application's verdict, recorded where you're

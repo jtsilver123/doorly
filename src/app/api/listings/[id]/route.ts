@@ -64,8 +64,14 @@ export async function PATCH(request: Request, { params }: Params) {
         await setListingFields(id, { notes: String(body.notes ?? "") });
         break;
       case "followUp":
+        // The check-back day, and optionally what the wait is for. Clearing
+        // the day clears the reason with it; a note with no deadline is a
+        // sticky nobody rereads.
         await setListingFields(id, {
           follow_up_at: (body.followUpAt as string | null) ?? null,
+          ...(body.note !== undefined || !body.followUpAt
+            ? { follow_up_note: body.followUpAt ? String(body.note ?? "") : "" }
+            : {}),
         });
         break;
       case "visit":
