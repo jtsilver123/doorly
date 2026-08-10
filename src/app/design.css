@@ -2260,6 +2260,38 @@ button.fact:hover .fact-label { color: var(--accent); }
 .quickadd .field { flex: 1 1 16rem; min-width: 0; }
 .quickadd .btn { flex: none; }
 
+/* --- today, on the board -------------------------------------------------- */
+
+/* A viewing today is the only card here with a deadline in hours. It gets
+   the warm edge and a tinted ground, so the column answers "where do I
+   have to be" without being read line by line. */
+.board-card[data-today="yes"] {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+.board-card[data-today="yes"] .board-addr { font-weight: 700; }
+
+.board-today {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* The listing's own pages, pinned in the drawer header beside Share. */
+.drawer-head-sites { display: inline-flex; gap: 4px; }
+.drawer-head-sites .srcbtn {
+  padding: 5px 7px;
+  gap: 3px;
+  min-width: 0;
+}
+.drawer-head-sites .icon { color: var(--text-muted); }
+
 /* What the box found, under it, in the flow rather than over the board. */
 .quickadd-count {
   flex-basis: 100%;

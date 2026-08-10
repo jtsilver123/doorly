@@ -408,6 +408,21 @@ export default function ListingDrawer({
     setPullingPast(false);
   }
 
+  /*
+   * Where this place lives on the open web. Pinned in the header rather
+   * than buried mid-scroll: "let me look at the real listing" is a
+   * reflex you have while reading anything in this panel, and a link you
+   * have to scroll back for is a link you stop using.
+   */
+  const sites = (() => {
+    const order = linkPreference(profile.preferredSource);
+    const found = [...listing.alsoOn]
+      .filter((so) => so.url)
+      .sort((a, b) => order.indexOf(a.source) - order.indexOf(b.source));
+    if (!found.length && listing.url) found.push({ source: listing.source, url: listing.url });
+    return found;
+  })();
+
   const pastRead = pastRents ? readRentPast(pastRents, listing.price) : null;
   const pastTrend =
     pastRead && pastRead.annualPct != null && pastRead.yearsSpanned != null
@@ -907,6 +922,24 @@ export default function ListingDrawer({
             </div>
           </div>
           <div className="drawer-head-acts">
+            {sites.length > 0 && (
+              <span className="drawer-head-sites">
+                {sites.map((so) => (
+                  <a
+                    key={so.source}
+                    className="btn btn-quiet srcbtn"
+                    href={so.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`Open on ${SOURCE_LABEL[so.source]}`}
+                    aria-label={`Open on ${SOURCE_LABEL[so.source]}`}
+                  >
+                    <SourceMark source={so.source} size={15} />
+                    <Icon name="external" size={11} />
+                  </a>
+                ))}
+              </span>
+            )}
             <button
               className={shared ? "btn drawer-share is-done" : "btn drawer-share"}
               onClick={share}
@@ -1184,35 +1217,7 @@ export default function ListingDrawer({
               listing is the first thing people do, and these buttons lived at
               the very bottom of the scroll. A listing with no cross-site
               records still has its own page; an empty row read as broken. */}
-          {(() => {
-            const sites = [...listing.alsoOn]
-              .filter((so) => so.url)
-              .sort((a, b) => {
-                const order = linkPreference(profile.preferredSource);
-                return order.indexOf(a.source) - order.indexOf(b.source);
-              });
-            if (!sites.length && listing.url) {
-              sites.push({ source: listing.source, url: listing.url });
-            }
-            if (!sites.length) return null;
-            return (
-              <div className="drawer-sites">
-                {sites.map((so) => (
-                  <a
-                    key={so.source}
-                    className="btn btn-quiet srcbtn"
-                    href={so.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <SourceMark source={so.source} size={15} />
-                    View on {SOURCE_LABEL[so.source]}
-                    <Icon name="external" size={12} />
-                  </a>
-                ))}
-              </div>
-            );
-          })()}
+
 
           {/* A passed place explains itself — to you a week later, and to
               whoever found it. */}

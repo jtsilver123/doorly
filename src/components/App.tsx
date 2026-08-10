@@ -932,12 +932,26 @@ export default function Home() {
         return;
       }
     }
+    /*
+     * Adding is a moment; finding something you already had is not. A place
+     * already on your board gets opened and nothing else — no stage move
+     * that would quietly undo where you'd filed it, no confetti for work
+     * you did last week. Searching for what you own should feel like
+     * search.
+     */
+    const alreadyMine = (l: FeedListing) =>
+      l.starred || !["inbox", "passed"].includes(l.stage);
+
     const claim = (hit: FeedListing, message: string) => {
-      moveStage(hit, "interested");
+      const mine = alreadyMine(hit);
+      if (!mine) moveStage(hit, "interested");
       setOpen(hit);
-      toast({ message, tone: "good" });
+      toast({
+        message: mine ? `Already on your board: ${hit.address}` : message,
+        tone: "good",
+      });
       // Landing a place you were hunting for deserves more than a toast.
-      burstConfetti();
+      if (!mine) burstConfetti();
     };
 
     /*
@@ -948,13 +962,19 @@ export default function Home() {
      * corpus; tracking the hit is what carries it into the feed permanently.
      */
     const adopt = async (id: string, message: string) => {
-      await patch(id, { action: "stage", stage: "interested" }, false);
+      // Was this already yours before the round trip? Then it's a find.
+      const before = listings.find((l) => l.id === id);
+      const mine = before ? alreadyMine(before) : false;
+      if (!mine) await patch(id, { action: "stage", stage: "interested" }, false);
       const fresh = await loadFeed();
       const hit = fresh.find((l) => l.id === id);
       if (hit) {
         setOpen(hit);
-        toast({ message, tone: "good" });
-        burstConfetti();
+        toast({
+          message: mine ? `Already on your board: ${hit.address}` : message,
+          tone: "good",
+        });
+        if (!mine) burstConfetti();
         return true;
       }
       return false;

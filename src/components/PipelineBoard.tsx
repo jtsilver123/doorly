@@ -464,6 +464,17 @@ export default function PipelineBoard({
           >
             <div className="board-head">
               <span>{STAGE_LABEL[stage]}</span>
+              {/* How much of today is already spoken for, on the column
+                  header where the count already lives. */}
+              {stage === "tour" &&
+                (() => {
+                  const today = column.filter(
+                    (l) => l.tourAt && dayWord(l.tourAt) === "Today"
+                  ).length;
+                  return today > 0 ? (
+                    <span className="board-today">{today} today</span>
+                  ) : null;
+                })()}
               <span className="board-head-side">
                 {/* The Tour column is the one with a geography problem: the
                     bookings have times and addresses, so the app can draw
@@ -549,6 +560,15 @@ export default function PipelineBoard({
                   key={l.id}
                   data-card-id={l.id}
                   data-hit={searching ? (hitIds.has(l.id) ? "yes" : "no") : undefined}
+                  // Today's viewings are the only cards on this board with a
+                  // deadline measured in hours. They get their own colour so
+                  // "what am I doing today" is answered by glancing, not
+                  // reading every date in the column.
+                  data-today={
+                    l.stage === "tour" && l.tourAt && dayWord(l.tourAt) === "Today"
+                      ? "yes"
+                      : undefined
+                  }
                   className="surface board-card"
                   draggable
                   data-dragging={dragging === l.id ? "true" : undefined}
