@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type {
   ContactLog,
@@ -175,20 +175,53 @@ function PriceChart({ points }: { points: PricePoint[] }) {
  * had. The current cycle draws in accent; history recedes to muted.
  */
 function RentTimeline({ cycles }: { cycles: { at: number; price: number }[][] }) {
+  /*
+   * Drawn in real pixels, not a scaled viewBox. A stretched viewBox scales
+   * everything with the container — at drawer width the dots became blobs,
+   * the label became a headline, and the year lines towered over the data.
+   * Measuring the box and mapping 1 unit = 1px keeps text at text size and
+   * strokes at stroke size no matter how wide the panel is.
+   */
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => setW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const all = cycles.flat();
   if (all.length < 2) return null;
+
+  const H = 128;
+  const TOP = 18;
+  const BOTTOM = 20;
+  const LEFT = 6;
+  const RIGHT = 54; // room for the price labels on the gridlines
+
   const minT = Math.min(...all.map((p) => p.at));
   const maxT = Math.max(...all.map((p) => p.at));
-  const minP = Math.min(...all.map((p) => p.price));
-  const maxP = Math.max(...all.map((p) => p.price));
+  const rawMin = Math.min(...all.map((p) => p.price));
+  const rawMax = Math.max(...all.map((p) => p.price));
+  const rawSpan = Math.max(rawMax - rawMin, 50);
+  const minP = rawMin - rawSpan * 0.08;
+  const maxP = rawMax + rawSpan * 0.08;
   const spanT = Math.max(maxT - minT, 1);
-  const spanP = Math.max(maxP - minP, 1);
-  const W = 320;
-  const H = 96;
-  const TOP = 10;
-  const BOTTOM = 16;
-  const x = (t: number) => 2 + ((t - minT) / spanT) * (W - 8);
-  const y = (p: number) => TOP + (1 - (p - minP) / spanP) * (H - TOP - BOTTOM);
+  const plotW = Math.max(w - LEFT - RIGHT, 40);
+  const x = (t: number) => LEFT + ((t - minT) / spanT) * plotW;
+  const y = (p: number) => TOP + (1 - (p - minP) / (maxP - minP)) * (H - TOP - BOTTOM);
+
+  // Price gridlines at round numbers: the y-axis the floating marks were
+  // missing, labeled where the eye lands.
+  const rawStep = rawSpan / 2.5;
+  const mag = 10 ** Math.floor(Math.log10(rawStep));
+  const gridStep = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= rawStep) ?? mag * 10;
+  const gridLines: number[] = [];
+  for (let v = Math.ceil(minP / gridStep) * gridStep; v <= maxP; v += gridStep) gridLines.push(v);
 
   const path = (cycle: { at: number; price: number }[]) => {
     // A one-event cycle still deserves a mark you can see: a short dash at
@@ -196,7 +229,7 @@ function RentTimeline({ cycles }: { cycles: { at: number; price: number }[][] })
     if (cycle.length === 1) {
       const cx = x(cycle[0].at);
       const cy = y(cycle[0].price).toFixed(1);
-      return `M ${Math.max(2, cx - 5).toFixed(1)} ${cy} H ${Math.min(W - 2, cx + 5).toFixed(1)}`;
+      return `M ${Math.max(LEFT, cx - 6).toFixed(1)} ${cy} H ${(cx + 6).toFixed(1)}`;
     }
     let d = `M ${x(cycle[0].at).toFixed(1)} ${y(cycle[0].price).toFixed(1)}`;
     for (let i = 1; i < cycle.length; i++) {
@@ -207,60 +240,81 @@ function RentTimeline({ cycles }: { cycles: { at: number; price: number }[][] })
 
   const y0 = new Date(minT).getUTCFullYear();
   const y1 = new Date(maxT).getUTCFullYear();
-  const step = Math.max(1, Math.ceil((y1 - y0) / 4));
-  const ticks: number[] = [];
-  for (let yr = Math.ceil(y0 / step) * step; yr <= y1; yr += step) ticks.push(yr);
+  const yearStep = Math.max(1, Math.ceil((y1 - y0) / Math.max(2, Math.floor(plotW / 90))));
+  const years: number[] = [];
+  for (let yr = Math.ceil(y0 / yearStep) * yearStep; yr <= y1; yr += yearStep) years.push(yr);
 
   const last = cycles[cycles.length - 1];
   const nowPt = last[last.length - 1];
+  const nowX = x(nowPt.at);
+  const nowY = y(nowPt.price);
 
   return (
-    <svg
-      className="renttimeline"
-      width="100%"
-      viewBox={`0 0 ${W} ${H}`}
-      role="img"
-      aria-label={`Rent history from ${y0} to now, ${money(minP)} to ${money(maxP)}`}
-    >
-      {ticks.map((yr) => {
-        const tx = x(Date.UTC(yr, 0, 1));
-        if (tx < 14 || tx > W - 14) return null;
-        return (
-          <g key={yr}>
-            <line x1={tx} y1={TOP} x2={tx} y2={H - BOTTOM} className="renttimeline-grid" />
-            <text x={tx} y={H - 4} textAnchor="middle" className="renttimeline-tick">
-              {yr}
-            </text>
-          </g>
-        );
-      })}
-      {cycles.map((cycle, i) => (
-        <path
-          key={cycle[0].at}
-          d={path(cycle)}
-          fill="none"
-          strokeWidth={i === cycles.length - 1 ? 2.2 : 1.8}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          className={i === cycles.length - 1 ? "renttimeline-now" : "renttimeline-past"}
-        />
-      ))}
-      {cycles
-        .slice(0, -1)
-        .map((cycle) => cycle[cycle.length - 1])
-        .map((p) => (
-          <circle key={p.at} cx={x(p.at)} cy={y(p.price)} r="2.2" className="renttimeline-end" />
-        ))}
-      <circle cx={x(nowPt.at)} cy={y(nowPt.price)} r="3.4" className="renttimeline-dot" />
-      <text
-        x={Math.min(x(nowPt.at), W - 4)}
-        y={Math.max(y(nowPt.price) - 7, 9)}
-        textAnchor="end"
-        className="renttimeline-nowlabel"
-      >
-        {money(nowPt.price)}
-      </text>
-    </svg>
+    <div ref={boxRef} className="renttimeline-box">
+      {w > 0 && (
+        <svg
+          className="renttimeline"
+          width={w}
+          height={H}
+          viewBox={`0 0 ${w} ${H}`}
+          role="img"
+          aria-label={`Rent history from ${y0} to now, ${money(rawMin)} to ${money(rawMax)}`}
+        >
+          {gridLines.map((v) => (
+            <g key={v}>
+              <line x1={LEFT} y1={y(v)} x2={LEFT + plotW} y2={y(v)} className="renttimeline-grid" />
+              <text x={w - 2} y={y(v) + 3} textAnchor="end" className="renttimeline-tick">
+                {money(v)}
+              </text>
+            </g>
+          ))}
+          {years.map((yr) => {
+            const tx = x(Date.UTC(yr, 0, 1));
+            if (tx < LEFT + 12 || tx > LEFT + plotW - 12) return null;
+            return (
+              <g key={yr}>
+                <line
+                  x1={tx}
+                  y1={H - BOTTOM}
+                  x2={tx}
+                  y2={H - BOTTOM + 4}
+                  className="renttimeline-grid"
+                />
+                <text x={tx} y={H - 6} textAnchor="middle" className="renttimeline-tick">
+                  {yr}
+                </text>
+              </g>
+            );
+          })}
+          {cycles.map((cycle, i) => (
+            <path
+              key={cycle[0].at}
+              d={path(cycle)}
+              fill="none"
+              strokeWidth={i === cycles.length - 1 ? 2 : 1.6}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              className={i === cycles.length - 1 ? "renttimeline-now" : "renttimeline-past"}
+            />
+          ))}
+          {cycles
+            .slice(0, -1)
+            .map((cycle) => cycle[cycle.length - 1])
+            .map((p) => (
+              <circle key={p.at} cx={x(p.at)} cy={y(p.price)} r="2" className="renttimeline-end" />
+            ))}
+          <circle cx={nowX} cy={nowY} r="3" className="renttimeline-dot" />
+          <text
+            x={Math.min(nowX - 7, LEFT + plotW - 4)}
+            y={Math.min(Math.max(nowY + 3.5, TOP + 8), H - BOTTOM - 2)}
+            textAnchor="end"
+            className="renttimeline-nowlabel"
+          >
+            {money(nowPt.price)} now
+          </text>
+        </svg>
+      )}
+    </div>
   );
 }
 
@@ -445,16 +499,18 @@ export default function ListingDrawer({
     setWho(listing.myContactName);
     setEmail(listing.myContactEmail);
     /*
-     * Never resync a field someone is typing in. A datetime-local fires
-     * change per segment, and snapping the input back to the server's copy
-     * between segments garbles the entry — the month you typed lands in
-     * the year. The blur that ends the edit flushes the save, and the next
-     * run of this effect reconciles.
+     * Never resync a field someone is typing in, and never through React.
+     * The time inputs are uncontrolled (see them below for why), so the
+     * server's copy lands by writing the DOM directly — and only when the
+     * cursor is elsewhere. The state mirrors ride along for the handlers
+     * that need the last complete value.
      */
-    if (document.activeElement !== tourAtEl.current) {
+    if (document.activeElement !== tourAtEl.current && tourAtEl.current) {
+      tourAtEl.current.value = toLocalInput(listing.tourAt);
       setTourAt(toLocalInput(listing.tourAt));
     }
-    if (document.activeElement !== tourEndsEl.current) {
+    if (document.activeElement !== tourEndsEl.current && tourEndsEl.current) {
+      tourEndsEl.current.value = toLocalInput(listing.tourEndsAt);
       setTourEndsAt(toLocalInput(listing.tourEndsAt));
     }
     setTourKind(listing.tourKind);
@@ -1432,6 +1488,15 @@ export default function ListingDrawer({
                   ))}
                 </div>
 
+                {/* Uncontrolled ON PURPOSE, both of them. A controlled
+                    datetime-local loses its half-typed segments whenever
+                    React reconciles the value prop, and the debounced save
+                    guarantees a re-render about a second into typing — so
+                    entering a date at human speed could never finish. React
+                    never writes these inputs; the resync effect updates
+                    them through the ref, and only while you're not in
+                    them. Proven by typing under a real renderer: fill()
+                    never catches it, keystrokes do. */}
                 <label className="tourtime">
                   <span>{tourKind === "open_house" ? "Starts" : "When is it?"}</span>
                   <input
@@ -1439,7 +1504,6 @@ export default function ListingDrawer({
                     ref={tourAtEl}
                     className="field"
                     type="datetime-local"
-                    value={tourAt}
                     onChange={(e) => {
                       setTourAt(e.target.value);
                       queueTourSave(e.target.value, tourKind, tourEndsAt);
@@ -1456,7 +1520,6 @@ export default function ListingDrawer({
                       ref={tourEndsEl}
                       className="field"
                       type="datetime-local"
-                      value={tourEndsAt}
                       onChange={(e) => {
                         setTourEndsAt(e.target.value);
                         queueTourSave(tourAt, tourKind, e.target.value);
