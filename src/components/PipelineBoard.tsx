@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import type { FeedListing, Stage } from "@/types";
 import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
 import { googleCalendarUrl } from "@/lib/calendar";
 import { nextAction, dayWord } from "@/lib/nextAction";
+import { fuzzyBest } from "@/lib/fuzzy";
 import { CONTACT_LABEL } from "@/lib/outreach";
 import { compactPrice } from "@/lib/cost";
 import Icon from "@/components/Icon";
@@ -120,6 +121,61 @@ export default function PipelineBoard({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
   const [quick, setQuick] = useState("");
+
+  /*
+   * One box, two jobs. Typing searches the board you already have —
+   * fuzzily, because people remember "ludlow" or "the bushwick one", not
+   * the exact string — and dims everything that doesn't match. Submitting
+   * opens the best match, or, when nothing on the board matches, falls
+   * through to the paste-it-in behaviour this box has always had.
+   */
+  const hits = useMemo(() => {
+    const query = quick.trim();
+    // A pasted link is an add, never a search: no card's text looks like a URL.
+    if (query.length < 2 || /^https?:\/\//i.test(query)) return null;
+    const scored = listings
+      // Only what the board actually shows: counting matches you can't see
+      // makes the tally a lie.
+      .filter((l) => (PIPELINE_STAGES as string[]).includes(l.stage))
+      .map((l) => ({
+        listing: l,
+        score: fuzzyBest(
+          [
+            { text: `${l.address}${l.unit ? ` #${l.unit}` : ""}`, weight: 3 },
+            { text: l.neighborhood, weight: 2 },
+            { text: l.myContactName || l.contactName || "", weight: 1.5 },
+            { text: l.notes, weight: 1 },
+          ],
+          query
+        ),
+      }))
+      .filter((row): row is { listing: FeedListing; score: number } => row.score != null)
+      .sort((a, b) => b.score - a.score);
+    /*
+     * Subsequence matching is generous by design — it has to be, to survive
+     * a typo — but that generosity turns into "everything is a match" on
+     * short queries. Anything far weaker than the best hit is coincidence,
+     * so the tail gets cut rather than shown.
+     */
+    if (!scored.length) return null;
+    const floor = scored[0].score * 0.45;
+    return scored.filter((row) => row.score >= floor);
+  }, [quick, listings]);
+
+  const hitIds = useMemo(
+    () => new Set((hits ?? []).map((h) => h.listing.id)),
+    [hits]
+  );
+  const searching = hits != null || (quick.trim().length >= 2 && !/^https?:\/\//i.test(quick));
+
+  // The best match scrolls itself into view, so a hit three columns over
+  // isn't a hit you have to go hunting for.
+  useEffect(() => {
+    const top = hits?.[0];
+    if (!top) return;
+    const el = boardRef.current?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(top.listing.id)}"]`);
+    el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [hits]);
   /**
    * Per-column sort by time in the column. Three states per column: the
    * default order (rating as the feed arrived; Tour reads as a schedule),
@@ -317,6 +373,12 @@ export default function PipelineBoard({
         onSubmit={(e) => {
           e.preventDefault();
           if (!quick.trim()) return;
+          // On the board already? Open it. Otherwise it's something new.
+          if (hits?.length) {
+            onOpen(hits[0].listing);
+            setQuick("");
+            return;
+          }
           onQuickAdd(quick.trim());
           setQuick("");
         }}
@@ -324,13 +386,20 @@ export default function PipelineBoard({
         <input
           className="field"
           value={quick}
-          placeholder="Paste an address or a listing link to pull it in"
-          aria-label="Find a place by address or link"
+          placeholder="Search your board, or paste a link to pull one in"
+          aria-label="Search your pipeline, or paste an address or link"
           onChange={(e) => setQuick(e.target.value)}
         />
         <button className="btn btn-primary" type="submit" disabled={!quick.trim()}>
-          Find it
+          {hits?.length ? "Open it" : "Find it"}
         </button>
+        {searching && (
+          <span className="quickadd-count muted" aria-live="polite">
+            {hits?.length
+              ? `${hits.length} match${hits.length === 1 ? "" : "es"} · Enter opens ${hits[0].listing.address}`
+              : "Nothing on your board matches. Enter pulls it in"}
+          </span>
+        )}
       </form>
 
     <div
@@ -478,6 +547,8 @@ export default function PipelineBoard({
               {column.map((l) => (
                 <button
                   key={l.id}
+                  data-card-id={l.id}
+                  data-hit={searching ? (hitIds.has(l.id) ? "yes" : "no") : undefined}
                   className="surface board-card"
                   draggable
                   data-dragging={dragging === l.id ? "true" : undefined}

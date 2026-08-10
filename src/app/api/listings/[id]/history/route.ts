@@ -67,11 +67,58 @@ export async function POST(
         .maybeSingle();
       if (src?.source_id) zpid = String(src.source_id).replace(/^zillow-/, "");
     }
+
+    /*
+     * A StreetEasy-only listing can still have a Zillow twin: the same unit
+     * posted to both sites as two rows we never linked. Matching on address
+     * AND unit finds it for free, without spending a request. Address alone
+     * would be wrong — 4F and 12B in one building are different rents, and
+     * a confident wrong history is worse than none.
+     */
     if (!zpid) {
+      const { data: self } = await supabase
+        .from("listings")
+        .select("address, unit")
+        .eq("id", id)
+        .maybeSingle();
+      if (self?.address) {
+        const { data: twins } = await supabase
+          .from("listings")
+          .select("id, unit")
+          .ilike("address", self.address.trim())
+          .neq("id", id)
+          .limit(20);
+        const sameUnit = (twins ?? []).filter(
+          (t) => (t.unit ?? "").trim().toLowerCase() === (self.unit ?? "").trim().toLowerCase()
+        );
+        if (sameUnit.length) {
+          const { data: twinSrc } = await supabase
+            .from("listing_sources")
+            .select("source_id")
+            .eq("source", "zillow")
+            .in(
+              "listing_id",
+              sameUnit.map((t) => t.id)
+            )
+            .limit(1)
+            .maybeSingle();
+          if (twinSrc?.source_id) zpid = String(twinSrc.source_id).replace(/^zillow-/, "");
+        }
+      }
+    }
+
+    if (!zpid) {
+      /*
+       * Only Zillow publishes a rent history through this API — StreetEasy's
+       * side exposes search and nothing else — so a place Zillow has never
+       * carried has no history to fetch anywhere. Say that plainly instead
+       * of implying the person did something wrong.
+       */
       return NextResponse.json({
         events: null,
+        noSource: true,
         error:
-          "No Zillow record for this place, and that's where the history lives. Places also listed on Zillow have one.",
+          "Rent history only comes from Zillow's record, and this unit isn't in it. Nothing to pull for this one.",
       });
     }
 

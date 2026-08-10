@@ -2229,6 +2229,8 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* Add by address, above the board. */
 .quickadd {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--s2);
   margin-bottom: var(--s4);
   max-width: 34rem;
@@ -2255,7 +2257,25 @@ button.fact:hover .fact-label { color: var(--accent); }
   }
 }
 
-.quickadd .field { flex: 1; }
+.quickadd .field { flex: 1 1 16rem; min-width: 0; }
+.quickadd .btn { flex: none; }
+
+/* What the box found, under it, in the flow rather than over the board. */
+.quickadd-count {
+  flex-basis: 100%;
+  font-size: var(--t-xs);
+  margin-top: -2px;
+}
+
+/* Searching dims the board to its matches: the hit keeps full contrast and
+   gains a ring, everything else recedes without disappearing, so you still
+   see which column the match is sitting in. */
+.board-card[data-hit="no"] { opacity: 0.3; filter: saturate(0.5); }
+.board-card[data-hit="yes"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.board-card[data-hit] { transition: opacity 0.15s ease, filter 0.15s ease; }
 
 /* --- the rail ------------------------------------------------------------- */
 

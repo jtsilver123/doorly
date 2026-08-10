@@ -30,6 +30,7 @@ import { neighborhoodAt, withinAreas, locate } from "@/lib/geo";
 import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { dayWord } from "@/lib/nextAction";
+import { fuzzyScore, fuzzyBest } from "@/lib/fuzzy";
 import { readHunt } from "@/lib/insights";
 import { readRentPast, rentCycles } from "@/lib/rentHistory";
 import { statsFor, buildCompIndex, readDeal, flagsFor } from "@/lib/market";
@@ -894,6 +895,47 @@ test("days get names near, weekdays next, dates after that", () => {
   // A week out, a weekday stops being unambiguous.
   assert.equal(at("2026-08-18T11:45:00"), "Aug 18");
   assert.equal(at(null as unknown as string), "");
+});
+
+test("fuzzy search finds places you half-remember", () => {
+  const addr = "38 Ludlow Street";
+  // Substring, gapped subsequence, and a run that skips a space.
+  assert.ok(fuzzyScore(addr, "ludlow") != null);
+  assert.ok(fuzzyScore(addr, "38lud") != null);
+  assert.ok(fuzzyScore(addr, "38 lud") != null);
+  assert.ok(fuzzyScore(addr, "ldw") != null);
+  // Letters that aren't there, and letters out of order.
+  assert.equal(fuzzyScore(addr, "zqx"), null);
+  assert.equal(fuzzyScore(addr, "wolduL"), null);
+  assert.equal(fuzzyScore(addr, ""), null);
+});
+
+test("fuzzy ranks the real match above the lucky one", () => {
+  const q = "ludlow";
+  const real = fuzzyScore("38 Ludlow Street", q)!;
+  const lucky = fuzzyScore("Laundry, unit dishwasher, low floor", q);
+  assert.ok(real > (lucky ?? 0), `real ${real} vs lucky ${lucky}`);
+  // Earlier hits beat later ones.
+  assert.ok(fuzzyScore("Ludlow Street", q)! > fuzzyScore("Apartment on Ludlow", q)!);
+});
+
+test("an address hit outweighs the same letters in a note", () => {
+  const onAddress = fuzzyBest(
+    [
+      { text: "38 Ludlow Street", weight: 3 },
+      { text: "quiet block", weight: 1 },
+    ],
+    "ludlow"
+  )!;
+  const onNote = fuzzyBest(
+    [
+      { text: "12 Java Street", weight: 3 },
+      { text: "the ludlow one had better light", weight: 1 },
+    ],
+    "ludlow"
+  )!;
+  assert.ok(onAddress > onNote, `${onAddress} vs ${onNote}`);
+  assert.equal(fuzzyBest([{ text: "nothing here" }], "zzz"), null);
 });
 
 test("today's actions lead with what's rotting", () => {
