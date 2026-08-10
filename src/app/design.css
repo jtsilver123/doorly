@@ -5858,22 +5858,47 @@ button.timeline-funnel:disabled { cursor: default; }
 
 /* --- the viewing picker: calendar plus time chips ------------------------- */
 
-/* react-day-picker, dressed in this app's tokens. */
+/* Calendar left, time and confirmation right — the drawer is 720px now,
+   and a stretched month grid over a stray menu wasted all of it. */
+.tourpicker {
+  display: grid;
+  gap: var(--s4);
+  align-items: start;
+}
+@media (min-width: 620px) {
+  .tourpicker { grid-template-columns: auto minmax(150px, 1fr); }
+}
+
+.tourside { display: grid; gap: 5px; align-content: start; }
+.tourside-label {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.tourside-hint { font-size: var(--t-xs); line-height: 1.45; }
+
+/* react-day-picker, dressed in this app's tokens and sized to the content
+   rather than the container: a month is a fixed amount of information. */
 .tourcal {
   display: flex;
-  justify-content: center;
-  padding: var(--s2) 0;
+  justify-content: flex-start;
+  padding: 2px 0;
 }
 .tourcal .rdp-root {
   --rdp-accent-color: var(--accent);
   --rdp-accent-background-color: var(--accent-soft);
   --rdp-today-color: var(--accent);
-  --rdp-day-width: 40px;
-  --rdp-day-height: 38px;
-  --rdp-nav-height: 34px;
+  --rdp-day-width: 34px;
+  --rdp-day-height: 30px;
+  --rdp-nav-height: 28px;
+  --rdp-weekday-padding: 2px 0;
+  --rdp-months-gap: 0;
   font-size: var(--t-sm);
+  width: max-content;
 }
-.tourcal .rdp-month_caption { font-weight: 700; font-size: var(--t-md); }
+.tourcal .rdp-month_grid { border-spacing: 0; }
+.tourcal .rdp-nav { gap: 2px; }
+.tourcal .rdp-month_caption { font-weight: 700; font-size: var(--t-sm); height: 28px; }
 .tourcal .rdp-day_button { border-radius: var(--r-md); font-variant-numeric: tabular-nums; }
 .tourcal .rdp-selected .rdp-day_button {
   border: 2px solid var(--accent);
@@ -5888,11 +5913,11 @@ button.timeline-funnel:disabled { cursor: default; }
 }
 .tourcal .rdp-chevron { fill: var(--text-muted); }
 
-/* The time menu sits under the calendar at a readable width, not stretched
-   across the whole panel like a text field. */
+/* The time menu fills its own column, capped so it never reads as a
+   full-width text field. */
 .tourpick {
   width: 100%;
-  max-width: 240px;
+  max-width: 200px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -5931,12 +5956,27 @@ button.timeline-funnel:disabled { cursor: default; }
 }
 
 .tourtime-set {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s3);
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  margin-top: var(--s2);
+  padding-top: var(--s2);
+  border-top: 1px solid var(--border);
 }
+.tourtime-set b { font-size: var(--t-lg); color: var(--accent); }
 .tourtime-set .linkish { font-size: var(--t-xs); color: var(--text-muted); }
+
+/* The footer's status line, when it's a door rather than a label. */
+button.stagenote {
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+button.stagenote.is-live:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
 
 /* --- still deciding: the third state after a tour ------------------------- */
 

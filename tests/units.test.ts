@@ -29,6 +29,7 @@ import {
 import { neighborhoodAt, withinAreas, locate } from "@/lib/geo";
 import { neighborhoodAt as neighborhoodInPolygon } from "@/lib/nta";
 import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
+import { dayWord } from "@/lib/nextAction";
 import { readHunt } from "@/lib/insights";
 import { readRentPast, rentCycles } from "@/lib/rentHistory";
 import { statsFor, buildCompIndex, readDeal, flagsFor } from "@/lib/market";
@@ -879,6 +880,20 @@ test("scoring a big corpus stays linear enough to survive a Worker", () => {
   for (const row of corpus) statsFor(row, index);
   const ms = Date.now() - started;
   assert.ok(ms < 400, `indexed pass took ${ms}ms`);
+});
+
+test("days get names near, weekdays next, dates after that", () => {
+  const now = new Date("2026-08-11T09:00:00");
+  const at = (iso: string) => dayWord(iso, now);
+  // Late tonight is still today; early tomorrow is still tomorrow, even
+  // though the two are fourteen hours apart.
+  assert.equal(at("2026-08-11T23:30:00"), "Today");
+  assert.equal(at("2026-08-12T07:00:00"), "Tomorrow");
+  assert.equal(at("2026-08-10T20:00:00"), "Yesterday");
+  assert.equal(at("2026-08-14T11:45:00"), "Fri");
+  // A week out, a weekday stops being unambiguous.
+  assert.equal(at("2026-08-18T11:45:00"), "Aug 18");
+  assert.equal(at(null as unknown as string), "");
 });
 
 test("today's actions lead with what's rotting", () => {

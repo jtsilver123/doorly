@@ -38,19 +38,32 @@ export interface NextAction {
 
 const DAY = 86_400_000;
 
-/** Human time for a booked viewing: "Today 3:00 PM", "Thu 11:30 AM". */
+/**
+ * A day the way people say it: "Today", "Tomorrow", then the weekday
+ * while that's unambiguous, then a date. Shared by every surface that
+ * names a future day, so the board, the panel and the footer can never
+ * disagree about what to call Wednesday.
+ */
+export function dayWord(iso: string | null, now = new Date()): string {
+  if (!iso) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(at) - midnight(now)) / DAY);
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days === -1) return "Yesterday";
+  if (days > 1 && days < 7) return at.toLocaleDateString("en-US", { weekday: "short" });
+  return at.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/** Human time for a booked viewing: "Today 3:00 PM", "Tomorrow 11:30 AM". */
 export function tourWhen(iso: string | null): string {
   if (!iso) return "";
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return "";
-  const days = Math.floor((at.getTime() - Date.now()) / DAY);
   const time = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const sameDay = new Date().toDateString() === at.toDateString();
-  if (sameDay) return `Today ${time}`;
-  if (days >= 0 && days < 6) {
-    return `${at.toLocaleDateString("en-US", { weekday: "short" })} ${time}`;
-  }
-  return `${at.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${time}`;
+  return `${dayWord(iso)} ${time}`;
 }
 
 export function nextAction(listing: FeedListing): NextAction {
@@ -132,7 +145,7 @@ export function nextAction(listing: FeedListing): NextAction {
             label: "Deciding",
             hint:
               listing.followUpNote ||
-              `You gave yourself until ${at.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`,
+              `You gave yourself until ${dayWord(listing.followUpAt).toLowerCase()}`,
           };
         }
         return {

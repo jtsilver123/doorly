@@ -5,7 +5,7 @@ import type { FeedListing, Stage } from "@/types";
 import { PIPELINE_STAGES, STAGE_LABEL } from "@/types";
 import { RatingDisc } from "@/components/Rating";
 import { googleCalendarUrl } from "@/lib/calendar";
-import { nextAction } from "@/lib/nextAction";
+import { nextAction, dayWord } from "@/lib/nextAction";
 import { CONTACT_LABEL } from "@/lib/outreach";
 import { compactPrice } from "@/lib/cost";
 import Icon from "@/components/Icon";
@@ -690,7 +690,7 @@ export default function PipelineBoard({
                         }}
                       >
                         {l.followUpAt
-                          ? `deciding by ${new Date(l.followUpAt).toLocaleDateString("en-US", { weekday: "short" })}${l.followUpNote ? ` · ${l.followUpNote.slice(0, 24)}` : ""}`
+                          ? `deciding by ${dayWord(l.followUpAt).toLowerCase()}${l.followUpNote ? ` · ${l.followUpNote.slice(0, 24)}` : ""}`
                           : "still deciding?"}
                       </span>
                     </span>

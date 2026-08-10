@@ -1618,10 +1618,11 @@ export default function ListingDrawer({
                     three rounds of fixes with fragile mid-entry state, and
                     chips have none: a tap is atomic and saves on the spot. */}
                 <div className="tourtime">
-                  <span>{tourKind === "open_house" ? "Starts" : "When is it?"}</span>
+                  <span>When is it?</span>
                   {/* The calendar is react-day-picker — the same component
                       shadcn's date picker wraps, used bare so it wears this
                       design system instead of dragging in another one. */}
+                  <div className="tourpicker">
                   <div className="tourcal" data-tour-pick="day">
                     <DayPicker
                       mode="single"
@@ -1640,7 +1641,12 @@ export default function ListingDrawer({
                   {/* A dropdown, not a strip: sixty quarter-hour slots
                       scan far better in a menu, and a select is still
                       atomic — one change is one complete answer. */}
+                  <div className="tourside">
+                  <label className="tourside-label" htmlFor="tour-time">
+                    {tourKind === "open_house" ? "Starts" : "Start time"}
+                  </label>
                   <select
+                    id="tour-time"
                     className="field tourpick"
                     data-tour-pick="time"
                     aria-label="Viewing time"
@@ -1658,13 +1664,42 @@ export default function ListingDrawer({
                       </option>
                     ))}
                   </select>
+                  {tourKind === "open_house" && (
+                    <>
+                      <label className="tourside-label" htmlFor="tour-end">
+                        Ends
+                      </label>
+                      <select
+                        id="tour-end"
+                        className="field tourpick"
+                        data-tour-pick="end"
+                        aria-label="Open house end time"
+                        value={tourEndTime}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setTourEndTime(t);
+                          saveTourParts(tourDay, tourTime, tourKind, t);
+                        }}
+                      >
+                        <option value="">Ends at…</option>
+                        {tourTimeOptions(tourEndTime).map((t) => (
+                          <option key={t} value={t}>
+                            {slotLabel(t)}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="muted tourside-hint">
+                        A window, not an appointment. Show up any time inside it.
+                      </span>
+                    </>
+                  )}
                   {tourDay && !tourTime && (
-                    <span className="muted" style={{ fontSize: 11 }}>
+                    <span className="muted tourside-hint">
                       Now pick a time and it saves.
                     </span>
                   )}
                   {!tourDay && !listing.tourAt && (
-                    <span className="muted" style={{ fontSize: 11 }}>
+                    <span className="muted tourside-hint">
                       Pick a day, then a time. It saves itself.
                     </span>
                   )}
@@ -1684,38 +1719,10 @@ export default function ListingDrawer({
                       </button>
                     </div>
                   )}
+                  </div>
+                  </div>
                 </div>
 
-                {tourKind === "open_house" && (
-                  <div className="tourtime">
-                    <span>Until</span>
-                    <select
-                      className="field tourpick"
-                      data-tour-pick="end"
-                      aria-label="Open house end time"
-                      value={tourEndTime}
-                      onChange={(e) => {
-                        const t = e.target.value;
-                        setTourEndTime(t);
-                        saveTourParts(tourDay, tourTime, tourKind, t);
-                      }}
-                    >
-                      <option value="">Ends at…</option>
-                      {tourTimeOptions(tourEndTime).map((t) => (
-                        <option key={t} value={t}>
-                          {slotLabel(t)}
-                        </option>
-                      ))}
-                    </select>
-                    {listing.tourEndsAt && <b>{tourWhen(listing.tourEndsAt)}</b>}
-                  </div>
-                )}
-
-                {tourKind === "open_house" && (
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    A window, not an appointment. Show up any time inside it.
-                  </span>
-                )}
 
                 {listing.tourAt && (
                   <div className="addcal">
@@ -2262,6 +2269,14 @@ export default function ListingDrawer({
             >
               {action.kind === "chase" ? "Send a follow-up" : reach.label}
               <i className="cta-sub">{action.hint}</i>
+            </button>
+          ) : action.kind === "tour" ? (
+            // A booked time is a fact you change more often than any other:
+            // brokers move viewings. Saying it without offering the edit
+            // was a dead end on the one line most likely to be wrong.
+            <button className="stagenote btn-block is-live" onClick={goToViewing}>
+              <strong>{action.label}</strong>
+              <span>{action.hint} · tap to change</span>
             </button>
           ) : (
             <div className="stagenote btn-block">
