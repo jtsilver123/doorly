@@ -945,8 +945,11 @@ export default function ListingDrawer({
                     title={`Open on ${SOURCE_LABEL[so.source]}`}
                     aria-label={`Open on ${SOURCE_LABEL[so.source]}`}
                   >
-                    <SourceMark source={so.source} size={15} />
-                    <Icon name="external" size={11} />
+                    {/* The brand mark alone. An external arrow on every one
+                        doubled the weight of a row that sits beside the two
+                        buttons that matter, and a site's own logo already
+                        reads as "this opens there". */}
+                    <SourceMark source={so.source} size={16} />
                   </a>
                 ))}
               </span>
@@ -1038,15 +1041,17 @@ export default function ListingDrawer({
                 >
                   <Icon name={shared ? "check" : "external"} size={16} />
                 </button>
-                <a
-                  className="photo-btn photo-btn-flat"
-                  href={listing.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Open the original listing"
-                >
-                  <SourceMark source={listing.source} size={16} />
-                </a>
+                {sites[0] && (
+                  <a
+                    className="photo-btn photo-btn-flat"
+                    href={sites[0].url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open on ${SOURCE_LABEL[sites[0].source]}`}
+                  >
+                    <SourceMark source={sites[0].source} size={16} />
+                  </a>
+                )}
               </span>
             </div>
           </div>

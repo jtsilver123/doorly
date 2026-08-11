@@ -2283,14 +2283,20 @@ button.fact:hover .fact-label { color: var(--accent); }
   white-space: nowrap;
 }
 
-/* The listing's own pages, pinned in the drawer header beside Share. */
+/* The listing's own pages, pinned in the drawer header beside Share.
+   Square and quiet: these sit next to the two buttons that matter, so they
+   match their height and claim no more width than a logo needs. */
 .drawer-head-sites { display: inline-flex; gap: 4px; }
 .drawer-head-sites .srcbtn {
-  padding: 5px 7px;
-  gap: 3px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  gap: 0;
   min-width: 0;
+  border-radius: var(--r-md);
 }
-.drawer-head-sites .icon { color: var(--text-muted); }
 
 /* What the box found, under it, in the flow rather than over the board. */
 .quickadd-count {
@@ -4813,7 +4819,11 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 /* Share and close, together, so the header's right edge is one control group. */
 .drawer-head-acts { display: flex; align-items: center; gap: var(--s2); flex-shrink: 0; }
-.drawer-share { padding: 5px 10px; font-size: var(--t-sm); }
+/* One height across the row. Three controls at 32, 36 and 27 read as a
+   mistake even when nobody can name which one is wrong. */
+.drawer-head-acts > * { height: 34px; }
+.drawer-share { height: 34px; padding: 0 12px; font-size: var(--t-sm); }
+.drawer-close { width: 34px; padding: 0; display: grid; place-items: center; }
 .drawer-share.is-done { border-color: var(--good); color: var(--good); }
 
 /* --- passing, with a reason ----------------------------------------------- */
