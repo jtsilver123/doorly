@@ -53,6 +53,13 @@ export default function PassDialog({
     );
   }
 
+  /*
+   * Turning down a yes is not the same act as skipping a listing. You applied,
+   * they approved you, and you're saying no anyway — so the dialog says that
+   * instead of "passing", and it never implies the place was wrong for you.
+   */
+  const accepted = listing.appResult === 1 && !listing.secured;
+
   const labelOf = (code: string) =>
     PASS_REASONS.find((r) => r.code === code)?.label ?? code;
   // The note a person reads, assembled from the same picks that scope the
@@ -66,7 +73,9 @@ export default function PassDialog({
   const teaching = picked.filter((c) => PASS_REASONS.find((r) => r.code === c)?.families.length);
   const learns =
     picked.length === 0
-      ? "Without a reason this counts against everything about the place."
+      ? accepted
+        ? "Nothing here changes your scores. You applied, so this was never about taste."
+        : "Without a reason this counts against everything about the place."
       : teaching.length === 0
         ? "Noted for your crew. Nothing here changes your scores, which is right: this isn't about taste."
         : "Your scores will stop favoring places like this one, and leave the rest alone.";
@@ -78,13 +87,15 @@ export default function PassDialog({
         className="passdialog"
         role="dialog"
         aria-modal="true"
-        aria-label={`Pass on ${listing.address}`}
+        aria-label={
+          accepted ? `Turn down ${listing.address}` : `Pass on ${listing.address}`
+        }
         ref={panelRef}
         tabIndex={-1}
       >
         <header className="passdialog-head">
           <div>
-            <h2>Passing on this one</h2>
+            <h2>{accepted ? "Turning down their yes" : "Passing on this one"}</h2>
             <p className="muted">
               {listing.address}
               {listing.unit ? ` #${listing.unit}` : ""}
@@ -95,6 +106,14 @@ export default function PassDialog({
             <Icon name="close" size={15} />
           </button>
         </header>
+
+        {accepted && (
+          <p className="passdialog-why">
+            They approved you and you&rsquo;re not taking it. It moves to Not
+            applying with that on the record, so the board stops counting a
+            decision you&rsquo;ve already made.
+          </p>
+        )}
 
         {finderName && (
           <p className="passdialog-why">
@@ -138,10 +157,14 @@ export default function PassDialog({
 
         <div className="passdialog-foot">
           <button className="linkish" onClick={() => onConfirm("", [])}>
-            Pass without a reason
+            {accepted ? "Turn it down without a reason" : "Pass without a reason"}
           </button>
           <button className="btn btn-primary" onClick={() => onConfirm(note_, picked)}>
-            {finderName && note_ ? `Pass and tell ${finderName}` : "Pass"}
+            {finderName && note_
+              ? `${accepted ? "Turn it down" : "Pass"} and tell ${finderName}`
+              : accepted
+                ? "Turn it down"
+                : "Pass"}
           </button>
         </div>
       </div>

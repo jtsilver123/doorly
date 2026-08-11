@@ -845,10 +845,36 @@ export default function PipelineBoard({
                       )}
                       {l.secured && l.appResult === 1 ? (
                         <span className="lean-note secured-note">secured</span>
-                      ) : l.appResult !== 0 ? (
-                        <span className="muted lean-note">
-                          {l.appResult === 1 ? "accepted" : "denied"}
+                      ) : l.appResult === 1 ? (
+                        /* Their yes is not your yes. Without somewhere to
+                           record "accepted, and I passed", the card sits at
+                           "accepted" forever and the funnel counts a place
+                           you turned down as still live. */
+                        <span className="lean-accepted">
+                          <span className="muted lean-note">accepted</span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="declinebtn"
+                            title="Accepted, but you're not taking it"
+                            aria-label={`Turn down ${l.address}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPass(l);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onPass(l);
+                              }
+                            }}
+                          >
+                            not taking it
+                          </span>
                         </span>
+                      ) : l.appResult !== 0 ? (
+                        <span className="muted lean-note">denied</span>
                       ) : null}
                     </span>
                   )}

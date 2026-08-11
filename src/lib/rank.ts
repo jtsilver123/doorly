@@ -59,6 +59,7 @@ export const PASS_REASONS: {
   { code: "building", label: "Building looks rough", families: [] },
   { code: "layout", label: "Bad layout", families: [] },
   { code: "gone", label: "Already gone", families: [] },
+  { code: "other_place", label: "Took another place", families: [] },
 ];
 
 const BY_CODE = new Map(PASS_REASONS.map((r) => [r.code, r]));

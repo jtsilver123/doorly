@@ -166,6 +166,27 @@ export function nextAction(listing: FeedListing): NextAction {
     }
 
     case "applied":
+      // Taken. Nothing left to chase.
+      if (listing.secured) {
+        return { kind: "done", label: "Yours", hint: "Signed and taken" };
+      }
+      /*
+       * An acceptance is their answer, not yours, and it is the most
+       * perishable state in the hunt: landlords give you a day, sometimes
+       * an hour, before offering it to the next application. So it reads as
+       * a question with a deadline rather than a trophy.
+       */
+      if (listing.appResult === 1) {
+        return {
+          kind: "decide",
+          label: "They said yes",
+          hint: "Take it, or turn it down so it stops counting as live",
+          urgent: true,
+        };
+      }
+      if (listing.appResult === -1) {
+        return { kind: "done", label: "Turned down", hint: "They went with someone else" };
+      }
       return { kind: "wait", label: "Application in", hint: "Waiting on the landlord" };
 
     case "closed":
@@ -174,6 +195,17 @@ export function nextAction(listing: FeedListing): NextAction {
     case "no_go":
       // You saw it and said no. Offering outreach here would propose
       // re-courting a place you've already declined.
+      //
+      // Which "no" it was matters to anyone reading the column later: an
+      // application you were accepted for and turned down is a different
+      // fact from a place that never wanted you.
+      if (listing.appResult === 1) {
+        return {
+          kind: "done",
+          label: "You turned it down",
+          hint: listing.passReason || "They accepted you and you passed",
+        };
+      }
       return {
         kind: "done",
         label: "Not for you",

@@ -96,10 +96,13 @@ export function countSteps(listings: FeedListing[], now = new Date()): FunnelSte
   /*
    * An approval is the landlord's yes; signed is yours. Only `secured`
    * counts as won — calling a place signed while the person is still
-   * deciding overstates the hunt and understates the decision in front
-   * of them.
+   * deciding overstates the hunt and understates the decision in front of
+   * them. And a yes you turned down is no longer a yes on the table, or it
+   * would nag from here forever as an open decision.
    */
-  const approved = tracked.filter((l) => l.appResult === 1 && !l.secured);
+  const approved = tracked.filter(
+    (l) => l.appResult === 1 && !l.secured && l.stage !== "no_go" && l.stage !== "passed"
+  );
   const won = tracked.filter((l) => l.secured);
   return {
     saved: tracked.length,

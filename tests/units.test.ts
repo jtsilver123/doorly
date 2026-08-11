@@ -732,6 +732,32 @@ test("a win leads the insights regardless of leaks", () => {
   assert.equal(insights[0].key, "won");
 });
 
+test("a yes you turned down stops counting as live", () => {
+  const declined = feed({
+    id: "d",
+    stage: "no_go",
+    appResult: 1,
+    contactCount: 1,
+    hasReply: true,
+  });
+  const { steps, insights } = readHunt([declined]);
+  assert.equal(steps.approved, 0, "a declined acceptance is not an open decision");
+  assert.equal(steps.won, 0);
+  assert.ok(!insights.some((i) => i.key === "approved"));
+  // And the card says which "no" it was.
+  assert.equal(nextAction(declined).label, "You turned it down");
+});
+
+test("an acceptance reads as a question, and signing ends it", () => {
+  const accepted = feed({ id: "a", stage: "applied", appResult: 1 });
+  const act = nextAction(accepted);
+  assert.equal(act.label, "They said yes");
+  assert.equal(act.urgent, true);
+  const taken = nextAction(feed({ id: "a", stage: "applied", appResult: 1, secured: true }));
+  assert.equal(taken.label, "Yours");
+  assert.equal(taken.urgent, undefined);
+});
+
 test("a landlord's approval is not a signing", () => {
   // Application accepted, but the person hasn't taken the place.
   const listings = [
@@ -2291,6 +2317,22 @@ test("passing because it was already gone teaches nothing", () => {
   // A rented apartment is not a preference: no weight may move because of it.
   assert.deepEqual(withGone.weights, base.weights);
   assert.equal(withGone.passes, base.passes);
+});
+
+test("turning something down because you took another place teaches nothing", () => {
+  const liked = [{ listing: place({ price: 2600 }), liked: true }];
+  const base = train(liked);
+  const withMove = train([
+    ...liked,
+    {
+      listing: place({ price: 2600, neighborhood: "Bushwick" }),
+      liked: false,
+      reasons: ["other_place"],
+    },
+  ]);
+  // You signed somewhere else. That says nothing about this apartment.
+  assert.deepEqual(withMove.weights, base.weights);
+  assert.equal(withMove.passes, base.passes);
 });
 
 test("a reason the model has no feature for is dropped, not spread around", () => {

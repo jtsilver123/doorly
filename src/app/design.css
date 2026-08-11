@@ -2260,6 +2260,28 @@ button.fact:hover .fact-label { color: var(--accent); }
 .quickadd .field { flex: 1 1 16rem; min-width: 0; }
 .quickadd .btn { flex: none; }
 
+/* Their yes, declined: the quiet way out of an accepted application. */
+/* Their yes and your out, on one line: the state and the only thing you can
+   do about it belong together, and wrapping them apart reads as two facts. */
+.lean-accepted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.declinebtn {
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  border: 1px dashed var(--border-strong);
+  font-size: var(--t-2xs);
+  font-weight: 650;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.declinebtn:hover { color: var(--warn); border-color: var(--warn); border-style: solid; }
+
 /* --- today, on the board -------------------------------------------------- */
 
 /* A viewing today is the only card here with a deadline in hours. It gets
@@ -4415,6 +4437,23 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 
 .drawer-foot .control { max-width: 132px; }
+
+/* An acceptance has two endings, so the footer shows both rather than one
+   button that has to mean either. The hint sits above them because it is the
+   deadline, not a caption on a single act. */
+.drawer-decide {
+  flex: 1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.drawer-decide-hint { font-size: var(--t-xs); line-height: 1.35; }
+.drawer-decide-acts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+}
+.drawer-decide-acts .btn { justify-content: center; }
 
 /* A quiet pulse while a write is in flight, in place of disabling buttons. */
 .drawer-saving {

@@ -321,7 +321,17 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   const signals: Signal[] = [];
   for (const [listingId, { liked, reasons }] of explicit) {
     const row = byId.get(listingId);
-    if (row) signals.push({ listing: toListing(row), liked, reasons });
+    if (!row) continue;
+    /*
+     * A pass with no stated reason is read as "something about this listing
+     * was wrong", so it counts against every feature at once. That reading
+     * is plainly wrong for a place you were approved on: you wanted it
+     * enough to file an application, and turning down their yes usually
+     * means you took something else. Without a reason there is nothing here
+     * to learn, so it trains on nothing rather than on the wrong thing.
+     */
+    if (!liked && !reasons.length && stateBy.get(listingId)?.app_result === 1) continue;
+    signals.push({ listing: toListing(row), liked, reasons });
   }
   for (const [listingId, state] of stateBy) {
     if (explicit.has(listingId)) continue;

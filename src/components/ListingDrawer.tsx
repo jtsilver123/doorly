@@ -2263,6 +2263,35 @@ export default function ListingDrawer({
               {action.label}
               <i className="cta-sub">{action.hint}</i>
             </button>
+          ) : action.kind === "decide" && listing.appResult === 1 ? (
+            /*
+              Their yes is only half a decision, and it has exactly two
+              endings. Offering both here, side by side, is the whole point:
+              a card stuck on "accepted" is a decision the app is quietly
+              waiting on, and it counts as live until you answer.
+            */
+            <div className="drawer-decide">
+              <p className="muted drawer-decide-hint">{action.hint}</p>
+              <div className="drawer-decide-acts">
+                <button
+                  className="btn"
+                  onClick={() => {
+                    patch({ action: "pass", reason: "", reasons: [] }).catch(() => {});
+                    requestClose();
+                  }}
+                >
+                  Not taking it
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    patch({ action: "secured", secured: true }).catch(() => {});
+                  }}
+                >
+                  I&rsquo;m taking it
+                </button>
+              </div>
+            </div>
           ) : action.kind === "decide" ? (
             <button
               className="btn btn-primary btn-block"
