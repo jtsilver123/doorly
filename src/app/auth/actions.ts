@@ -86,15 +86,56 @@ export async function signUp(_prev: AuthResult, formData: FormData): Promise<Aut
   if (password.length < 8) return { error: "Use at least 8 characters." };
   if (!name) return { error: "Tell us your name — it's how your crew sees you." };
 
+  const origins = originsFor((await headers()).get("host"));
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // Into auth metadata AND the profile below: metadata survives even if
-    // the profile write fails, and Google users get theirs the same way.
-    options: { data: { name } },
+    options: {
+      // Into auth metadata AND the profile below: metadata survives even if
+      // the profile write fails, and Google users get theirs the same way.
+      data: { name },
+      // Say where the confirmation link should land instead of leaning on
+      // the project's Site URL, which is one dashboard edit away from
+      // sending everybody to the wrong host.
+      ...(origins
+        ? { emailRedirectTo: `${origins.marketing}/auth/callback?next=${encodeURIComponent("/welcome")}` }
+        : {}),
+    },
   });
-  if (error) return { error: error.message };
+  if (error) {
+    /*
+     * Supabase's built-in mailer allows only a couple of messages an hour
+     * across the whole project, and when it refuses, NO account is created
+     * — the person is simply turned away. Its own wording ("email rate
+     * limit exceeded") reads like our bug, so say what actually happened
+     * and offer the door that always works.
+     */
+    if (/rate limit/i.test(error.message)) {
+      return {
+        error:
+          "We couldn't send the confirmation email just now — our mail service is throttled. Try again in a few minutes, or use Continue with Google, which needs no email.",
+      };
+    }
+    return { error: error.message };
+  }
+
+  /*
+   * The address already has an account.
+   *
+   * Supabase answers a repeated signup with a success shaped exactly like a
+   * new one — an obfuscated user, no session — so it never confirms to a
+   * stranger which addresses are registered. It also sends no email. We used
+   * to print "check your inbox" anyway, which is the one reply guaranteed to
+   * waste somebody's afternoon: they wait for mail that was never sent.
+   * An empty identities array is the documented tell.
+   */
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    return {
+      error:
+        "That email already has an account. Sign in instead — and if you started with Google, use Continue with Google.",
+    };
+  }
 
   // The whole point of asking: "via Emma" instead of "via emma.k.92". Only
   // possible immediately when signup returns a session (no email confirm).
@@ -112,7 +153,9 @@ export async function signUp(_prev: AuthResult, formData: FormData): Promise<Aut
   // With email confirmation on, there's a session only after the link is
   // clicked. Say which happened rather than dumping the user on a blank app.
   if (!data.session) {
-    return { message: `Check ${email} for a confirmation link, then sign in.` };
+    return {
+      message: `Check ${email} for a confirmation link, then sign in. It can take a minute, and it does land in spam sometimes.`,
+    };
   }
 
   revalidatePath("/", "layout");
