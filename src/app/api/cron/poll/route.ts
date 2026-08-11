@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ingest } from "@/lib/ingest";
-import { loadAllActiveSearches } from "@/lib/feed";
+import { recheckWatch, WATCH_STAGES } from "@/lib/watch";
+import { adminDb } from "@/lib/supabase";
 import {
   loadConfigFor,
   nextCheckDue,
@@ -13,17 +13,18 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Scheduled poll. Separate from /api/refresh so the cron path can always demand
- * the shared secret, while the in-app refresh button stays friction-free.
+ * Scheduled watch tick. Separate from /api/refresh so the cron path can
+ * always demand the shared secret, while the in-app button stays
+ * friction-free.
  *
- * One tick, many spenders — each on their own account. The first version
- * pooled every account's searches into one ingest and paid for all of it with
- * "the most recently updated" key, which meant whoever pasted a key last was
- * silently billed for the whole userbase. Now the tick walks users one at a
- * time: their searches, their key, their cadence. A user with no key of their
- * own is skipped — no free-riding on someone else's budget — but every pull
- * still lands in the shared listings corpus, so freshness is communal even
- * though spending never is.
+ * The crawl this used to run — every saved search re-scraped hourly — is
+ * gone: discovery belongs to the listing sites now (see the directory in
+ * siteLinks.ts). What remains is the watch: each user's pipeline, re-checked
+ * on their own key at their own cadence, so a price drop or a quiet
+ * delisting on a place they're chasing still finds them within hours.
+ *
+ * One tick, many spenders, each on their own account — a user with no key
+ * of their own is skipped rather than free-riding on someone else's budget.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -32,20 +33,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
-    // No session here, so gather every account's searches with the service role.
-    const searches = await loadAllActiveSearches();
-    if (!searches.length) {
-      return NextResponse.json({ message: "no active searches", fetched: 0 });
-    }
-
-    const byUser = new Map<string, typeof searches>();
-    for (const search of searches) {
-      if (!search.userId) continue;
-      byUser.set(search.userId, [...(byUser.get(search.userId) ?? []), search]);
+    // Everyone with anything on a board. No session here, so service role.
+    const { data, error } = await adminDb()
+      .from("user_listing_state")
+      .select("user_id")
+      .in("stage", WATCH_STAGES);
+    if (error) throw new Error(error.message);
+    const userIds = [...new Set((data ?? []).map((r) => r.user_id as string))];
+    if (!userIds.length) {
+      return NextResponse.json({ message: "nothing watched", users: 0 });
     }
 
     const runs: Record<string, unknown>[] = [];
-    for (const [userId, theirSearches] of byUser) {
+    for (const userId of userIds) {
       const config = await loadConfigFor(userId);
       // Their own saved key only. The env fallback exists for the app's own
       // requests, not as a communal pool an hourly cron may drain.
@@ -68,13 +68,14 @@ export async function GET(request: Request) {
 
       try {
         const result = await withConfig({ ...config, realtyApiKey: ownKey }, () =>
-          ingest(theirSearches, { userId })
+          recheckWatch(userId)
         );
         runs.push({
           user: userId,
           key: keyHint(ownKey),
-          fetched: result.fetched,
-          newListings: result.newListings,
+          checked: result.checked,
+          watched: result.watched,
+          events: result.events,
           errors: result.errors.slice(0, 3),
         });
       } catch (err) {
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ users: byUser.size, runs });
+    return NextResponse.json({ users: userIds.length, runs });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "poll failed" },

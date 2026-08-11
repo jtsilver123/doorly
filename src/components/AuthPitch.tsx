@@ -13,10 +13,10 @@
 
 const CLAIMS: { stat: string; label: string; detail: string }[] = [
   {
-    stat: "5",
-    label: "sites, one search",
+    stat: "17",
+    label: "sites, one hunt",
     detail:
-      "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, deduplicated into one scored list.",
+      "StreetEasy, Zillow, the sublet boards, the groups — each opens with your search set, and what you find lands on one board.",
   },
   {
     stat: "1",
@@ -42,9 +42,10 @@ export default function AuthPitch({ children }: { children?: React.ReactNode }) 
           not lucky.
         </h1>
         <p className="auth-lede">
-          A good New York apartment goes to whoever replied first. This checks
-          every listing site every hour, tells you which places are genuinely a
-          good deal, and keeps track of who you&apos;ve contacted. The search
+          A good New York apartment goes to whoever replied first and
+          followed through. Paste any place you find and this runs the chase:
+          the honest price, the building&apos;s record, the message already
+          written, and a watch on every place you&apos;re after. The hunt
           stops living in twelve browser tabs.
         </p>
 

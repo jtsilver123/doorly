@@ -2,33 +2,19 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { FeedListing, SearchCriteria, Source } from "@/types";
+import type { FeedListing, SearchCriteria } from "@/types";
 import type { Stage } from "@/types";
-import { siteJumps } from "@/lib/siteLinks";
 import { isFacebookUrl, parseFreePost, type FreePost } from "@/lib/freepost";
 import PasteIn from "@/components/PasteIn";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
-import {
-  DEFAULT_PROFILE,
-  bestChannel,
-  draftTourMessage,
-  draftFollowUp,
-  mailtoLink,
-  smsLink,
-  tourSubject,
-  type Profile,
-} from "@/lib/outreach";
+import { DEFAULT_PROFILE, type Profile } from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
-import { applyFilters, findPasted } from "@/lib/filters";
+import { findPasted } from "@/lib/filters";
 import { burstConfetti } from "@/lib/confetti";
-import { nextAction } from "@/lib/nextAction";
 import { runwayDays } from "@/lib/runway";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
 import { formatPhone } from "@/lib/phone";
 import { usePush } from "@/lib/usePush";
-import { commuteMinutes } from "@/lib/commute";
-import { brokerHistory } from "@/lib/leverage";
-import type { AmenityKey } from "@/lib/amenities";
 import ApplyHub from "@/components/ApplyHub";
 import UploadStatus from "@/components/UploadStatus";
 import SearchEditor from "@/components/SearchEditor";
@@ -38,14 +24,11 @@ import ChaseAll from "@/components/ChaseAll";
 import ReviewTours from "@/components/ReviewTours";
 import MoveInCosts from "@/components/MoveInCosts";
 import MessageSettings from "@/components/MessageSettings";
-import FilterBar, { type Filters } from "@/components/FilterBar";
-import SearchHeader from "@/components/SearchHeader";
 import Toasts, { useToasts } from "@/components/Toasts";
 import Timeline from "@/components/Timeline";
 import AccountMenu, { type ProfileSection } from "@/components/AccountMenu";
 import CrewPanel, { type CrewView } from "@/components/CrewPanel";
-import { phaseFor, funnelFor, todaysActions } from "@/lib/timeline";
-import ListingCard, { orderedSources } from "@/components/ListingCard";
+import { phaseFor, funnelFor } from "@/lib/timeline";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
 import Changes, { type Change, type Notice } from "@/components/Changes";
@@ -55,14 +38,10 @@ import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
 import JoinGate from "@/components/JoinGate";
 import Tour from "@/components/Tour";
+import WhereToLook from "@/components/WhereToLook";
 import Insights from "@/components/Insights";
 // Client-only: Leaflet reads `window` the moment its module loads, which
-// detonates the server prerender. The map has no server-renderable form anyway.
-const CityMap = dynamic(() => import("@/components/CityMap"), {
-  ssr: false,
-  loading: () => <div className="citymap" aria-busy="true" />,
-});
-// Same constraint, same cure: the planner is Leaflet too.
+// detonates the server prerender. The planner has no server-renderable form.
 const TourPlanner = dynamic(() => import("@/components/TourPlanner"), { ssr: false });
 
 /**
@@ -83,15 +62,6 @@ const TABS: Tab[] = ["pipeline", "feed", "compare", "apply", "profile"];
  * — the Activity list now lives inside Listings, so the old tab lands there
  * with the panel open rather than 404ing someone's routine.
  */
-/** Which diary heading a listing files under, for the newest-first grid. */
-function freshnessBucket(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "New today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return "Earlier this week";
-  return "Older";
-}
-
 const LEGACY_TABS: Record<string, Tab> = { today: "feed", changes: "feed" };
 
 /** The clean addresses, one per section, and the way back. */
@@ -125,15 +95,15 @@ const TOUR_STOPS: { tab: Tab; target?: string; title: string; body: string }[] =
   },
   {
     tab: "feed",
-    target: ".searchfield",
-    title: "Finding places",
-    body: "Five listing sites, checked hourly, scored against what you told us. Spot a place anywhere else? Paste its link here and it joins the hunt.",
+    target: ".wtl-lane",
+    title: "Search where the inventory lives",
+    body: "StreetEasy, Zillow, the sublet boards — organized by what kind of hunt yours is, each opening with your filters already set. Browse there; the work happens here.",
   },
   {
     tab: "feed",
-    target: ".card",
-    title: "Star what's worth chasing",
-    body: "A star saves a place to your pipeline. Click a card for everything else: the price check, the building's record, a message ready to send.",
+    target: ".searchfield",
+    title: "Found one? Paste it",
+    body: "A link from any site, or a whole Facebook post. It lands on your board with the price checked, the building's record pulled, and a message ready to send.",
   },
   {
     tab: "feed",
@@ -144,8 +114,8 @@ const TOUR_STOPS: { tab: Tab; target?: string; title: string; body: string }[] =
   {
     tab: "pipeline",
     target: ".refresh",
-    title: "Speed wins apartments",
-    body: "Good places go in a day here. The sites are checked hourly on their own, and Check for new runs one on the spot. That's the tour. Go find your place.",
+    title: "We watch what you're chasing",
+    body: "Every place on your board gets re-checked on a schedule: price drops, relists, quiet delistings. Check now runs one on the spot. That's the tour. Go find your place.",
   },
 ];
 
@@ -176,20 +146,6 @@ const NAV_ICON: Record<string, IconName> = {
   apply: "send",
   profile: "profile",
 };
-
-/** Cards mounted per page. Two full rows beyond a tall viewport. */
-const PAGE = 36;
-
-/**
- * What the "good deals only" filter means.
- *
- * Pinned to the rating at which the verdict starts saying "worth a tour", so
- * the filter and the words on the cards agree. On the live corpus that's about
- * a sixth of what's tracked — a shortlist you could actually work through in
- * an evening, rather than a different-sized wall of cards.
- */
-const GOOD_DEAL_RATING = 64;
-
 
 function sinceText(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -369,6 +325,8 @@ export default function Home() {
     setTourAt(0);
   }, [loading, guest]);
 
+  const [open, setOpen] = useState<FeedListing | null>(null);
+
   const startTour = useCallback(() => {
     setOpen(null);
     setTab(TOUR_STOPS[0].tab);
@@ -382,7 +340,6 @@ export default function Home() {
     setDrawerJump(null);
   }, []);
 
-  const [open, setOpen] = useState<FeedListing | null>(null);
   /** The tour-day route planner, opened from the pipeline's Tour column. */
   const [planning, setPlanning] = useState(false);
   /** The listing whose pass dialog is open. */
@@ -396,65 +353,9 @@ export default function Home() {
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
   const [email, setEmail] = useState("");
-  const [budget, setBudget] = useState(0);
-  /** The saved search's neighborhoods — what "Where" actually means. */
-  const [searchAreas, setSearchAreas] = useState<string[]>([]);
-  /** The whole saved search, for the jump-to-StreetEasy/Zillow links. */
+  /** The saved search, for the directory links that carry it outward. */
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(null);
-  const [focus, setFocus] = useState(0);
   const { toasts, push: toast, dismiss } = useToasts();
-
-  // filters
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState("best");
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
-  const [beds, setBeds] = useState("any");
-  const [baths, setBaths] = useState("any");
-  const [sourceFilter, setSourceFilter] = useState<Source[]>([]);
-  const [changedOnly, setChangedOnly] = useState(false);
-  const [starredOnly, setStarredOnly] = useState(false);
-  const [noFeeOnly, setNoFeeOnly] = useState(false);
-  const [followUpOnly, setFollowUpOnly] = useState(false);
-  const [readyOnly, setReadyOnly] = useState(false);
-  const [goodOnly, setGoodOnly] = useState(false);
-  /** Cap on minutes to the first commute anchor. "any" = off. */
-  const [commuteMax, setCommuteMax] = useState("any");
-  /** Must-have amenities: w/d, elevator, dishwasher and friends. */
-  const [perkFilter, setPerkFilter] = useState<AmenityKey[]>([]);
-  /** Which panel the profile area opens on, so the menu can deep-link. */
-  /**
-   * How many cards are mounted.
-   *
-   * The grid used to render the whole filtered set — 323 articles of ~30 nodes
-   * each, about ten thousand DOM nodes, most of them below the fold. It's
-   * imperceptible at this corpus size and won't be at three thousand, or on a
-   * mid-range phone. Cards past the first page mount as you approach them.
-   */
-  const [pageSize, setPageSize] = useState(PAGE);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  /** Shared between the map and the grid, so hovering either highlights both. */
-  const [linkedId, setLinkedId] = useState<string | null>(null);
-
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  const clearFilters = useCallback(() => {
-    setQuery("");
-    setPriceMin("");
-    setPriceMax("");
-    setBeds("any");
-    setBaths("any");
-    setSourceFilter([]);
-    setSort("best");
-    setChangedOnly(false);
-    setStarredOnly(false);
-    setNoFeeOnly(false);
-    setFollowUpOnly(false);
-    setReadyOnly(false);
-    setGoodOnly(false);
-    setCommuteMax("any");
-    setPerkFilter([]);
-  }, []);
 
   /**
    * One fetch for the whole corpus, then everything narrows in the browser.
@@ -548,74 +449,12 @@ export default function Home() {
   }, [listings, toast]);
 
 
-  const anchor = (profile.anchors ?? [])[0];
-  /** Late listings shown anyway, by explicit request. */
-  const [showLate, setShowLate] = useState(false);
   /** A pasted Facebook post (or any free-text tip) awaiting the form. */
   const [pasteDraft, setPasteDraft] = useState<null | {
     text: string;
     url: string;
     parsed: FreePost;
   }>(null);
-  /** Phones: which of the two views the toggle is showing. */
-  const [mobileMap, setMobileMap] = useState(false);
-  const { visible, lateHidden } = useMemo(() => {
-    let filtered = applyFilters(listings, {
-      stage: "all",
-      search: query,
-      priceMin: priceMin ? Number(priceMin) : undefined,
-      priceMax: priceMax ? Number(priceMax) : undefined,
-      bedsMin: beds === "any" ? undefined : Number(beds),
-      bedsMax: beds === "any" ? undefined : Number(beds),
-      bathsMin: baths === "any" ? undefined : Number(baths),
-      sources: sourceFilter,
-      changedOnly,
-      starredOnly,
-      noFeeOnly,
-      followUpOnly,
-      readyByMoveIn: readyOnly,
-      minRating: goodOnly ? GOOD_DEAL_RATING : undefined,
-      perks: perkFilter,
-      sort: sort as Parameters<typeof applyFilters>[1]["sort"],
-    });
-    // The commute cap is against the first anchor — "work", for most people.
-    if (anchor && commuteMax !== "any") {
-      const cap = Number(commuteMax);
-      filtered = filtered.filter((l) => {
-        const est = commuteMinutes(l, anchor);
-        return est != null && est.minutes <= cap;
-      });
-    }
-    /*
-     * A place that won't be free until weeks after the move-in date is not a
-     * candidate, and showing it as one reads as the app not listening. Hidden
-     * by default rather than dropped: the count and a reveal keep it honest,
-     * and "soon" (a week or two late — landlords flex) stays visible with its
-     * label. Anything already in your pipeline is yours regardless.
-     */
-    if (showLate || readyOnly) return { visible: filtered, lateHidden: 0 };
-    const kept = filtered.filter((l) => l.timing !== "late" || l.stage !== "inbox");
-    return { visible: kept, lateHidden: filtered.length - kept.length };
-  }, [
-    showLate,
-    listings,
-    query,
-    priceMin,
-    priceMax,
-    beds,
-    baths,
-    sourceFilter,
-    changedOnly,
-    starredOnly,
-    noFeeOnly,
-    followUpOnly,
-    readyOnly,
-    goodOnly,
-    sort,
-    anchor,
-    commuteMax,
-    perkFilter,
-  ]);
 
   const loadChanges = useCallback(async () => {
     const body = await fetch("/api/changes").then((r) => r.json());
@@ -693,8 +532,6 @@ export default function Home() {
       .then((r) => r.json())
       .then((b) => {
         const first = (b.searches ?? [])[0];
-        if (first?.criteria?.priceMax) setBudget(first.criteria.priceMax);
-        if (Array.isArray(first?.criteria?.areas)) setSearchAreas(first.criteria.areas);
         if (first?.criteria) setSearchCriteria(first.criteria);
       })
       .catch(() => {});
@@ -708,41 +545,31 @@ export default function Home() {
   }, [loadChanges, loadApi]);
 
   /**
-   * One press of "Check for new": run the poll, reload everything it can
-   * change, and hand back the fresh feed so callers can look inside it.
-   * Quick-add re-runs its match against exactly this list.
+   * One press of "Check my places": re-check everything on the board against
+   * the sites — prices, delistings, relists — then reload what it touched.
    */
-  const checkNow = async (): Promise<{
-    listings: FeedListing[];
-    error?: string;
-    newListings: number;
-    events: number;
-  }> => {
-    const body = await fetch("/api/refresh", { method: "POST" }).then((r) => r.json());
-    const [fresh] = await Promise.all([loadFeed(), loadChanges(), loadApi()]);
-    return {
-      listings: fresh,
-      error: body.error,
-      newListings: body.newListings ?? 0,
-      events: body.events ?? 0,
-    };
-  };
-
   async function refresh() {
     if (requireAccount()) return;
     setRefreshing(true);
 
     try {
-      const res = await checkNow();
-      if (res.error) {
-        toast({ message: res.error, tone: "warn" });
-      } else if (res.newListings || res.events) {
+      const body = await fetch("/api/refresh", { method: "POST" }).then((r) => r.json());
+      await Promise.all([loadFeed(), loadChanges(), loadApi()]);
+      if (body.error) {
+        toast({ message: body.error, tone: "warn" });
+      } else if (body.events) {
+        const drops = body.priceDrops
+          ? `${body.priceDrops} price drop${body.priceDrops === 1 ? "" : "s"}`
+          : "";
+        const gone = body.gone ? `${body.gone} gone` : "";
         toast({
-          message: `${res.newListings} new · ${res.events} changes`,
+          message: [drops, gone].filter(Boolean).join(" · ") || `${body.events} changes`,
           tone: "good",
         });
+      } else if (body.checked === 0 && body.watched === 0) {
+        toast({ message: "Nothing on your board to watch yet. Save a place first" });
       } else {
-        toast({ message: "Nothing new since last check" });
+        toast({ message: `Checked ${body.checked} — all holding steady` });
       }
     } catch (err) {
       toast({
@@ -771,24 +598,6 @@ export default function Home() {
       if (reload) await loadFeed();
     },
     [loadFeed, requireAccount]
-  );
-
-  /**
-   * Star and pass update the list immediately and reconcile in the background.
-   * Waiting on a round trip for a keystroke is what made triage feel heavy —
-   * at one card per second, a 300ms refetch is most of the interaction.
-   */
-  const star = useCallback(
-    (listing: FeedListing) => {
-      const next = !listing.starred;
-      setListings((list) =>
-        list.map((l) => (l.id === listing.id ? { ...l, starred: next } : l))
-      );
-      patch(listing.id, { action: "star", starred: next }, false).catch(() =>
-        loadFeed()
-      );
-    },
-    [patch, loadFeed]
   );
 
   /**
@@ -1034,34 +843,6 @@ export default function Home() {
     }
   }, []);
 
-  const pass = useCallback(
-    (listing: FeedListing) => {
-      optimisticPass(listing);
-      patch(listing.id, { action: "feedback", value: "pass" }, false).catch(() =>
-        loadFeed()
-      );
-      /*
-       * The quick dismiss stays one tap. Clearing a feed of forty places can't
-       * cost forty dialogs, so the reason is offered rather than demanded —
-       * and a pass with no reason still counts, just against everything.
-       */
-      toast({
-        message: sawIt(listing)
-          ? `${listing.address} filed under "Not applying"`
-          : `Passed on ${listing.address}`,
-        actionLabel: "Say why",
-        onAction: () => setPassing(listing),
-        secondaryLabel: "Undo",
-        onSecondary: () => {
-          patch(listing.id, { action: "unpass" }, false)
-            .then(loadFeed)
-            .catch(() => loadFeed());
-        },
-      });
-    },
-    [patch, loadFeed, toast, optimisticPass]
-  );
-
   /**
    * Passing with a reason attached, from the dialog.
    *
@@ -1117,23 +898,6 @@ export default function Home() {
     [patch, loadFeed]
   );
 
-  /**
-   * Shift-select: the panel and the listing's own site together. Triage
-   * often ends at "looks right, now show me the full listing" — one gesture
-   * covers both instead of open-panel-then-hunt-for-the-link.
-   */
-  const openCard = useCallback(
-    (listing: FeedListing, visitSource?: boolean) => {
-      if (visitSource) {
-        const target =
-          orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
-        if (target) window.open(target, "_blank", "noopener");
-      }
-      setOpen(listing);
-    },
-    [profile.preferredSource]
-  );
-
   /** The .ics for a booked tour, shared by the board and the drawer. */
   const downloadIcs = useCallback((listing: FeedListing) => {
     const body = icsFor(listing);
@@ -1147,201 +911,6 @@ export default function Home() {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }, []);
-
-  /**
-   * One "reach out" action whose behaviour depends on what the listing has.
-   * Whatever the channel, the CRM is written first — an sms:/mailto: handoff
-   * can unload the page before a later request lands.
-   */
-  const reachOut = useCallback(
-    async (listing: FeedListing) => {
-      // Texting an agent from the app is the product; doing it needs a you.
-      if (requireAccount()) return;
-      // Anything that isn't "send them a message" belongs in the panel, where
-      // the control for it lives.
-      const action = nextAction(listing);
-      if (action.kind !== "reach" && action.kind !== "chase") {
-        if (action.becomes) {
-          patch(listing.id, { action: "stage", stage: action.becomes }, false).catch(() =>
-            loadFeed()
-          );
-          setListings((list) =>
-            list.map((l) => (l.id === listing.id ? { ...l, stage: action.becomes! } : l))
-          );
-          return;
-        }
-        setOpen(listing);
-        return;
-      }
-      const { channel } = bestChannel(listing);
-      /*
-       * Which draft rides the button. Once you've contacted, every later
-       * message from a card is a nudge, never the opening pitch resent —
-       * getting the original again is what makes people look like bots.
-       */
-      const chasing = listing.stage === "contacted";
-      /*
-       * The broker-memory panel tells the user their repeat interest is
-       * leverage; the draft this button sends has to actually use it. This
-       * call site was the one place that forgot to pass the prior thread,
-       * so the panel promised a warmer message than the button delivered.
-       */
-      const prior = brokerHistory(listings, listing)?.others[0] ?? null;
-      const message = chasing
-        ? draftFollowUp(listing, profile, prior)
-        : draftTourMessage(listing, profile, prior);
-
-      await patch(
-        listing.id,
-        {
-          action: "contact",
-          channel,
-          direction: "out",
-          who: listing.contactName,
-          note: chasing ? "Follow-up" : "Tour request",
-        },
-        false
-      );
-      if (listing.stage === "inbox" || listing.stage === "interested") {
-        await patch(listing.id, { action: "stage", stage: "contacted" }, false);
-      }
-      await loadFeed();
-
-      if (channel === "text") {
-        window.location.href = smsLink(listing.contactPhone, message);
-      } else if (channel === "email") {
-        window.location.href = mailtoLink(
-          listing.contactEmail,
-          tourSubject(listing),
-          message
-        );
-      } else {
-        // No published contact: put the draft on the clipboard and open the
-        // listing, where the site's own enquiry form lives.
-        try {
-          await navigator.clipboard.writeText(message);
-          toast({
-            message: "Message copied. Paste it into their contact form",
-            tone: "good",
-          });
-        } catch {
-          toast({ message: "Opened the listing. Copy the message from the detail panel" });
-        }
-        const target = orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
-        if (target) window.open(target, "_blank", "noopener");
-      }
-    },
-    // listings rides along for broker memory — a stale closure would draft
-    // from last render's threads.
-    [patch, profile, listings, loadFeed, requireAccount]
-  );
-
-  // --- keyboard triage -----------------------------------------------------
-  // With hundreds of listings the bottleneck is triage speed, so the whole
-  // feed is drivable without the mouse.
-  useEffect(() => {
-    if (tab !== "feed" || open) return;
-
-    function onKey(e: KeyboardEvent) {
-      const el = e.target as HTMLElement | null;
-      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      const current = visible[focus];
-      switch (e.key.toLowerCase()) {
-        case "arrowright":
-        case "arrowdown":
-        case "j":
-          e.preventDefault();
-          setFocus((f) => Math.min(f + 1, visible.length - 1));
-          break;
-        case "arrowleft":
-        case "arrowup":
-        case "k":
-          e.preventDefault();
-          setFocus((f) => Math.max(f - 1, 0));
-          break;
-        case "enter":
-          if (current) {
-            e.preventDefault();
-            // Shift widens the gesture: the panel plus the source site.
-            openCard(current, e.shiftKey);
-          }
-          break;
-        case "e":
-          if (current) {
-            e.preventDefault();
-            reachOut(current);
-          }
-          break;
-        case "x":
-          if (current) {
-            e.preventDefault();
-            pass(current);
-          }
-          break;
-        case "s":
-          if (current) {
-            e.preventDefault();
-            star(current);
-          }
-          break;
-        case "o":
-          if (current) {
-            e.preventDefault();
-            const target =
-              orderedSources(current, profile.preferredSource)[0]?.url ?? current.url;
-            if (target) window.open(target, "_blank", "noopener");
-          }
-          break;
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [tab, open, visible, focus, pass, star, reachOut, openCard, profile.preferredSource]);
-
-  // Keep the focused card in view as you move through the list.
-  useEffect(() => {
-    // Cards sit inside display:contents wrappers now, which have no box to
-    // scroll to — target the card itself.
-    const node = gridRef.current?.querySelectorAll(".card")[focus] as HTMLElement | undefined;
-    node?.scrollIntoView({ block: "nearest" });
-  }, [focus]);
-
-  // Any change to what's on screen resets the cursor to the top of it.
-  useEffect(() => setFocus(0), [visible]);
-  useEffect(() => setPageSize(PAGE), [visible]);
-
-  /**
-   * Grow the window when the marker below the grid comes into view.
-   *
-   * A callback ref rather than an effect over a plain ref: the marker only
-   * exists on the listings tab, so an effect would have to name every piece of
-   * state that governs whether it's mounted — tab, view, loading, result count
-   * — and the first one forgotten leaves the observer watching nothing. This
-   * attaches whenever the node appears and detaches when it goes, with no
-   * dependency list to get wrong.
-   */
-  const sentinelRef = useCallback((node: HTMLDivElement | null) => {
-    observerRef.current?.disconnect();
-    if (!node) return;
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) setPageSize((n) => n + PAGE);
-      },
-      // Start loading before the marker is actually reached, so a fast scroll
-      // meets cards rather than a gap.
-      { rootMargin: "800px" }
-    );
-    observerRef.current.observe(node);
-  }, []);
-
-  useEffect(() => () => observerRef.current?.disconnect(), []);
-
-  // Keyboard triage can outrun the window, so walking past the end grows it.
-  useEffect(() => {
-    if (focus >= pageSize - 4) setPageSize((n) => Math.min(visible.length, n + PAGE));
-  }, [focus, pageSize, visible.length]);
 
   /**
    * The open listing, always re-read from the current feed.
@@ -1395,57 +964,6 @@ export default function Home() {
     () => funnelFor(listings, daysToMove),
     [listings, daysToMove]
   );
-  const actions = useMemo(
-    () => todaysActions(listings, funnel, phase),
-    [listings, funnel, phase]
-  );
-
-  /**
-   * Budget and move-in date, saved from wherever they're edited.
-   *
-   * The budget lives on the saved search (it bounds what gets scraped) and the
-   * date lives on the profile (it fills the outreach message and the timeline),
-   * but to the user they're one pair of settings. This hides that seam, and
-   * reloads the feed because both feed straight back into the rating.
-   */
-  const saveSearchBasics = useCallback(
-    async ({ budget: nextBudget, moveInDate }: { budget?: number; moveInDate?: string }) => {
-      if (nextBudget != null) {
-        setBudget(nextBudget);
-        const body = await fetch("/api/searches").then((r) => r.json());
-        const current = (body.searches ?? [])[0];
-        if (current) {
-          await fetch("/api/searches", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              label: current.label,
-              criteria: { ...current.criteria, priceMax: nextBudget },
-            }),
-          });
-          // Criteria are keyed by content, so an edit creates a new row. Drop
-          // the old one or every poll scrapes both and doubles the API spend.
-          await fetch("/api/searches", {
-            method: "DELETE",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ searchKey: current.searchKey }),
-          });
-        }
-      }
-      if (moveInDate) {
-        setProfile((p) => ({ ...p, moveInDate }));
-        await fetch("/api/profile", {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ profile: { ...profile, moveInDate } }),
-        });
-      }
-      await loadFeed();
-      toast({ message: "Updated", tone: "good" });
-    },
-    [profile, loadFeed, toast]
-  );
-
   // No toast: the forms save themselves as you type now, and a "Saved" pop
   // for every debounced keystroke would be a metronome. Each form shows its
   // own quiet status line instead.
@@ -1481,8 +999,8 @@ export default function Home() {
             <div className="railguest">
               <b>{counts.active.toLocaleString()}</b>
               <span className="muted">
-                NYC places live, checked hourly. Look around. Saving one is
-                where your own hunt starts.
+                NYC places tracked here so far. Look around. Pasting one in
+                is where your own hunt starts.
               </span>
             </div>
           ) : (
@@ -1505,7 +1023,7 @@ export default function Home() {
               // its unread count joins the Listings badge so news still
               // shows without a whole tab to hold it.
               ["pipeline", "Pipeline", counts.pipeline],
-              ["feed", "Listings", actions.length + unread],
+              ["feed", "Find", unread],
               ["compare", "Compare", finalistCount],
               // Applying promoted from a settings panel to a step of the
               // work: find, work it, choose, then win the place.
@@ -1535,12 +1053,10 @@ export default function Home() {
         </div>
 
         {counts.followUp > 0 && (
+          // The chase lives where the cards do: the board's Contacted column.
           <button
             className="callout"
-            onClick={() => {
-              setTab("feed");
-              setFollowUpOnly(true);
-            }}
+            onClick={() => setTab("pipeline")}
           >
             <strong>{counts.followUp} waiting on a reply</strong>
             <span className="muted">Contacted 2+ days ago. Chase them</span>
@@ -1561,7 +1077,7 @@ export default function Home() {
           {!guest && (
           <div className="refresh">
             {/*
-              A dead key makes "Check for new" a lie — pressing it runs a
+              A dead key makes "Check my places" a lie — pressing it runs a
               check that cannot fetch and reports nothing new. When the key
               is spent, the button says what actually needs doing and goes
               where you do it.
@@ -1582,7 +1098,7 @@ export default function Home() {
                 onClick={refresh}
                 disabled={refreshing}
               >
-                {refreshing ? "Checking…" : "Check for new"}
+                {refreshing ? "Checking…" : "Check my places"}
               </button>
             )}
 
@@ -1699,233 +1215,64 @@ export default function Home() {
       </nav>
 
       <main className="main" id="results">
-        {tab === "feed" && (
-          <div className="stickytop">
-            {budget > 0 && (
-          <SearchHeader
-            listings={listings}
-            budget={budget}
-            searchAreas={searchAreas}
-            moveInDate={profile.moveInDate}
-            onSave={saveSearchBasics}
+        {/*
+          Find: the directory out to the sites that own the inventory, and
+          the paste box back in. The grid-and-map that used to live here
+          imitated a listings site and miscast the product as one; the pages
+          that matter — the board, Compare, Apply — are about what happens
+          after the search.
+        */}
+        {tab === "feed" && !activityOpen && (
+          <WhereToLook
+            criteria={searchCriteria}
+            /* While the feed loads we assume a hunt in progress — the recap
+               popping in for a first-timer beats it flashing at everyone. */
+            hasPlaces={
+              loading ||
+              listings.some((l) => l.starred || !["inbox", "passed"].includes(l.stage))
+            }
             onEditSearch={() => {
               setSection("search");
               setTab("profile");
             }}
-          />
-            )}
-
-        {loading && <SkeletonGrid />}
-
-            {/* What used to be the Today tab, boiled down to its one useful
-                part: the things that need doing, as a strip above the browse.
-                Nothing urgent means no strip — the feed speaks for itself. */}
-            {!loading && actions.length > 0 && (
-              <div className="actions actions-strip">
-                {actions.map((action) => (
-                  <button
-                    key={action.key}
-                    className={`surface action action-${action.tone}`}
-                    title={action.detail}
-                    onClick={() => {
-                      if (action.filter === "followUp") {
-                        setFollowUpOnly(true);
-                      } else if (action.filter === "new") {
-                        setSort("newest");
-                      } else if (action.filter === "tour") {
-                        setTab("pipeline");
-                      }
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{action.title}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {action.detail}
-                      </div>
-                    </div>
-                    <span className="action-arrow">→</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {tab === "feed" && (
-              <FilterBar
-              total={visible.length}
-              filters={{
-                query,
-                priceMin,
-                priceMax,
-                beds,
-                baths,
-                sources: sourceFilter,
-                sort,
-                changedOnly,
-                starredOnly,
-                noFeeOnly,
-                followUpOnly,
-                readyOnly,
-                goodOnly,
-                commuteMax,
-                perks: perkFilter,
-              }}
-              onChange={(next: Partial<Filters>) => {
-                if (next.query !== undefined) setQuery(next.query);
-                if (next.priceMin !== undefined) setPriceMin(next.priceMin);
-                if (next.priceMax !== undefined) setPriceMax(next.priceMax);
-                if (next.beds !== undefined) setBeds(next.beds);
-                if (next.baths !== undefined) setBaths(next.baths);
-                if (next.sources !== undefined) setSourceFilter(next.sources);
-                if (next.sort !== undefined) setSort(next.sort);
-                if (next.changedOnly !== undefined) setChangedOnly(next.changedOnly);
-                if (next.starredOnly !== undefined) setStarredOnly(next.starredOnly);
-                if (next.noFeeOnly !== undefined) setNoFeeOnly(next.noFeeOnly);
-                if (next.followUpOnly !== undefined) setFollowUpOnly(next.followUpOnly);
-                if (next.readyOnly !== undefined) setReadyOnly(next.readyOnly);
-                if (next.goodOnly !== undefined) setGoodOnly(next.goodOnly);
-                if (next.commuteMax !== undefined) setCommuteMax(next.commuteMax);
-                if (next.perks !== undefined) setPerkFilter(next.perks);
-              }}
-              onReset={clearFilters}
-              lastCheckedAt={api?.lastCheckedAt}
-              sourceCount={ALL_SOURCES.length}
-              anchorLabel={anchor?.label ?? null}
-              jumps={searchCriteria ? siteJumps(searchCriteria) : undefined}
-              /* One box for both intents: typing filters, pasting a link or
-                 a whole group post pulls the place in. Two side-by-side
-                 inputs made people guess which one meant what. */
-              onPasteSubmit={(q) => {
-                const pastable =
-                  /^https?:\/\//i.test(q.trim()) || isFacebookUrl(q) || q.trim().length > 60;
-                if (!pastable) return false;
-                quickAdd(q.trim());
-                return true;
-              }}
-              /* Activity used to hold a whole row of the frozen header for
-                 one pill; it rides the count row now. It's diligence on the
-                 same inventory (price cuts, relists, delistings), so it
-                 opens here over the browse instead of a tab away. */
-              trailing={
-                !loading ? (
-                  <button
-                    className={activityOpen ? "pill activity-pill is-on" : "pill activity-pill"}
-                    aria-expanded={activityOpen}
-                    onClick={() => setActivityOpen((v) => !v)}
-                  >
-                    <Icon name="bell" size={14} />
-                    Activity
-                    {unread > 0 && <span className="chip">{unread}</span>}
-                  </button>
-                ) : null
-              }
-              />
-            )}
-          </div>
-        )}
-
-        {tab === "feed" && activityOpen && !loading && (
-          <Changes
-            changes={changes}
-            notices={notices}
-            listings={listings}
-            onOpen={setOpen}
-            onRefresh={refresh}
-            refreshing={refreshing}
+            onFind={(q) => {
+              const pastable =
+                /^https?:\/\//i.test(q.trim()) || isFacebookUrl(q) || q.trim().length > 60;
+              if (!pastable) return false;
+              quickAdd(q.trim());
+              return true;
+            }}
+            activityPill={
+              <button
+                className={activityOpen ? "pill activity-pill is-on" : "pill activity-pill"}
+                aria-expanded={activityOpen}
+                onClick={() => setActivityOpen((v) => !v)}
+              >
+                <Icon name="bell" size={14} />
+                Activity
+                {unread > 0 && <span className="chip">{unread}</span>}
+              </button>
+            }
           />
         )}
 
-        {tab === "feed" && !activityOpen && (
+        {/* Diligence on your places: price cuts, relists, delistings. */}
+        {tab === "feed" && activityOpen && (
           <>
-            {loading ? null : visible.length === 0 ? (
-              <Empty
-                filtered={listings.length > 0}
-                onRefresh={refresh}
-                onClear={clearFilters}
-              />
-            ) : (
-              // Zillow's split on desktop: the map holds still on the left
-              // while the results scroll on the right, hover linked both
-              // ways. Phones choose one at a time via the floating toggle —
-              // a 300px map above the cards taxed every visit a scroll.
-              <>
-                {(lateHidden > 0 || showLate) && (
-                  <div className="late-note" role="status">
-                    {showLate ? (
-                      <>
-                        Including places that are not free until well after
-                        your move-in.{" "}
-                        <button className="linkish" onClick={() => setShowLate(false)}>
-                          Hide them again
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        {lateHidden} hidden: not free until well after your
-                        move-in date.{" "}
-                        <button className="linkish" onClick={() => setShowLate(true)}>
-                          Show them
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-                <div className="split" data-view={mobileMap ? "map" : "list"}>
-                  <div className="split-map">
-                    <CityMap
-                      listings={visible}
-                      onOpen={setOpen}
-                      linkedId={linkedId}
-                      onHover={setLinkedId}
-                    />
-                  </div>
-                  <div className="split-cards" ref={gridRef}>
-                    {visible.slice(0, pageSize).map((listing, i) => (
-                      <div className="card-cell" key={listing.id}>
-                        {/* Sorted by newest, the grid reads as a diary:
-                            day headings mark where today's crop ends and
-                            yesterday's begins. Other sorts interleave dates,
-                            where headings would lie. */}
-                        {sort === "newest" &&
-                          (() => {
-                            const bucket = freshnessBucket(listing.firstSeenAt);
-                            const prev =
-                              i > 0 ? freshnessBucket(visible[i - 1].firstSeenAt) : null;
-                            if (bucket === prev) return null;
-                            return <h3 className="grid-day">{bucket}</h3>;
-                          })()}
-                        <ListingCard
-                          listing={listing}
-                          via={via(listing)}
-                          focused={i === focus}
-                          linked={linkedId === listing.id}
-                          preferredSource={profile.preferredSource}
-                          onHover={setLinkedId}
-                          onOpen={openCard}
-                          onStar={star}
-                          onPass={pass}
-                          onReach={reachOut}
-                        />
-                      </div>
-                    ))}
-                    {visible.length > pageSize && (
-                      <div ref={sentinelRef} className="more-sentinel">
-                        Showing {pageSize} of {visible.length.toLocaleString()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {/* Phones: one view at a time, switched from a thumb-height
-                    floating pill — the pattern every listing app lands on. */}
-                <button
-                  className="mapswitch"
-                  onClick={() => setMobileMap((v) => !v)}
-                  aria-pressed={mobileMap}
-                >
-                  <Icon name={mobileMap ? "listings" : "pin"} size={15} />
-                  {mobileMap ? "List" : "Map"}
-                </button>
-              </>
-            )}
+            <button
+              className="linkish wtl-back"
+              onClick={() => setActivityOpen(false)}
+            >
+              ← Back to where to look
+            </button>
+            <Changes
+              changes={changes}
+              notices={notices}
+              listings={listings}
+              onOpen={setOpen}
+              onRefresh={refresh}
+              refreshing={refreshing}
+            />
           </>
         )}
 
@@ -2231,72 +1578,6 @@ export default function Home() {
       {/* Uploads outlive the panel that started them; this is their heartbeat. */}
       <UploadStatus />
 
-    </div>
-  );
-}
-
-/**
- * Two different nothings, two different answers.
- *
- * "You have no listings at all" and "your filters excluded all 300 of them" are
- * unrelated problems, and offering "check for new listings" to someone who has
- * simply set the max rent too low sends them off to spend API credit on a
- * question they could answer by clicking Clear.
- */
-/** Placeholder cards in the real card's shape, so nothing jumps on arrival. */
-function SkeletonGrid() {
-  return (
-    <div className="grid" aria-busy="true" aria-label="Loading listings">
-      {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className="card skeleton-card">
-          <div className="skeleton skeleton-media" />
-          <div className="card-body">
-            <div className="skeleton skeleton-line" style={{ width: "45%", height: 18 }} />
-            <div className="skeleton skeleton-line" style={{ width: "62%" }} />
-            <div className="skeleton skeleton-line" style={{ width: "88%" }} />
-            <div className="skeleton skeleton-line" style={{ width: "50%" }} />
-            <div className="skeleton skeleton-line" style={{ width: "70%" }} />
-            <div
-              className="skeleton skeleton-line"
-              style={{ width: "100%", height: 32, marginTop: 10 }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Empty({
-  filtered,
-  onRefresh,
-  onClear,
-}: {
-  filtered: boolean;
-  onRefresh: () => void;
-  onClear: () => void;
-}) {
-  return (
-    <div className="empty">
-      <div className="empty-title">
-        {filtered ? "No listings match these filters" : "Nothing tracked yet"}
-      </div>
-      <p className="empty-body">
-        {filtered
-          ? "Everything we're tracking got filtered out. Clearing the filters will bring the full list back."
-          : "Pull listings from StreetEasy, Zillow, Apartments.com, HotPads and Craigslist. Browse deep on the big sites; run the chase here."}
-      </p>
-      <div className="empty-actions">
-        {filtered ? (
-          <button className="btn btn-primary" onClick={onClear}>
-            Clear all filters
-          </button>
-        ) : (
-          <button className="btn btn-primary" onClick={onRefresh}>
-            Find listings now
-          </button>
-        )}
-      </div>
     </div>
   );
 }

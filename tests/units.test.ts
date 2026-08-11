@@ -52,7 +52,7 @@ import {
   walkMinutes,
 } from "@/lib/subway";
 import { applyFilters, findPasted, addressFromListingUrl } from "@/lib/filters";
-import { streeteasySearchUrl, zillowSearchUrl, siteJumps } from "@/lib/siteLinks";
+import { streeteasySearchUrl, zillowSearchUrl, siteJumps, directoryLanes } from "@/lib/siteLinks";
 import { parseFreePost, isFacebookUrl, suggestedRentFor } from "@/lib/freepost";
 import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { nearAreas } from "@/lib/geo";
@@ -66,6 +66,7 @@ import {
   brokerHistory,
 } from "@/lib/leverage";
 import { commuteMinutes } from "@/lib/commute";
+import { watchDiff, findWatched, type WatchedRow } from "@/lib/watch";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
@@ -2469,6 +2470,46 @@ test("the jump row carries both sites in cross-check order", () => {
   );
 });
 
+/* --- the directory: doors out, honestly labeled -------------------------- */
+
+test("the directory has a lane per kind of hunt, each with real doors", () => {
+  const lanes = directoryLanes(DEFAULT_CRITERIA);
+  assert.deepEqual(
+    lanes.map((l) => l.kind),
+    ["lease", "short", "sublet"]
+  );
+  for (const lane of lanes) {
+    assert.ok(lane.sites.length >= 4, `${lane.kind} has enough doors`);
+    for (const site of lane.sites) {
+      assert.match(site.url, /^https:\/\//, `${site.key} links out`);
+      assert.ok(site.tagline.length > 0, `${site.key} says why it earns a slot`);
+    }
+  }
+});
+
+test("carrying sites really carry the search; the rest never claim to", () => {
+  const c = { ...DEFAULT_CRITERIA, priceMin: 2000, priceMax: 4000, bedMin: 0, bedMax: 1 };
+  const sites = directoryLanes(c).flatMap((l) => l.sites);
+
+  const carriers = sites.filter((s) => s.carries);
+  assert.ok(carriers.length >= 4, "several doors open pre-filtered");
+  for (const site of carriers) {
+    assert.match(site.url, /4000/, `${site.key} carries the price ceiling`);
+  }
+
+  const craigslist = sites.find((s) => s.key === "craigslist")!;
+  assert.match(craigslist.url, /min_price=2000/);
+  assert.match(craigslist.url, /max_bedrooms=1/);
+  const sublets = sites.find((s) => s.key === "cl-sublets")!;
+  assert.match(sublets.url, /\/search\/sub\?/, "the sublet door is the sublet section");
+});
+
+test("with nothing saved, no door pretends to be filtered", () => {
+  const sites = directoryLanes(null).flatMap((l) => l.sites);
+  assert.ok(sites.every((s) => !s.carries), "carries is never claimed without criteria");
+  assert.ok(sites.every((s) => /^https:\/\//.test(s.url)), "every door still opens");
+});
+
 /* --- the facebook paste: prose becoming a listing ------------------------ */
 
 test("a group post yields its rent, size, neighborhood and phone", () => {
@@ -2628,4 +2669,84 @@ test("the built-in follow-up names the earlier thread with the same agent", () =
   const without = draftFollowUp(feed({ myContactName: "Jennifer C" }), DEFAULT_PROFILE);
   assert.ok(!withPrior.includes("undefined"));
   assert.ok(!without.includes("We were also in touch"));
+});
+
+/* --- the watch: re-checking your places without crying wolf --------------- */
+
+const watched = (over: Partial<WatchedRow> = {}): WatchedRow => ({
+  id: "zillow-1",
+  address: "330 East 35th Street",
+  unit: "3",
+  bedrooms: 1,
+  price: 2595,
+  isActive: true,
+  ...over,
+});
+
+test("a failed fetch renders no verdict at all", () => {
+  const v = watchDiff(watched(), null, false, "2026-08-11T00:00:00Z");
+  assert.deepEqual(v.events, []);
+  assert.deepEqual(v.update, {});
+});
+
+test("gone from its own address search means delisted, exactly once", () => {
+  const v = watchDiff(watched(), null, true, "2026-08-11T00:00:00Z");
+  assert.deepEqual(
+    v.events.map((e) => e.kind),
+    ["delisted"]
+  );
+  assert.equal(v.update.is_active, false);
+
+  // Already off market: silence confirms what we knew, no second event.
+  const again = watchDiff(watched({ isActive: false }), null, true, "2026-08-11T00:00:00Z");
+  assert.deepEqual(again.events, []);
+});
+
+test("a price move becomes the event, and jitter does not", () => {
+  const now = "2026-08-11T00:00:00Z";
+  const drop = watchDiff(
+    watched(),
+    place({ address: "330 East 35th Street", unit: "3", price: 2495 }),
+    true,
+    now
+  );
+  assert.deepEqual(drop.events.map((e) => e.kind), ["price_drop"]);
+  assert.equal(drop.update.price, 2495);
+
+  const jitter = watchDiff(
+    watched(),
+    place({ address: "330 East 35th Street", unit: "3", price: 2599 }),
+    true,
+    now
+  );
+  assert.deepEqual(jitter.events, [], "a $4 wobble is rounding, not news");
+  assert.equal(jitter.update.last_seen_at, now, "but the sighting still counts");
+});
+
+test("reappearing after a delisting is one back-on-market event", () => {
+  const v = watchDiff(
+    watched({ isActive: false }),
+    place({ address: "330 East 35th Street", unit: "3", price: 2595 }),
+    true,
+    "2026-08-11T00:00:00Z"
+  );
+  assert.deepEqual(v.events.map((e) => e.kind), ["back_on_market"]);
+  assert.equal(v.update.is_active, true);
+});
+
+test("the building search matches the unit, not its neighbors", () => {
+  const results = [
+    place({ address: "330 East 35th Street", unit: "7B", price: 3400 }),
+    place({ address: "330 East 35th Street", unit: "3", price: 2495 }),
+    place({ address: "12 Other Ave", unit: "3", price: 2495 }),
+  ];
+  const hit = findWatched(watched(), results);
+  assert.equal(hit?.unit, "3");
+
+  // Unit unstated on the found side: same building and bed count is the
+  // best evidence available, so it matches; a different layout does not.
+  const vague = [place({ address: "330 East 35th Street", unit: "", bedrooms: 1 })];
+  assert.ok(findWatched(watched(), vague), "same building, same layout: taken");
+  const wrong = [place({ address: "330 East 35th Street", unit: "", bedrooms: 3 })];
+  assert.equal(findWatched(watched(), wrong), null, "a 3BR is not your 1BR");
 });

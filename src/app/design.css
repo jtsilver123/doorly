@@ -6562,3 +6562,183 @@ button.stagenote.is-live:hover {
 }
 .msgslot-preview { display: grid; gap: 4px; font-size: var(--t-xs); }
 .msgslot-preview .preview { margin: 0; }
+
+/* --- where to look --------------------------------------------------------
+ *
+ * The listings tab as a directory: doors out to the sites that own the
+ * inventory, one door back in. It replaces a grid that imitated Zillow and
+ * lost; the design goal here is the opposite of a feed — calm, finite,
+ * readable top to bottom in one pass.
+ */
+
+.wtl {
+  display: grid;
+  gap: var(--s5);
+  max-width: 980px;
+  margin: 0 auto;
+  padding-bottom: var(--s6);
+}
+
+.wtl-head {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s5);
+}
+
+.wtl-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.wtl-head h2 { margin: 0; font-size: var(--t-2xl); }
+.wtl-lede { margin: 2px 0 0; }
+
+/* The plan, held in one hand. Numbered because a stressed person counts. */
+.wtl-steps {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0 0 0 var(--s4);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.wtl-steps li::marker { font-weight: 700; color: var(--accent); }
+.wtl-steps b { color: var(--text); font-weight: 650; }
+
+.wtl-criteria {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-muted);
+}
+
+.wtl-criteria-label {
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.wtl-criteria-terms { font-weight: 600; color: var(--text); }
+
+.wtl-paste {
+  display: flex;
+  gap: var(--s2);
+}
+.wtl-paste .searchfield { flex: 1; min-width: 0; }
+.wtl-paste .btn { white-space: nowrap; }
+
+.wtl-miss {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: var(--warn);
+}
+
+.wtl-lane { display: grid; gap: var(--s3); }
+
+.wtl-lane-head { display: grid; gap: 2px; }
+.wtl-lane-head h3 { margin: 0; font-size: var(--t-lg); }
+.wtl-lane-head .muted { margin: 0; font-size: var(--t-sm); }
+
+.wtl-sites {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s2);
+}
+
+.wtl-site {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.wtl-site:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+/* One monogram system instead of five favicons: no third-party fetches, and
+   the letters read at a glance once you've seen them twice. Tinted per lane
+   by the section, not per brand — brand colors would fight the page. */
+.wtl-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 750;
+  font-size: var(--t-lg);
+  flex-shrink: 0;
+}
+.wtl-site:hover .wtl-mark { background: var(--accent-soft); color: var(--accent); }
+
+.wtl-site-body { display: grid; gap: 2px; min-width: 0; }
+
+.wtl-site-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+}
+.wtl-out { color: var(--text-muted); }
+
+/* One per lane. The accent edge does what a stressed eye needs: says
+   "click this one first" without reading anything. */
+.wtl-site[data-lead="yes"] { box-shadow: inset 3px 0 0 var(--accent); }
+
+.wtl-lead {
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+}
+
+.wtl-site-line { font-size: var(--t-xs); line-height: 1.4; }
+
+.wtl-carries {
+  justify-self: start;
+  margin-top: 3px;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: var(--t-2xs);
+  font-weight: 650;
+}
+
+.wtl-foot {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  max-width: 620px;
+}
+
+.wtl-back {
+  align-self: start;
+  margin-bottom: var(--s3);
+  font-size: var(--t-sm);
+}
+
+@media (max-width: 640px) {
+  .wtl-head { padding: var(--s4); }
+  .wtl-sites { grid-template-columns: 1fr; }
+  .wtl-paste { flex-wrap: wrap; }
+  .wtl-paste .searchfield { flex: 1 1 100%; }
+  /* When the box takes the row, the button takes the next one whole —
+     a stranded pill bottom-left reads as a leftover, not a step. */
+  .wtl-paste .btn { flex: 1 1 100%; justify-content: center; }
+}

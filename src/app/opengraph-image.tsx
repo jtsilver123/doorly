@@ -113,7 +113,7 @@ export default async function OpengraphImage() {
             </div>
           </div>
           <div style={{ display: "flex", fontSize: 27, color: "rgba(244,242,234,0.68)" }}>
-            Every listing site, checked hourly &middot; priced against real comps &middot;
+            Every listing site, one hunt &middot; priced against real comps &middot;
             the building&apos;s record &middot; your message already written
           </div>
         </div>

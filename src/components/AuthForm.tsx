@@ -81,10 +81,10 @@ export default function AuthForm({
             not lucky.
           </h1>
           <p className="auth-lede">
-            A good New York apartment goes to whoever replied first. This
-            checks every listing site every hour, tells you which places are
-            genuinely a good deal, and keeps track of who you&apos;ve
-            contacted. The search stops living in twelve browser tabs.
+            A good New York apartment goes to whoever replied first and
+            followed through. Paste any place you find and this runs the
+            chase: the honest price, the building&apos;s record, the message
+            already written. The hunt stops living in twelve browser tabs.
           </p>
 
           <ul className="auth-claims">

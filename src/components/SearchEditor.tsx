@@ -109,7 +109,7 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
     }
 
     setBusy(false);
-    setNote(body.error ? body.error : "Saved. Press Check for new to pull fresh listings.");
+    setNote(body.error ? body.error : "Saved. The site links on Find now open with this search.");
     if (!body.error) {
       const refreshed = await fetch("/api/searches").then((r) => r.json());
       setSearches(refreshed.searches ?? []);

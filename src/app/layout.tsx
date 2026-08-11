@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     template: "%s · DamnLease",
   },
   description:
-    "A free CRM for finding an NYC apartment. Every rental listing site checked hourly, priced against real comps, tracked through outreach, tours, and applications. The spreadsheet, retired.",
+    "A free CRM for finding an NYC apartment. Every listing site a click away with your search set, each place priced against real comps, tracked through outreach, tours, and applications. The spreadsheet, retired.",
   keywords: [
     "NYC apartment search",
     "apartment hunting tracker",
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DamnLease — Be first, not lucky.",
     description:
-      "A good NYC apartment is gone in a day, and it goes to whoever replied first. Every listing site checked hourly, each place priced against its own comps, the building's record from city data, and your message already written.",
+      "A good NYC apartment is gone in a day, and it goes to whoever replied first. Paste any place you find: priced against its own comps, the building's record from city data, and your message already written.",
     url: "https://damnlease.com",
     siteName: "DamnLease",
     type: "website",
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "DamnLease — Be first, not lucky.",
     description:
-      "Gone in a day, to whoever replied first. Every listing site checked hourly, priced against real comps, message already written.",
+      "Gone in a day, to whoever replied first. Paste any place: priced against real comps, message already written, watched for price cuts.",
   },
 };
 

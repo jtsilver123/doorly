@@ -69,19 +69,14 @@ const EDGE: { label: string; title: string; body: string }[] = [
  * Guarded hard: the landing page must render for a stranger even if the
  * database is unreachable, so a failure here just hides the strip.
  */
-async function corpus(): Promise<{ tracked: number; fresh: number } | null> {
+async function corpus(): Promise<{ tracked: number } | null> {
   try {
     const supabase = adminDb();
-    const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
-    const [all, recent] = await Promise.all([
-      supabase.from("listings").select("id", { count: "exact", head: true }),
-      supabase
-        .from("listings")
-        .select("id", { count: "exact", head: true })
-        .gte("first_seen_at", dayAgo),
-    ]);
+    const all = await supabase
+      .from("listings")
+      .select("id", { count: "exact", head: true });
     if (!all.count) return null;
-    return { tracked: all.count, fresh: recent.count ?? 0 };
+    return { tracked: all.count };
   } catch {
     return null;
   }
@@ -143,7 +138,7 @@ export default async function Home({
             operatingSystem: "Web",
             url: "https://damnlease.com",
             description:
-              "A free CRM for the NYC apartment hunt: every listing site checked hourly, real comps on every price, and a pipeline from first text to signed lease.",
+              "A free CRM for the NYC apartment hunt: every listing site one click away with your search carried, real comps on every price, and a pipeline from first text to signed lease.",
             offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
             creator: { "@type": "Person", name: "Jake" },
           }),
@@ -166,10 +161,12 @@ export default async function Home({
           </h1>
           <p className="landing-sub">
             A good New York apartment is gone in a day. It goes to whoever
-            replies first. DamnLease checks every listing site every hour,
-            tells you what a place is really worth the minute it shows up,
-            and writes your message to the agent for you. You reply while
-            everyone else is still opening tabs.
+            replies first and follows through. The listing sites are where
+            you look; DamnLease is where you win. Paste any place you find
+            and it runs the chase: the honest price, the building&apos;s
+            record, the message to the agent already written, and a watch on
+            every place you&apos;re after, so a price cut or a quiet
+            delisting finds you first.
           </p>
           <div className="landing-cta">
             <Link className="landing-go" href={go}>
@@ -206,18 +203,12 @@ export default async function Home({
               </dd>
             </div>
             <div>
-              <dt>New in the last 24h</dt>
-              <dd>
-                <CountUp to={counts.fresh} />
-              </dd>
+              <dt>Sites to hunt, one door each</dt>
+              <dd>17</dd>
             </div>
             <div>
-              <dt>Sites watched</dt>
-              <dd>5</dd>
-            </div>
-            <div>
-              <dt>Checked</dt>
-              <dd>Hourly</dd>
+              <dt>Your places re-checked</dt>
+              <dd>Daily</dd>
             </div>
             <div>
               <dt>Price</dt>
@@ -282,10 +273,10 @@ export default async function Home({
               Anywhere else it would just be a worse spreadsheet.
             </li>
             <li>
-              <b>It doesn&apos;t see every apartment.</b> Five listing sites,
-              checked every hour. Buildings that only post on their own
-              website, and the ones that never get listed at all, are
-              invisible to it. They are invisible to Zillow too.
+              <b>It isn&apos;t the inventory.</b> The apartments live on
+              StreetEasy, Zillow, and the sublet boards. DamnLease opens
+              each of them with your search already set, and hunts whatever
+              you paste back. A place you never paste, it never sees.
             </li>
             <li>
               <b>The numbers are estimates.</b> Price checks, monthly costs,
@@ -324,8 +315,8 @@ export default async function Home({
           {(
             [
               [
-                "Every site at once",
-                "StreetEasy, Zillow, Apartments.com, HotPads, and Craigslist, with the copies merged into one. No single site has all of New York.",
+                "Every site, one hunt",
+                "StreetEasy, Zillow, the sublet boards, the Facebook groups — each a click away with your search carried, and everything you find lands on one board with the copies merged.",
                 "One site's slice of the market",
               ],
               [
@@ -345,7 +336,7 @@ export default async function Home({
               ],
               [
                 "A pipeline that chases",
-                "Every place you chase, tracked from first text to signed lease. Silence gets flagged, and follow-ups write themselves.",
+                "Every place you chase, tracked from first text to signed lease, and re-checked while you sleep: price cuts, relists, and quiet delistings come to you. Silence gets flagged, and follow-ups write themselves.",
                 "Browser tabs and memory",
               ],
               [
