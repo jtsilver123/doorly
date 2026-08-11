@@ -6667,22 +6667,18 @@ button.stagenote.is-live:hover {
 }
 .wtl-site:hover { border-color: var(--accent); transform: translateY(-1px); }
 
-/* One monogram system instead of five favicons: no third-party fetches, and
-   the letters read at a glance once you've seen them twice. Tinted per lane
-   by the section, not per brand — brand colors would fight the page. */
+/* Each site's own mark, drawn inline in its brand colour (see SiteLogo).
+   The SVGs carry their own ground and rounding; the container just sizes
+   them and keeps the light lift on hover. */
 .wtl-mark {
-  display: grid;
-  place-items: center;
   width: 38px;
   height: 38px;
   border-radius: var(--r-sm);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-weight: 750;
-  font-size: var(--t-lg);
+  overflow: hidden;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(20, 20, 26, 0.14);
 }
-.wtl-site:hover .wtl-mark { background: var(--accent-soft); color: var(--accent); }
+.wtl-site:hover .wtl-mark { transform: scale(1.04); }
 
 .wtl-site-body { display: grid; gap: 2px; min-width: 0; }
 

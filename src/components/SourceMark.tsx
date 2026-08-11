@@ -18,7 +18,8 @@ import { SOURCE_LABEL } from "@/types";
  */
 
 /** 24×24 viewBox for all of them, so they line up at any size. */
-function Glyph({ source }: { source: Source }) {
+// Exported for the Find directory, which shows these marks at tile size.
+export function Glyph({ source }: { source: Source }) {
   switch (source) {
     case "facebook":
       // The f in its circle — nominative use, same as the rest.

@@ -6,6 +6,7 @@ import { directoryLanes, type DirectorySite } from "@/lib/siteLinks";
 import { criteriaSummary } from "@/lib/criteria";
 import { AREAS } from "@/lib/areas";
 import Icon from "@/components/Icon";
+import SiteLogo from "@/components/SiteLogo";
 
 /**
  * Where to look: the door out, not a store inside.
@@ -179,10 +180,9 @@ function SiteCard({ site }: { site: DirectorySite }) {
       target="_blank"
       rel="noreferrer"
     >
-      {/* A monogram, not a favicon: no third-party fetches, one visual
-          system, and it reads at a glance once you've seen it twice. */}
-      <span className="wtl-mark" data-site={site.key} aria-hidden="true">
-        {site.name.slice(0, 1)}
+      {/* The site's own mark, drawn inline — see SiteLogo for the rules. */}
+      <span className="wtl-mark" aria-hidden="true">
+        <SiteLogo site={site.key} />
       </span>
       <span className="wtl-site-body">
         <span className="wtl-site-name">
