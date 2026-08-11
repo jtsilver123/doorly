@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AreaPicker from "@/components/AreaPicker";
-import type { Source } from "@/types";
-import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
+import { ALL_SOURCES } from "@/types";
 import BedBathPicker from "@/components/BedBathPicker";
 import { siteUrl } from "@/lib/site";
 
@@ -12,29 +11,33 @@ import { siteUrl } from "@/lib/site";
  * Setup.
  *
  * This was one long screen with nine questions on it, which reads as a form to
- * survive rather than a product to use. Now it's four steps, ordered by what
+ * survive rather than a product to use. Now it's three steps, ordered by what
  * earns the next answer:
  *
- *   1  What you want      The interesting question. Answering it is what makes
- *                         the rest feel worth doing, so it goes first — never
- *                         make somebody do admin before they've seen the point.
- *   2  Where we look      Cheap, all defaults already correct, and it sets up
- *                         the tie-breaker question that only makes sense once
- *                         more than one site is on.
- *   3  Connect listings   The API key. Deliberately third: it's the only real
- *                         work, and by now they've spent two steps describing
- *                         the apartment they want.
- *   4  Your team          Optional and last, because it's the one step that
- *                         can wait — and ending on "invite someone" is a much
- *                         better final beat than ending on "paste a token".
+ *   1  What you want    The interesting question, and the one that makes the
+ *                       Find page work: every site link opens carrying this
+ *                       search. Never make somebody do admin before they've
+ *                       seen the point.
+ *   2  Power the watch  The API key. It's what lets a pasted address come
+ *                       back priced and checked, and what re-checks your
+ *                       places for price cuts — the only real work here, and
+ *                       by now they've spent a step describing the apartment
+ *                       it will guard.
+ *   3  Your team        Optional and last, because it's the one step that
+ *                       can wait — and ending on "invite someone" is a much
+ *                       better final beat than ending on "paste a token".
+ *
+ * There used to be a "which sites should we search" step between these; it
+ * described the crawl, and the crawl is gone. Search happens on the sites
+ * themselves now, so there's nothing to configure about it.
  *
  * Your name isn't asked here any more; signup takes it, and asking twice
  * reads as an app that wasn't listening.
  */
 
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2;
 
-const STEPS = ["What you want", "Where we look", "Connect listings", "Your team"];
+const STEPS = ["What you want", "Power the watch", "Your team"];
 
 export default function Welcome() {
   const router = useRouter();
@@ -48,14 +51,10 @@ export default function Welcome() {
   const [bathMin, setBathMin] = useState("0");
   const [moveIn, setMoveIn] = useState(defaultMoveIn());
 
-  // 2 — the sources
-  const [sources, setSources] = useState<Source[]>([...ALL_SOURCES]);
-  const [preferred, setPreferred] = useState<Source>(DEFAULT_PREFERRED_SOURCE);
-
-  // 3 — the key
+  // 2 — the key
   const [apiKey, setApiKey] = useState("");
 
-  // 4 — the crew
+  // 3 — the crew
   const [crewMode, setCrewMode] = useState<"solo" | "partner" | "scout" | null>(null);
   const [inviteUrl, setInviteUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -63,18 +62,7 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  function toggleSource(source: Source) {
-    setSources((list) => {
-      const next = list.includes(source)
-        ? list.filter((s) => s !== source)
-        : [...list, source];
-      // The tie-breaker has to be a site we're actually searching.
-      if (next.length && !next.includes(preferred)) setPreferred(next[0]);
-      return next;
-    });
-  }
-
-  /** Steps 1–3 are saved before the team step, so the crew has a search to join. */
+  /** Steps 1–2 are saved before the team step, so the crew has a search to join. */
   async function saveSearch(): Promise<boolean> {
     setBusy(true);
     setError("");
@@ -91,7 +79,9 @@ export default function Welcome() {
           bathMin: Number(bathMin),
           priceMin: 0,
           priceMax: Number(priceMax) || 4000,
-          sources,
+          // Nothing to choose any more: sources only scope ratings and
+          // paste matching, and all of them is always the right answer.
+          sources: [...ALL_SOURCES],
           noFeeOnly: false,
         },
       }),
@@ -113,7 +103,7 @@ export default function Welcome() {
     await fetch("/api/profile", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ profile: { moveInDate: moveIn, preferredSource: preferred } }),
+      body: JSON.stringify({ profile: { moveInDate: moveIn } }),
     }).catch(() => {});
     setBusy(false);
     return true;
@@ -145,17 +135,16 @@ export default function Welcome() {
     router.refresh();
   }
 
-  const canAdvance =
-    step === 0 ? areas.length > 0 : step === 1 ? sources.length > 0 : true;
+  const canAdvance = step === 0 ? areas.length > 0 : true;
 
   async function next() {
-    if (step === 2) {
+    if (step === 1) {
       // Everything the app needs to work is now answered; persist before the
       // optional step so abandoning at "team" still leaves a working account.
-      if (await saveSearch()) setStep(3);
+      if (await saveSearch()) setStep(2);
       return;
     }
-    setStep((s) => Math.min(3, s + 1) as Step);
+    setStep((s) => Math.min(2, s + 1) as Step);
   }
 
   return (
@@ -164,17 +153,15 @@ export default function Welcome() {
         <header className="welcome-head">
           <div className="brand" style={{ fontSize: 22 }}>
             {step === 0 && "What are you looking for?"}
-            {step === 1 && "Where should we look?"}
-            {step === 2 && "Connect the listings"}
-            {step === 3 && "Hunting alone?"}
+            {step === 1 && "Power the watch"}
+            {step === 2 && "Hunting alone?"}
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
             {step === 0 &&
-              "Neighborhoods are the one thing nobody can guess for you. Everything else has a sensible default."}
+              "Every site link on the Find page opens carrying this search. Neighborhoods are the one thing nobody can guess for you."}
             {step === 1 &&
-              "One key covers the big four. Craigslist is free and always on."}
-            {step === 2 && "About a minute, and it's what fills your first screen."}
-            {step === 3 &&
+              "About a minute. It's what prices the places you paste, and re-checks them for you."}
+            {step === 2 &&
               "Apartment hunting is a team sport, even when one name goes on the lease."}
           </div>
 
@@ -243,73 +230,23 @@ export default function Welcome() {
           </>
         )}
 
-        {/* --- 2 · the sources ------------------------------------------ */}
+        {/* --- 2 · the key ---------------------------------------------- */}
         {step === 1 && (
-          <>
-            <div className="welcome-field">
-              <span className="muted">
-                Sites to search <strong>{sources.length} on</strong>
-              </span>
-              <div className="welcome-chips">
-                {ALL_SOURCES.map((source) => (
-                  <button
-                    key={source}
-                    type="button"
-                    className={sources.includes(source) ? "btn btn-primary" : "btn"}
-                    style={{ fontSize: 12, padding: "5px 10px" }}
-                    aria-pressed={sources.includes(source)}
-                    onClick={() => toggleSource(source)}
-                  >
-                    {sources.includes(source) ? "✓ " : ""}
-                    {SOURCE_LABEL[source]}
-                  </button>
-                ))}
-              </div>
-              <span className="muted welcome-hint">
-                More sites means better coverage and more of your monthly
-                request budget per check. All five is the right default.
-              </span>
-            </div>
-
-            {/* Only a question once there's something to break a tie between. */}
-            {sources.length > 1 && (
-              <div className="welcome-field">
-                <span className="muted">
-                  When a place is on several of them, which do we open?
-                </span>
-                <div className="welcome-chips">
-                  {sources.map((source) => (
-                    <button
-                      key={source}
-                      type="button"
-                      className={preferred === source ? "btn btn-primary" : "btn"}
-                      style={{ fontSize: 12, padding: "5px 10px" }}
-                      onClick={() => setPreferred(source)}
-                    >
-                      {SOURCE_LABEL[source]}
-                    </button>
-                  ))}
-                </div>
-                <span className="muted welcome-hint">
-                  The same apartment is usually listed three or four times. This
-                  picks the one the buttons open. Every card still shows all of
-                  them.
-                </span>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* --- 3 · the key ---------------------------------------------- */}
-        {step === 2 && (
           <div className="welcome-field welcome-key">
+            <span className="muted welcome-hint">
+              When you paste a place, the key is what looks it up: the real
+              price history, the honest comps, whether it&apos;s still live.
+              And it keeps looking after everything on your board, so a price
+              cut or a quiet delisting finds you first.
+            </span>
             <ol className="welcome-steps">
               <li>
                 Open{" "}
                 <a href="https://realtyapi.io" target="_blank" rel="noreferrer">
                   realtyapi.io
                 </a>{" "}
-                and sign up. The free tier is 250 requests a month.
+                and sign up. The free tier is 250 requests a month — plenty for
+                a hunt.
               </li>
               <li>
                 Copy the key from your dashboard. It starts with <code>rt_</code>.
@@ -325,15 +262,14 @@ export default function Welcome() {
               onChange={(e) => setApiKey(e.target.value.trim())}
             />
             <span className="muted welcome-hint">
-              One key covers StreetEasy, Zillow, Apartments.com and HotPads.
-              Craigslist needs none, so you&apos;ll see listings either way, just
-              fewer. You can add or change this any time under your account.
+              Skippable: pasting and tracking work without it, just without the
+              lookups. You can add or change this any time under your account.
             </span>
           </div>
         )}
 
-        {/* --- 4 · the crew --------------------------------------------- */}
-        {step === 3 && (
+        {/* --- 3 · the crew --------------------------------------------- */}
+        {step === 2 && (
           <>
             {!inviteUrl && (
               <div className="welcome-field">
@@ -423,7 +359,7 @@ export default function Welcome() {
             <span />
           )}
 
-          {step < 3 ? (
+          {step < 2 ? (
             <button
               type="button"
               className="btn btn-primary"
@@ -432,7 +368,7 @@ export default function Welcome() {
             >
               {busy
                 ? "Saving…"
-                : step === 2
+                : step === 1
                   ? apiKey.trim()
                     ? "Save and continue"
                     : "Skip for now"

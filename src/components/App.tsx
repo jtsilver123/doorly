@@ -1597,7 +1597,6 @@ function ApiSettings({
   onSaved: () => void;
 }) {
   const [key, setKey] = useState("");
-  const [pages, setPages] = useState(String(status?.pagesPerSource ?? 1));
   const [limit, setLimit] = useState(String(status?.monthlyLimit ?? 250));
   const [checks, setChecks] = useState(String(status?.checksPerDay ?? 2));
   const [busy, setBusy] = useState(false);
@@ -1607,13 +1606,12 @@ function ApiSettings({
 
   useEffect(() => {
     if (!status) return;
-    setPages(String(status.pagesPerSource));
     setLimit(String(status.monthlyLimit));
     setChecks(String(status.checksPerDay));
   }, [status]);
 
   /**
-   * Schedule, depth and allowance save themselves. The key deliberately does
+   * Schedule and allowance save themselves. The key deliberately does
    * not: debouncing a 27-character paste-or-type would write the first half of
    * a key mid-entry, so it commits on blur or Enter instead.
    *
@@ -1622,13 +1620,12 @@ function ApiSettings({
    * how apps quietly reset people's configuration.
    */
   const settingsState = useAutosave(
-    { pages, limit, checks },
+    { limit, checks },
     async (next) => {
       await fetch("/api/settings", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          pagesPerSource: Number(next.pages),
           monthlyLimit: Number(next.limit),
           checksPerDay: Number(next.checks),
         }),
@@ -1654,13 +1651,9 @@ function ApiSettings({
     onSaved();
   }
 
-  // Measured from this key's actual spend (server-side), scaled if the user is
-  // trying a different page depth than the one the measurement was taken at.
-  const savedPages = Math.max(status?.pagesPerSource ?? 1, 1);
-  const perPoll = Math.max(
-    1,
-    Math.round((status?.perPollEstimate ?? 5) * (Number(pages) / savedPages))
-  );
+  // Measured from this key's actual spend, server-side: with the watch, a
+  // check costs about one request per place on the board.
+  const perPoll = Math.max(1, Math.round(status?.perPollEstimate ?? 5));
   const polls = status ? Math.floor(status.usage.remaining / perPoll) : 0;
 
   // Recomputed on every keystroke of the schedule dropdown — the estimate's
@@ -1679,8 +1672,9 @@ function ApiSettings({
       <div>
         <div style={{ fontWeight: 600 }}>API key & usage</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          StreetEasy, Zillow, Apartments.com and HotPads all run on one RealtyAPI
-          key. Craigslist needs none, so it keeps working when the quota is gone.
+          One RealtyAPI key powers the lookups: pricing a place you paste,
+          pulling its rent history, and re-checking everything on your board.
+          The site links on Find need none of it.
         </div>
       </div>
 
@@ -1713,15 +1707,15 @@ function ApiSettings({
             </div>
           ) : (
             <div className="muted" style={{ fontSize: 12 }}>
-              {status.usage.remaining} left. About {polls} more checks at {perPoll}{" "}
-              requests each. Usage resets when you paste a new key.
+              {status.usage.remaining} left. About {polls} more board checks at{" "}
+              {perPoll} requests each. Usage resets when you paste a new key.
             </div>
           )}
         </div>
       )}
 
       <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-        <span className="muted">Check for new listings</span>
+        <span className="muted">Re-check your places</span>
         <select className="field" value={checks} onChange={(e) => setChecks(e.target.value)}>
           <option value="0">Only when I press the button</option>
           <option value="1">Once a day</option>
@@ -1730,14 +1724,10 @@ function ApiSettings({
           <option value="8">Every 3 hours</option>
         </select>
         <span className="muted" style={{ fontSize: 11 }}>
-          {Number(checks) > 1 && (
-            <>
-              Vercel&apos;s free plan only runs one scheduled job a day, so
-              anything above &ldquo;once a day&rdquo; needs Vercel Pro or a free
-              external pinger hitting <code>/api/cron/poll</code>. Pressing
-              &ldquo;Check for new&rdquo; always works.{" "}
-            </>
-          )}
+          Each check re-reads the places on your board from the sites: price
+          cuts, relists, and delistings land in Activity and your
+          notifications. Pressing &ldquo;Check my places&rdquo; always works
+          on top of the schedule.{" "}
           {days == null
             ? "Nothing runs on its own. The key only spends when you press the button, so it never expires on a schedule."
             : days <= 3
@@ -1806,14 +1796,6 @@ function ApiSettings({
       </label>
 
         <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>
-          <span className="muted">Pages per source</span>
-          <select className="field" value={pages} onChange={(e) => setPages(e.target.value)}>
-            <option value="1">1 · lightest (~10/check)</option>
-            <option value="2">2 · deeper (~20/check)</option>
-            <option value="3">3 · thorough (~30/check)</option>
-          </select>
-        </label>
-        <label style={{ display: "grid", gap: 4, fontSize: 12, flex: 1 }}>
           <span className="muted">Monthly allowance</span>
           <input
             className="field"
@@ -1825,8 +1807,8 @@ function ApiSettings({
       </div>
 
       <div className="muted" style={{ fontSize: 11 }}>
-        Listings are sorted newest-first, so one page catches everything fresh.
-        Raise it only when you want to backfill deeper history.
+        A check costs about one request per place on your board, so a normal
+        hunt fits the free tier with room to spare.
       </div>
 
       <div className="savestate" data-state={busy ? "saving" : settingsState} role="status">
