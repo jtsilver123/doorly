@@ -2049,6 +2049,10 @@ test("a decision row tells yes from no from never-said", () => {
   assert.equal(row.value(c), "—", "silence is neither");
   // And the fold rule must not eat these rows when finalists agree.
   assert.equal(row.alwaysShow, true);
+  // Silence never outranks a stated no, or a row where one place said
+  // walk-up and the rest said nothing would crown the ones that said nothing.
+  assert.equal(row.num!(a), 1, "a yes is the only winner");
+  assert.equal(row.num!(b), row.num!(c), "a no and a silence tie, so neither wins");
 });
 
 // --- distance to the train -------------------------------------------------

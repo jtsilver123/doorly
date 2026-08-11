@@ -992,7 +992,11 @@ button.control.is-on { border-color: var(--accent); color: var(--accent); backgr
   .filterbar-row > * { flex-shrink: 0; }
 
   .board { overflow-x: auto; }
-  .compare { display: block; overflow-x: auto; }
+  /* The table used to be its own scroller on phones. It can't be, now that it
+     declares a minimum width: a block that is both the overflow box and wider
+     than the screen just pushes the page sideways. The wrapper scrolls
+     instead, same as on desktop. */
+  .compare-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .control-sm { max-width: 108px; }
 
   /* Full-height sheet rather than a side panel — a 560px drawer on a 390px
@@ -1760,12 +1764,25 @@ button.fact:hover .fact-label { color: var(--accent); }
 
 .compare-wrap { display: grid; gap: var(--s3); }
 
+/* Widths come from the colgroup, so the browser must stop guessing them from
+   content. See the comment on the table in Compare.tsx. */
+.compare { table-layout: fixed; width: 100%; border-collapse: collapse; }
+
+/* The box the table scrolls inside. `min-width: 0` is the whole trick: a grid
+   item defaults to min-content width, so without it the wide table drags the
+   page sideways instead of scrolling within its own frame. */
+.compare-scroller { min-width: 0; }
+
 .compare-same {
+  display: grid;
+  gap: 4px;
   margin: 0;
   font-size: var(--t-sm);
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+.compare-same p { margin: 0; }
 
 /* Panels lay themselves out with grid, which stretches every child to the full
    column — so a "Save" button ended up 1500px wide. Buttons size to their

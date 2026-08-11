@@ -2305,7 +2305,11 @@ kbd {
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
-  white-space: nowrap;
+  /* Columns are declared, not measured (see the colgroup in Compare.tsx), so
+     text wraps inside its own column instead of widening it. Cells used to be
+     nowrap, which is what made five identical apartments five different
+     widths: one long subway line stretched its column and nothing else. */
+  overflow-wrap: anywhere;
 }
 
 .compare thead th {
@@ -2314,7 +2318,6 @@ kbd {
 
 .compare tbody tr:last-child td {
   border-bottom: none;
-  white-space: normal;
 }
 
 .compare-head {

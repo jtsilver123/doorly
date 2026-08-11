@@ -357,6 +357,10 @@ const DECISION_KEYS: AmenityKey[] = [
 
 const FACT_MARK = { yes: "✓", no: "✗", unknown: "—" } as const;
 
+/** The row-label column, and the floor a finalist column can shrink to. */
+const LABEL_COL = 148;
+const MIN_COL = 200;
+
 /** Label → amenity key, for showing which cells carry your own mark. */
 const KEY_BY_LABEL = new Map(
   Object.values(AMENITIES).map((a) => [a.label, a.key as string])
@@ -364,7 +368,12 @@ const KEY_BY_LABEL = new Map(
 function rowKeyOf(label: string): string {
   return KEY_BY_LABEL.get(label) ?? label;
 }
-const FACT_RANK = { yes: 1, no: -1, unknown: 0 } as const;
+/*
+ * Only a confirmed yes wins a row. Ranking "no" below "unknown" made silence
+ * beat a stated answer, so a row where one listing said walk-up and the rest
+ * said nothing painted four dashes green as the winners.
+ */
+const FACT_RANK = { yes: 1, no: 0, unknown: 0 } as const;
 
 export function amenityRowsFor(
   finalists: FeedListing[],
@@ -627,13 +636,23 @@ export default function Compare({
 
   const rows: Row[] = [];
   const agreed: string[] = [];
+  /*
+   * Six amenities nobody's listing mentions is six rows of dashes: a third of
+   * the table's height spent saying "unknown" over and over, pushing the money
+   * below the fold. The fact still matters, so it collapses to one line under
+   * the table instead of vanishing.
+   */
+  const unsaid: string[] = [];
   // Rent, then the amenities that decide leases, then the rest of the money
   // and the context — the order the user actually compares in.
   for (const row of [RENT_ROW, ...amenityRows, ...MONEY_ROWS, ...CONTEXT_ROWS]) {
     const values = finalists.map((l) => row.value(l));
-    // Decision amenities stay on the table even in agreement — "everyone has
-    // a washer" is the kind of agreement people are checking for.
-    if (!row.alwaysShow && new Set(values).size === 1) {
+    const same = new Set(values).size === 1;
+    if (row.alwaysShow && same && values[0] === FACT_MARK.unknown) {
+      unsaid.push(row.label.toLowerCase());
+    } else if (!row.alwaysShow && same) {
+      // Decision amenities stay on the table even in agreement — "everyone has
+      // a washer" is the kind of agreement people are checking for.
       agreed.push(`${row.label.toLowerCase()}: ${values[0]}`);
     } else {
       rows.push(row);
@@ -741,7 +760,29 @@ export default function Compare({
       )}
 
       <div className="surface compare-scroller">
-      <table className="compare">
+      {/*
+        Equal columns, declared rather than inferred.
+
+        On auto layout the browser widened whichever column had the longest
+        subway line or the wordiest catch, so five identical apartments came
+        out at five different widths and the eye had to re-find every value
+        per column. Fixed layout with one width for every finalist means a
+        price sits at the same x in all of them; the minimum keeps a column
+        readable when there are enough of them to scroll.
+      */}
+      <table
+        className="compare"
+        style={{ minWidth: `${LABEL_COL + finalists.length * MIN_COL}px` }}
+      >
+        <colgroup>
+          <col style={{ width: `${LABEL_COL}px` }} />
+          {finalists.map((l) => (
+            <col
+              key={l.id}
+              style={{ width: `calc((100% - ${LABEL_COL}px) / ${finalists.length})` }}
+            />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             {/* The corner cell was dead space over the row labels; now it
@@ -932,10 +973,20 @@ export default function Compare({
         </tbody>
       </table>
       </div>
-      {agreed.length > 0 && (
-        <p className="compare-same">
-          Identical on all {finalists.length}: {agreed.join(" · ")}
-        </p>
+      {(agreed.length > 0 || unsaid.length > 0) && (
+        <div className="compare-same">
+          {agreed.length > 0 && (
+            <p>
+              Identical on all {finalists.length}: {agreed.join(" · ")}
+            </p>
+          )}
+          {unsaid.length > 0 && (
+            <p>
+              No listing mentions {unsaid.join(", ")}. Ask on the tour, then
+              mark what you saw in the panel.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
