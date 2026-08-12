@@ -513,7 +513,7 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
  * pipeline runs for exactly one row instead of being duplicated here.
  */
 export async function loadSharedListing(id: string): Promise<FeedListing | null> {
-  const rows = await loadGuestFeed({ priceMin: Number.MAX_SAFE_INTEGER }, id);
+  const rows = await loadGuestFeed({}, id, true);
   return rows.find((l) => l.id === id) ?? null;
 }
 
@@ -537,7 +537,15 @@ export async function loadGuestFeed(
    * of — including when the place has gone off market, which is itself
    * information the recipient came for.
    */
-  ensureId?: string
+  ensureId?: string,
+  /**
+   * Just the ensured listing, nothing else. The window query is skipped
+   * entirely rather than filtered into emptiness — an earlier version
+   * asked for an impossible price floor to achieve this, and the floor it
+   * picked overflowed Postgres's integer, 500ing every shared link whose
+   * listing wasn't already in the window.
+   */
+  onlyEnsured = false
 ): Promise<FeedListing[]> {
   const supabase = adminDb();
 
@@ -549,9 +557,9 @@ export async function loadGuestFeed(
   if (filters.bathsMin != null) query = query.gte("bathrooms", filters.bathsMin);
   if (filters.noFeeOnly) query = query.eq("no_fee", true);
 
-  const { data: rows, error } = await query
-    .order("first_seen_at", { ascending: false })
-    .limit(400);
+  const { data: rows, error } = onlyEnsured
+    ? { data: [] as ListingRow[], error: null }
+    : await query.order("first_seen_at", { ascending: false }).limit(400);
   if (error) throw new Error(`loadGuestFeed: ${error.message}`);
   const listings = (rows ?? []) as ListingRow[];
 

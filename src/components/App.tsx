@@ -443,17 +443,33 @@ export default function Home() {
   /**
    * The sender's id, when this page was opened from a share link. It rides
    * the URL as ?via= and is what lets a visitor see the footage the sender
-   * attached — their walkthrough, nobody else's. Held in state because the
-   * URL is scrubbed below and the drawer needs it for as long as it's open.
+   * attached — their walkthrough, nobody else's.
    */
   const [sharedVia, setSharedVia] = useState<string | null>(null);
+  /*
+   * The incoming link, snapshotted before anything can rewrite it. The URL
+   * is now a live mirror of the open drawer (see the sync effect), and that
+   * mirror runs on mount with nothing open — it would erase the very
+   * parameters this effect is waiting on, because the feed takes a moment
+   * longer to arrive than the first paint.
+   */
+  const incoming = useRef<{ place: string | null; via: string | null }>({
+    place: null,
+    via: null,
+  });
+  useLayoutEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    incoming.current = { place: search.get("place"), via: search.get("via") };
+    if (incoming.current.via) setSharedVia(incoming.current.via);
+  }, []);
   useEffect(() => {
     if (openedShared.current || !listings.length) return;
-    const search = new URLSearchParams(window.location.search);
-    const id = search.get("place");
-    if (!id) return;
+    const id = incoming.current.place;
+    if (!id) {
+      openedShared.current = true;
+      return;
+    }
     openedShared.current = true;
-    setSharedVia(search.get("via"));
     const hit = listings.find((l) => l.id === id);
     if (hit) {
       setOpen(hit);
@@ -461,12 +477,6 @@ export default function Home() {
     } else {
       toast({ message: "That place isn't tracked here any more.", tone: "warn" });
     }
-    // Drop the parameters once they're used; a reload shouldn't fight you
-    // by reopening a drawer you closed.
-    const url = new URL(window.location.href);
-    url.searchParams.delete("place");
-    url.searchParams.delete("via");
-    window.history.replaceState(null, "", url.toString());
   }, [listings, toast]);
 
   /** Own id, for building share links that carry your footage with them. */
@@ -477,6 +487,7 @@ export default function Home() {
       .then(({ data }) => setMyId(data.session?.user?.id ?? null))
       .catch(() => {});
   }, []);
+
 
 
   /** A pasted Facebook post (or any free-text tip) awaiting the form. */
@@ -955,6 +966,44 @@ export default function Home() {
     () => (open ? listings.find((l) => l.id === open.id) ?? open : null),
     [open, listings]
   );
+
+  /**
+   * The address bar says what's open.
+   *
+   * This used to run the other way: an incoming ?place= was consumed and
+   * then scrubbed out of the URL, on the theory that a reload shouldn't
+   * reopen a drawer you'd closed. The cost was the most natural sharing
+   * gesture there is — copy the URL of the page you're looking at — which
+   * silently produced a bare /app that opens nothing. Closing the drawer
+   * clears the parameters instead, which answers the reload worry without
+   * breaking copy and paste.
+   *
+   * `via` rides along because footage is per-person: a link that carries
+   * who is looking is a link that can show that person's walkthrough. It's
+   * your own id while you're the one browsing, so the URL you copy shares
+   * your footage; opening someone else's link and copying it hands on
+   * yours, not theirs, which is the honest default.
+   */
+  useEffect(() => {
+    // Wait for the incoming link to be honoured; until then the URL is an
+    // instruction, not a reflection.
+    if (!openedShared.current) return;
+    const url = new URL(window.location.href);
+    const openId = openListing?.id ?? null;
+    if (openId) {
+      url.searchParams.set("place", openId);
+      const via = myId ?? sharedVia;
+      if (via) url.searchParams.set("via", via);
+      else url.searchParams.delete("via");
+    } else {
+      url.searchParams.delete("place");
+      url.searchParams.delete("via");
+    }
+    const next = url.pathname + url.search + url.hash;
+    if (next !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(null, "", next);
+    }
+  }, [openListing, myId, sharedVia]);
 
   /*
    * Compare is a strict subset of the pipeline: every board card except

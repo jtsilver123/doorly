@@ -850,11 +850,22 @@ export default function ListingDrawer({
    * else.
    */
   async function share() {
-    // `via` is what lets the recipient see your footage — see the media
-    // routes. Without a known id the link still shares the listing itself.
-    const url = siteUrl(
-      `/app?place=${encodeURIComponent(listing.id)}${meId ? `&via=${encodeURIComponent(meId)}` : ""}`
-    );
+    /*
+     * Whatever is in the address bar, because the address bar is already
+     * the link: opening this panel writes ?place= and ?via= (see App's URL
+     * sync). Building a second URL here is how the button and a copied URL
+     * drift apart — and the copied one silently lost the footage.
+     *
+     * The fallback covers the first render after a cold open, before the
+     * sync effect has run.
+     */
+    const live = typeof window !== "undefined" ? new URL(window.location.href) : null;
+    const url =
+      live && live.searchParams.get("place") === listing.id
+        ? live.toString()
+        : siteUrl(
+            `/app?place=${encodeURIComponent(listing.id)}${meId ? `&via=${encodeURIComponent(meId)}` : ""}`
+          );
     const title = `${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`;
     const text = `${money(listing.price)}/mo · ${listing.neighborhood} · ${listing.rating}/100 on DamnLease`;
     if (navigator.share) {
