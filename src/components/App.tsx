@@ -1018,12 +1018,11 @@ export default function Home() {
         <div className="mobile-nav" style={{ display: "grid", gap: 2 }}>
           {(
             [
-              // Ordered like the work: the board you live on, the finding
-              // tool, then choosing. Activity rides inside Listings now —
-              // its unread count joins the Listings badge so news still
-              // shows without a whole tab to hold it.
-              ["pipeline", "Pipeline", counts.pipeline],
+              // Ordered like the hunt: find places, work them on the board,
+              // then choose. Activity rides inside Find — its unread count
+              // joins that badge so news shows without a tab to hold it.
               ["feed", "Find", unread],
+              ["pipeline", "Pipeline", counts.pipeline],
               ["compare", "Compare", finalistCount],
               // Applying promoted from a settings panel to a step of the
               // work: find, work it, choose, then win the place.
