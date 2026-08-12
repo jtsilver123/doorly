@@ -1022,12 +1022,26 @@ export default function Home() {
           {/* A visitor has no move-in date and no funnel; showing them a red
               "Behind pace" computed from a default profile reads as either
               broken or manipulative. They get the calm truth instead. */}
-          {guest ? (
+          {/*
+            Nothing until the feed answers. Before that we don't know whether
+            this is a visitor or a hunt in progress, and rendering the
+            signed-in instrument first meant a stranger watched a move-in
+            countdown appear and then vanish — the app looked broken at the
+            one moment it was making its first impression.
+          */}
+          {loading ? null : guest ? (
+            /*
+             * No count here. The visitor feed is capped at 400 rows, so the
+             * number was always "400" — a fact about a query limit wearing
+             * the clothes of a fact about New York. What a stranger needs is
+             * what this place is for.
+             */
             <div className="railguest">
-              <b>{counts.active.toLocaleString()}</b>
+              <b>You&rsquo;re looking around</b>
               <span className="muted">
-                NYC places tracked here so far. Look around. Pasting one in
-                is where your own hunt starts.
+                Every apartment you paste in gets priced, checked and chased
+                from here. Nothing saves until you make an account, which is
+                free.
               </span>
             </div>
           ) : (

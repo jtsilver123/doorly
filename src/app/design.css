@@ -3638,10 +3638,11 @@ button.fact:hover .fact-label { color: var(--accent); }
   gap: 4px;
   padding: var(--s3) 0;
 }
+/* Words now, not a number: sized as a sentence rather than a scoreboard. */
 .railguest b {
-  font-size: 26px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-size: var(--t-md);
+  line-height: 1.3;
+  letter-spacing: 0;
 }
 .railguest .muted { font-size: var(--t-xs); line-height: 1.5; }
 
