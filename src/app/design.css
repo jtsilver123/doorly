@@ -6579,10 +6579,26 @@ button.stagenote.is-live:hover {
   padding-bottom: var(--s6);
 }
 
+/* Frozen at the top of the scroll: the search summary and the paste box are
+   the page's controls, and controls don't leave. The lanes slide under it;
+   the ::before covers the scroller's top padding so nothing peeks above. */
 .wtl-head {
+  position: sticky;
+  top: calc(-1 * var(--s3));
+  z-index: 6;
   display: grid;
   gap: var(--s3);
   padding: var(--s5);
+}
+
+.wtl-head::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--s2));
+  right: calc(-1 * var(--s2));
+  top: -20px;
+  height: 24px;
+  background: var(--bg);
 }
 
 .wtl-head-top {
@@ -6648,7 +6664,9 @@ button.stagenote.is-live:hover {
 
 .wtl-lane-head {
   position: sticky;
-  top: calc(-1 * var(--s3));
+  /* Directly under the frozen header, whatever its height today. The
+     variable is published by WhereToLook's ResizeObserver. */
+  top: calc(var(--wtl-head-h, 0px) - var(--s3) + var(--s2));
   z-index: 3;
   display: grid;
   gap: 2px;

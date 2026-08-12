@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { SearchCriteria } from "@/types";
 import { directoryLanes, type DirectorySite } from "@/lib/siteLinks";
 import { criteriaSummary } from "@/lib/criteria";
@@ -52,6 +52,27 @@ export default function WhereToLook({
   const [query, setQuery] = useState("");
   const [miss, setMiss] = useState(false);
 
+  /*
+   * The header is frozen at the top while the lanes scroll, and the lane
+   * headers pin directly beneath it. "Beneath it" needs a number, and the
+   * header's height isn't one — it changes with the first-timer steps, the
+   * criteria line, the viewport. Measured once here, kept fresh by a
+   * ResizeObserver, and published as a CSS variable the lane-head rule reads.
+   */
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const head = headRef.current;
+    const wrap = wrapRef.current;
+    if (!head || !wrap) return;
+    const publish = () =>
+      wrap.style.setProperty("--wtl-head-h", `${head.offsetHeight}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(head);
+    return () => ro.disconnect();
+  }, []);
+
   const areaLabels = criteria
     ? criteria.areas
         .map((slug) => AREAS.find((a) => a.slug === slug)?.label)
@@ -67,8 +88,8 @@ export default function WhereToLook({
   }
 
   return (
-    <div className="wtl">
-      <header className="wtl-head surface">
+    <div className="wtl" ref={wrapRef}>
+      <header className="wtl-head surface" ref={headRef}>
         <div className="wtl-head-top">
           <div>
             <h2>Where to look</h2>
