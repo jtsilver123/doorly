@@ -129,7 +129,9 @@ export default function TourMedia({
           <span className="muted tourmedia-hint">
             {items.length
               ? "Filmed at the viewing by the person who sent you this."
-              : "No footage on this one yet."}
+              : via
+                ? "They didn't attach footage to this one."
+                : "Filming the walkthrough is how you tell two apartments apart a week later. Footage lives here once you have an account."}
           </span>
         ) : (
           <>

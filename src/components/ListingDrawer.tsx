@@ -2075,7 +2075,7 @@ export default function ListingDrawer({
 
           {/* --- what you saw with your own eyes -------------------------- */}
           <section className="dsec" data-sec="sec-footage">
-            <h3 className="dsec-label">{via ? "Tour footage" : "Your tour footage"}</h3>
+            <h3 className="dsec-label">{via ? "Their tour footage" : "Your tour footage"}</h3>
             {/* Keyed so the grid resets when the panel moves to another
                 apartment. */}
             <TourMedia key={listing.id} listingId={listing.id} via={via} />

@@ -39,6 +39,7 @@ import Logo from "@/components/Logo";
 import Icon, { type IconName } from "@/components/Icon";
 import JoinGate from "@/components/JoinGate";
 import Tour from "@/components/Tour";
+import GuestWall from "@/components/GuestWall";
 import WhereToLook from "@/components/WhereToLook";
 import Insights from "@/components/Insights";
 // Client-only: Leaflet reads `window` the moment its module loads, which
@@ -1403,17 +1404,37 @@ export default function Home() {
             applying stage, and the packet they're all waiting on. */}
         {!loading && tab === "apply" && (
           <div className="page-panels">
-            <ApplyHub
-              listings={listings}
-              profile={profile}
-              onSave={saveProfile}
-              onOpen={setOpen}
-              onOpenApply={(l) => {
-                setDrawerJump("sec-apply");
-                setOpen(l);
-              }}
-              onGate={requireAccount}
-            />
+            {/*
+              The one place the shop window closes. Everything else a
+              visitor sees is the market or the method; this is their own
+              file — documents, readiness, the packet a landlord reads —
+              and rendering it empty invites a stranger to upload a passport
+              into an account that doesn't exist.
+            */}
+            {guest ? (
+              <GuestWall
+                title="Your application packet"
+                body="A landlord says yes at 6pm and wants everything by 8. This is the folder that's already ready when they ask."
+                points={[
+                  "Your ID, pay stubs, bank letter and references in one place",
+                  "A packet you paste into any email or portal, already written",
+                  "A readiness score, so you know what's missing before it costs you a place",
+                ]}
+                onJoin={() => setJoinOpen(true)}
+              />
+            ) : (
+              <ApplyHub
+                listings={listings}
+                profile={profile}
+                onSave={saveProfile}
+                onOpen={setOpen}
+                onOpenApply={(l) => {
+                  setDrawerJump("sec-apply");
+                  setOpen(l);
+                }}
+                onGate={requireAccount}
+              />
+            )}
           </div>
         )}
 

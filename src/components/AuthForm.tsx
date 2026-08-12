@@ -24,9 +24,10 @@ import { siteUrl } from "@/lib/site";
 
 const CLAIMS: { stat: string; label: string; detail: string }[] = [
   {
-    stat: "5",
-    label: "sites, one search",
-    detail: "StreetEasy, Zillow, Apartments.com, HotPads and Craigslist, deduplicated into one scored list.",
+    stat: "17",
+    label: "sites, one hunt",
+    detail:
+      "StreetEasy, Zillow, the sublet boards, the groups — each opens with your search set, and what you find lands on one board.",
   },
   {
     stat: "1",
