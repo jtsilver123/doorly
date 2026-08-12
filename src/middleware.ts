@@ -180,7 +180,7 @@ export async function middleware(request: NextRequest) {
     // naming whose footage, with signed URLs; and the byte reader accepts
     // those signatures in place of a session.
     (request.method === "GET" &&
-      /^\/api\/listings\/[^/]+(\/intel|\/history|\/media)?$/.test(path)) ||
+      /^\/api\/listings\/[^/]+(\/intel|\/records|\/history|\/media)?$/.test(path)) ||
     (request.method === "GET" && path.startsWith("/api/media/"));
 
   /*

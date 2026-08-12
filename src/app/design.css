@@ -6943,6 +6943,182 @@ button.stagenote.is-live:hover {
   .wtl[data-scrolled="yes"] .wtl-head h2 { font-size: var(--t-lg); }
 }
 
+/* --- the building's full record -------------------------------------------
+ *
+ * Every report the city has on the address, as one reverse-chronological
+ * list. The shape is a reading surface, not a dashboard: a date rail on the
+ * left so the eye can scan years without reading, and the report itself
+ * given the width. It sits above the drawer that opened it.
+ */
+.records {
+  position: fixed;
+  inset: 0;
+  z-index: 340;
+  display: grid;
+  place-items: center;
+  padding: var(--s4);
+  background: rgba(20, 20, 26, 0.55);
+  backdrop-filter: blur(2px);
+  animation: fadein 0.15s var(--ease);
+}
+
+.records-panel {
+  width: min(760px, 96vw);
+  max-height: 88dvh;
+  display: grid;
+  /* head, tools, scroller, foot: only the scroller grows. */
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  overflow: hidden;
+}
+
+.records-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+.records-title h2 { margin: 0; font-size: var(--t-xl); }
+.records-title p { margin: 2px 0 0; font-size: var(--t-sm); }
+
+.records-tools {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.records-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.records-kinds .pill { display: inline-flex; align-items: center; gap: 5px; }
+/* The count rides inside the chip, dimmed, so the labels stay readable as
+   labels rather than becoming "Violations (128)". */
+.records-n { opacity: 0.6; font-variant-numeric: tabular-nums; }
+.records-search { width: 100%; }
+
+.records-scroll { overflow: auto; padding: var(--s2) var(--s4) var(--s4); }
+
+.records-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.records-row {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: var(--s3);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+.records-row:last-child { border-bottom: none; }
+
+.records-when { display: grid; gap: 2px; }
+.records-date {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Which department filed it, at legend weight. */
+.records-kind {
+  display: flex;
+  gap: 6px;
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* A call from the building next door, labelled as such. Without this a
+   street's parking gripes read as the building's own record. */
+.records-kind em { font-style: normal; font-weight: 550; opacity: 0.65; }
+.records-row[data-scope="block"] .records-headline b { font-weight: 550; }
+
+.records-what { display: grid; gap: 3px; min-width: 0; }
+.records-headline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: var(--t-md);
+}
+.records-where { font-size: var(--t-xs); }
+.records-detail {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+  /* City prose arrives in one unbroken block-capital sentence. */
+  overflow-wrap: anywhere;
+}
+
+/* The severity rail. A hairline rather than a tinted row: two hundred rows
+   with coloured backgrounds is a heat map of nothing. */
+.records-row[data-tone="bad"] .records-when { border-left: 2px solid var(--warn); padding-left: var(--s2); margin-left: -2px; }
+.records-row[data-tone="warn"] .records-when { border-left: 2px solid var(--accent); padding-left: var(--s2); margin-left: -2px; }
+.records-row[data-tone="bad"] .records-headline b { color: var(--warn); }
+
+.records-note { margin: var(--s4) 0; font-size: var(--t-md); }
+
+.records-partial {
+  margin: 0;
+  padding: var(--s2) var(--s4);
+  font-size: var(--t-xs);
+  line-height: 1.45;
+  background: var(--warn-soft);
+}
+
+.records-foot {
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--border);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  background: var(--surface-2);
+}
+
+/* The way in, under the four-line summary. */
+.records-open { justify-self: start; }
+
+.records-x {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .records { padding: 0; }
+  .records-panel {
+    width: 100vw;
+    max-height: 100dvh;
+    height: 100dvh;
+    border: none;
+    border-radius: 0;
+  }
+  /* The date moves above the report rather than holding a 132px column
+     against a 240px screen. */
+  .records-row { grid-template-columns: 1fr; gap: var(--s1); }
+  .records-when { display: flex; align-items: baseline; gap: var(--s2); }
+  .records-row[data-tone="bad"] .records-when,
+  .records-row[data-tone="warn"] .records-when {
+    border-left: none;
+    padding-left: 0;
+    margin-left: 0;
+  }
+  .records-row[data-tone="bad"] { border-left: 2px solid var(--warn); padding-left: var(--s2); }
+  .records-row[data-tone="warn"] { border-left: 2px solid var(--accent); padding-left: var(--s2); }
+  .records-foot { padding-bottom: max(var(--s3), env(safe-area-inset-bottom, 0px)); }
+}
+
 /* --- the ending -----------------------------------------------------------
  *
  * The screen after a place is marked secured. It is the only full-bleed

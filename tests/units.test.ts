@@ -59,7 +59,13 @@ import { originsFor, cookieDomainFor, isAppHost } from "@/lib/hosts";
 import { nearAreas } from "@/lib/geo";
 import { safeNext } from "@/lib/nextPath";
 import { tourQuestions, looksGroundFloor } from "@/lib/tourPrep";
-import { hpdAddress, stabilizedLikely } from "@/lib/nycdata";
+import {
+  hpdAddress,
+  stabilizedLikely,
+  fetchBuildingRecords,
+  soql,
+  streetVariants,
+} from "@/lib/nycdata";
 import {
   negotiationScript,
   incomeToAnnual,
@@ -2844,4 +2850,279 @@ test("the story withholds a comparison it cannot honestly make", () => {
     dealDelta: -12,
   });
   assert.equal(blind.vsMarket, null);
+});
+
+/* --- the building's full record ------------------------------------------- */
+
+test("the full record flattens three city feeds into one history", async () => {
+  const realFetch = globalThis.fetch;
+  // Each dataset is answered by URL, so one stub covers all three calls and
+  // the assertions below are about the shaping, not the plumbing.
+  globalThis.fetch = (async (url: string | URL) => {
+    const href = String(url);
+    const rows = href.includes("wvxf-dwi5")
+      ? [
+          {
+            violationstatus: "Open",
+            class: "C",
+            inspectiondate: "2025-06-01T00:00:00",
+            novdescription: "  SECTION 27-2029 ADM CODE   PROVIDE HEAT  ",
+            apartment: "4B",
+          },
+          {
+            violationstatus: "Close",
+            class: "C",
+            inspectiondate: "2023-01-09T00:00:00",
+            novdescription: "REPAIR THE BROKEN STAIR",
+            apartment: "",
+          },
+        ]
+      : href.includes("erm2-nwe9")
+        ? [
+            {
+              created_date: "2025-08-02T11:00:00",
+              complaint_type: "Noise - Residential",
+              descriptor: "Loud Music/Party",
+              status: "Closed",
+              resolution_description: "Police responded.",
+              incident_address: "330 EAST 35 STREET",
+            },
+          ]
+        : [
+            {
+              filing_date: "2024-11-15T00:00:00",
+              infested_dwelling_unit_count: "2",
+              eradicated_unit_count: "2",
+              re_infested_dwelling_unit: "0",
+            },
+          ];
+    return new Response(JSON.stringify(rows), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchBuildingRecords("330 East 35th Street", "Manhattan", 40.7, -73.9);
+
+    assert.equal(rec.matched, "330 EAST 35 STREET", "matched on the city's spelling");
+    assert.deepEqual(rec.counts, { violation: 2, complaint: 1, bedbug: 1 });
+  assert.equal(rec.block, 0, "the 311 row is at the building itself");
+    assert.equal(rec.entries.length, 4);
+
+    // One history, newest first, regardless of which department filed it.
+    assert.deepEqual(
+      rec.entries.map((e) => e.date),
+      ["2025-08-02", "2025-06-01", "2024-11-15", "2023-01-09"]
+    );
+
+    const openC = rec.entries.find((e) => e.date === "2025-06-01")!;
+    assert.equal(openC.title, "Class C (immediately hazardous)");
+    assert.equal(openC.status, "Open");
+    assert.equal(openC.tone, "bad");
+    assert.equal(openC.where, "Apt 4B");
+    // The city's double-spaced shouting is collapsed, not passed through.
+    assert.equal(openC.detail, "SECTION 27-2029 ADM CODE PROVIDE HEAT");
+
+    // A closed class C is history, not a live warning.
+    const closedC = rec.entries.find((e) => e.date === "2023-01-09")!;
+    assert.equal(closedC.status, "Closed");
+    assert.equal(closedC.tone, "info");
+
+    const bug = rec.entries.find((e) => e.kind === "bedbug")!;
+    assert.match(bug.detail, /2 units infested, 2 eradicated/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("the full record survives one city feed failing", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    // 311 is down; the violations still have to come back.
+    if (String(url).includes("erm2-nwe9")) return new Response("nope", { status: 503 });
+    if (String(url).includes("wvxf-dwi5")) {
+      return new Response(
+        JSON.stringify([
+          { violationstatus: "Open", class: "B", inspectiondate: "2025-02-02", novdescription: "MOLD" },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchBuildingRecords("12 Bank Street", "Manhattan", 40.7, -74);
+    assert.equal(rec.counts.violation, 1);
+    assert.equal(rec.counts.complaint, 0, "a dead feed contributes nothing, and throws nothing");
+    assert.equal(rec.entries[0].tone, "warn");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("311 calls from the street are marked nearby, not counted against the building", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    const href = String(url);
+    if (href.includes("erm2-nwe9")) {
+      return new Response(
+        JSON.stringify([
+          {
+            created_date: "2025-05-05T00:00:00",
+            complaint_type: "Illegal Parking",
+            descriptor: "Blocked Sidewalk",
+            status: "Closed",
+            resolution_description:
+              "The New York City Police Department responded to the complaint and determined no violation existed. Thank you for attention to this matter. We count on New Yorkers like yourself to maintain a safe and clean city.",
+            incident_address: "596 LEIDESDORF WAY",
+          },
+          {
+            created_date: "2025-05-06T00:00:00",
+            complaint_type: "HEAT/HOT WATER",
+            descriptor: "Entire Building",
+            status: "Open",
+            resolution_description: "",
+            incident_address: "330 EAST 35 STREET",
+          },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchBuildingRecords("330 East 35th Street", "Manhattan", 40.7, -73.9);
+    assert.equal(rec.counts.complaint, 1, "only the call at this address counts");
+    assert.equal(rec.block, 1, "the street's call is context");
+
+    const parking = rec.entries.find((e) => e.title === "Illegal Parking")!;
+    assert.equal(parking.scope, "block");
+    // Near, so never a warning about this building.
+    assert.equal(parking.tone, "info");
+    // The form letter comes off; the finding stays.
+    assert.match(parking.detail, /Police responded to the complaint and determined no violation existed/);
+    assert.ok(!/Thank you for attention/.test(parking.detail), "civic filler stripped");
+    assert.ok(!/count on New Yorkers/.test(parking.detail), "and the rest of it");
+
+    const heat = rec.entries.find((e) => e.title === "HEAT/HOT WATER")!;
+    assert.equal(heat.scope, "building");
+    assert.equal(heat.tone, "warn", "an open call against this building is a warning");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a dead city feed marks the record partial so it is never cached as clean", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    // 311 refuses; violations answer normally.
+    if (String(url).includes("erm2-nwe9")) return new Response("busy", { status: 429 });
+    if (String(url).includes("wvxf-dwi5")) {
+      return new Response(
+        JSON.stringify([
+          { violationstatus: "Open", class: "B", inspectiondate: "2025-02-02", novdescription: "MOLD" },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchBuildingRecords("12 Bank Street", "Manhattan", 40.7, -74);
+    assert.equal(rec.partial, true, "the caller must know a dataset is missing");
+    assert.equal(rec.entries.length, 1, "and still gets what did arrive");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a complete record is not marked partial", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify([]), { status: 200 })) as typeof fetch;
+  try {
+    const rec = await fetchBuildingRecords("12 Bank Street", "Manhattan", 40.7, -74);
+    assert.equal(rec.partial, false);
+    assert.equal(rec.entries.length, 0, "genuinely nothing on file");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a transient city failure is retried before it counts as a dead feed", async () => {
+  const realFetch = globalThis.fetch;
+  const seen = new Map<string, number>();
+  globalThis.fetch = (async (url: string | URL) => {
+    const key = String(url).includes("wvxf-dwi5") ? "violations" : "other";
+    const n = (seen.get(key) ?? 0) + 1;
+    seen.set(key, n);
+    // Violations 429 once, the way an unauthenticated Socrata caller does,
+    // then answer.
+    if (key === "violations" && n === 1) return new Response("busy", { status: 429 });
+    if (key === "violations") {
+      return new Response(
+        JSON.stringify([
+          { violationstatus: "Open", class: "C", inspectiondate: "2025-03-03", novdescription: "NO HEAT" },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchBuildingRecords("330 East 35th Street", "Manhattan", 40.7, -73.9);
+    assert.equal(seen.get("violations"), 2, "the throttled query was asked again");
+    assert.equal(rec.partial, false, "a retry that worked is not a partial record");
+    assert.equal(rec.counts.violation, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("an apostrophe in a street name is escaped, not left to break the query", () => {
+  // Saint Mark's Place closed the SoQL string early, so the city answered
+  // 400 and the building read as having no violations at all.
+  assert.equal(soql("SAINT MARK'S PLACE"), "SAINT MARK''S PLACE");
+  assert.equal(soql("EAST 35 STREET"), "EAST 35 STREET", "ordinary names pass through");
+  assert.equal(
+    soql("X' OR '1'='1"),
+    "X'' OR ''1''=''1",
+    "and a listing source cannot inject query syntax through an address"
+  );
+});
+
+test("the city's own spellings are what get asked for", () => {
+  // No apostrophe: HPD files "ST MARKS PLACE", never "MARK'S".
+  assert.deepEqual(hpdAddress("109 Saint Mark's Place"), {
+    houseNumber: "109",
+    street: "SAINT MARKS PLACE",
+  });
+  // And both abbreviations exist in the same dataset, so both get asked.
+  assert.deepEqual(streetVariants("SAINT MARKS PLACE"), [
+    "SAINT MARKS PLACE",
+    "ST MARKS PLACE",
+  ]);
+  assert.deepEqual(streetVariants("ST MARKS PLACE"), [
+    "ST MARKS PLACE",
+    "SAINT MARKS PLACE",
+  ]);
+  assert.deepEqual(streetVariants("EAST 35 STREET"), ["EAST 35 STREET"]);
+});
+
+test("the apostrophe address actually reaches the city", async () => {
+  const realFetch = globalThis.fetch;
+  let asked = "";
+  globalThis.fetch = (async (url: string | URL) => {
+    if (String(url).includes("wvxf-dwi5")) asked = decodeURIComponent(String(url));
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+  try {
+    await fetchBuildingRecords("109 Saint Mark's Place", "Manhattan", 40.7, -73.9);
+    assert.match(asked, /streetname in\('SAINT MARKS PLACE','ST MARKS PLACE'\)/);
+    assert.ok(!asked.includes("'S PLACE"), "no stray apostrophe reaches the query");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

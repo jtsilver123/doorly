@@ -23,6 +23,7 @@ import SourceMark from "@/components/SourceMark";
 import Perks from "@/components/Perks";
 import { amenityFacts, AMENITY_ORDER, AMENITIES, type AmenityKey } from "@/lib/amenities";
 import PhotoGallery from "@/components/PhotoGallery";
+import BuildingRecords from "@/components/BuildingRecords";
 import TourMedia from "@/components/TourMedia";
 import { RatingDisc, MyScoreDisc, MyScoreField, ProsConsList } from "@/components/Rating";
 import { nextAction, tourWhen } from "@/lib/nextAction";
@@ -395,6 +396,8 @@ export default function ListingDrawer({
 
   const [detail, setDetail] = useState<Detail | null>(null);
   const [intel, setIntel] = useState<BuildingIntel | null>(null);
+  /** The full city record, opened from the summary. Loads on demand. */
+  const [recordsOpen, setRecordsOpen] = useState(false);
   /** Past rents: undefined = cache check in flight, null = none cached. */
   const [pastRents, setPastRents] = useState<
     { date: string; price: number; event: string }[] | null | undefined
@@ -1638,6 +1641,17 @@ export default function ListingDrawer({
                   </li>
                 )}
               </ul>
+              {/* The four lines above are the verdict. This is the evidence:
+                  every violation, every 311 call, every bedbug filing, in the
+                  order they happened. Nobody needs it while skimming, and the
+                  people who need it really need it. */}
+              <button
+                className="btn records-open"
+                onClick={() => setRecordsOpen(true)}
+              >
+                <Icon name="changes" size={14} />
+                See every report on this building
+              </button>
               <p className="muted drawer-fineprint">
                 NYC Open Data: HPD violations, the bedbug registry, 311 and the
                 city&apos;s tax lot records, matched to this address. Public
@@ -2400,6 +2414,14 @@ export default function ListingDrawer({
           {saving && <span className="drawer-saving" aria-live="polite" />}
         </footer>
       </aside>
+
+      {recordsOpen && (
+        <BuildingRecords
+          listingId={listing.id}
+          address={listing.address}
+          onClose={() => setRecordsOpen(false)}
+        />
+      )}
     </>
   );
 }
