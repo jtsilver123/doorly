@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, currentUserId } from "@/lib/supabase";
 import { mediaBucket } from "@/lib/r2";
+import { verifyMediaSig } from "@/lib/mediaSign";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +22,34 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    await currentUserId();
     const { path } = await params;
     const key = path.map(decodeURIComponent).join("/");
 
-    const supabase = await db();
-    const { data: row } = await supabase
-      .from("user_listing_media")
-      .select("id, kind")
-      .eq("path", key)
-      .maybeSingle();
-    if (!row) return new NextResponse("not found", { status: 404 });
+    /*
+     * A signed URL is its own authorization — minted by the guest media
+     * list for share-link recipients, verified here the same way the
+     * Worker's front door verifies it (see upload-handler.js, which serves
+     * this route in production; this handler is the local-dev twin).
+     */
+    const search = new URL(request.url).searchParams;
+    const sig = search.get("sig");
+    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const signed = Boolean(
+      sig &&
+        secret &&
+        (await verifyMediaSig(secret, key, Number(search.get("exp") ?? NaN), sig))
+    );
+
+    if (!signed) {
+      await currentUserId();
+      const supabase = await db();
+      const { data: row } = await supabase
+        .from("user_listing_media")
+        .select("id, kind")
+        .eq("path", key)
+        .maybeSingle();
+      if (!row) return new NextResponse("not found", { status: 404 });
+    }
 
     const object = await mediaBucket().get(key);
     if (!object) return new NextResponse("not found", { status: 404 });

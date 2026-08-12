@@ -67,6 +67,7 @@ import {
 } from "@/lib/leverage";
 import { commuteMinutes } from "@/lib/commute";
 import { watchDiff, findWatched, type WatchedRow } from "@/lib/watch";
+import { signMediaPath, verifyMediaSig } from "@/lib/mediaSign";
 import { LAYOUT_PRESETS } from "@/types";
 import type { Listing, FeedListing } from "@/types";
 
@@ -2749,4 +2750,33 @@ test("the building search matches the unit, not its neighbors", () => {
   assert.ok(findWatched(watched(), vague), "same building, same layout: taken");
   const wrong = [place({ address: "330 East 35th Street", unit: "", bedrooms: 3 })];
   assert.equal(findWatched(watched(), wrong), null, "a 3BR is not your 1BR");
+});
+
+/* --- signed media URLs: the share link's proof ---------------------------- */
+
+test("a signed media URL verifies, and every altered claim fails", async () => {
+  const secret = "test-secret";
+  const path = "user-1/streeteasy-1/17-clip.mp4";
+  const { exp, sig } = await signMediaPath(secret, path);
+
+  assert.ok(await verifyMediaSig(secret, path, exp, sig), "the minted claim holds");
+  assert.ok(!(await verifyMediaSig(secret, "user-2/streeteasy-1/17-clip.mp4", exp, sig)), "another path fails");
+  assert.ok(!(await verifyMediaSig(secret, path, exp + 1, sig)), "a stretched expiry fails");
+  assert.ok(!(await verifyMediaSig("other-secret", path, exp, sig)), "another key fails");
+  const flipped = (sig[0] === "0" ? "1" : "0") + sig.slice(1);
+  assert.ok(!(await verifyMediaSig(secret, path, exp, flipped)), "a tampered signature fails");
+});
+
+test("an expired signature is dead however valid it once was", async () => {
+  const secret = "test-secret";
+  const path = "user-1/streeteasy-1/17-clip.mp4";
+  const minted = await signMediaPath(secret, path, 1_000_000);
+  assert.ok(
+    await verifyMediaSig(secret, path, minted.exp, minted.sig, minted.exp - 1),
+    "alive just before the deadline"
+  );
+  assert.ok(
+    !(await verifyMediaSig(secret, path, minted.exp, minted.sig, minted.exp + 1)),
+    "dead just after"
+  );
 });

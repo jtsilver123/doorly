@@ -175,8 +175,13 @@ export async function middleware(request: NextRequest) {
     path === "/api/feed" ||
     // A single listing's public record (events, price history) and its
     // building's city record read the same shared data. GET only: the
-    // PATCH on the listing path stays gated.
-    (request.method === "GET" && /^\/api\/listings\/[^/]+(\/intel|\/history)?$/.test(path));
+    // PATCH on the listing path stays gated. The media list rides along
+    // for share-link visitors — the route itself only answers a ?via=
+    // naming whose footage, with signed URLs; and the byte reader accepts
+    // those signatures in place of a session.
+    (request.method === "GET" &&
+      /^\/api\/listings\/[^/]+(\/intel|\/history|\/media)?$/.test(path)) ||
+    (request.method === "GET" && path.startsWith("/api/media/"));
 
   /*
    * The app itself is the shop window. A visitor lands straight on the

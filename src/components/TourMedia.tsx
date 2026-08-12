@@ -35,7 +35,19 @@ interface MediaItem {
   url: string;
 }
 
-export default function TourMedia({ listingId }: { listingId: string }) {
+export default function TourMedia({
+  listingId,
+  via,
+}: {
+  listingId: string;
+  /**
+   * The sender's id when this drawer was opened from a share link by a
+   * visitor with no session. It buys exactly one thing: a read-only view of
+   * that person's footage, through URLs the server signs (see the media
+   * routes). Uploads and deletes stay signed-in-only.
+   */
+  via?: string | null;
+}) {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [me, setMe] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
@@ -46,17 +58,24 @@ export default function TourMedia({ listingId }: { listingId: string }) {
   const [, setTick] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const signedIn =
+    typeof document !== "undefined" && document.cookie.includes("-auth-token");
+
   const load = useCallback(async () => {
-    // A visitor has no footage; skip the guaranteed 401.
-    if (!document.cookie.includes("-auth-token")) return;
+    // A visitor has no footage of their own — but a share link's ?via= opens
+    // a read-only view of the sender's. Otherwise skip the guaranteed 401.
+    if (!signedIn && !via) return;
     try {
-      const res = await fetch(`/api/listings/${encodeURIComponent(listingId)}/media`);
+      const url = signedIn
+        ? `/api/listings/${encodeURIComponent(listingId)}/media`
+        : `/api/listings/${encodeURIComponent(listingId)}/media?via=${encodeURIComponent(via ?? "")}`;
+      const res = await fetch(url);
       const body = await res.json();
       if (body.media) setItems(body.media);
     } catch {
       // The section quietly stays empty; uploads will surface real errors.
     }
-  }, [listingId]);
+  }, [listingId, via, signedIn]);
 
   useEffect(() => {
     load();
@@ -106,30 +125,40 @@ export default function TourMedia({ listingId }: { listingId: string }) {
       }}
     >
       <div className="tourmedia-head">
-        <button className="btn" onClick={() => fileRef.current?.click()}>
-          <Icon name="plus" size={14} />
-          {pending > 0 ? `Uploading ${pending}. Add more` : "Add video or photos"}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          // Extensions spelled out alongside the wildcards: some pickers
-          // filter by MIME type and hide files the OS never typed, which is
-          // exactly how a .MOV can vanish from its own upload dialog.
-          accept="image/*,video/*,.mov,.mp4,.m4v,.webm,.3gp,.3g2,.mkv,.avi,.wmv,.mpg,.mpeg,.mts,.m2ts,.ogv,.jpg,.jpeg,.jfif,.png,.gif,.webp,.heic,.heif,.avif,.bmp,.tif,.tiff"
-          multiple
-          hidden
-          onChange={(e) => {
-            enqueueUploads(listingId, e.target.files ?? []);
-            e.target.value = "";
-          }}
-        />
-        {items.length === 0 && pending === 0 && (
+        {!signedIn ? (
           <span className="muted tourmedia-hint">
-            What you film at the viewing lives here, or drop files anywhere
-            in this box. Up to 400MB each; uploads keep going if you close the
-            panel.
+            {items.length
+              ? "Filmed at the viewing by the person who sent you this."
+              : "No footage on this one yet."}
           </span>
+        ) : (
+          <>
+            <button className="btn" onClick={() => fileRef.current?.click()}>
+              <Icon name="plus" size={14} />
+              {pending > 0 ? `Uploading ${pending}. Add more` : "Add video or photos"}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              // Extensions spelled out alongside the wildcards: some pickers
+              // filter by MIME type and hide files the OS never typed, which is
+              // exactly how a .MOV can vanish from its own upload dialog.
+              accept="image/*,video/*,.mov,.mp4,.m4v,.webm,.3gp,.3g2,.mkv,.avi,.wmv,.mpg,.mpeg,.mts,.m2ts,.ogv,.jpg,.jpeg,.jfif,.png,.gif,.webp,.heic,.heif,.avif,.bmp,.tif,.tiff"
+              multiple
+              hidden
+              onChange={(e) => {
+                enqueueUploads(listingId, e.target.files ?? []);
+                e.target.value = "";
+              }}
+            />
+            {items.length === 0 && pending === 0 && (
+              <span className="muted tourmedia-hint">
+                What you film at the viewing lives here, or drop files anywhere
+                in this box. Up to 400MB each; uploads keep going if you close
+                the panel.
+              </span>
+            )}
+          </>
         )}
       </div>
 

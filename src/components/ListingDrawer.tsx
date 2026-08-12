@@ -90,6 +90,10 @@ interface Props {
    * a check made here shows there and vice versa.
    */
   onMark?: (l: FeedListing, key: AmenityKey, fact: "yes" | "no" | null) => void;
+  /** Own user id, so a share link can carry your footage with it. */
+  meId?: string | null;
+  /** The sender's id when this page was opened from a share link. */
+  via?: string | null;
 }
 
 /**
@@ -362,6 +366,8 @@ export default function ListingDrawer({
   all,
   jumpTo,
   onMark,
+  meId,
+  via,
 }: Props) {
   /*
    * Closing is animated, which means the panel has to outlive the decision to
@@ -844,7 +850,11 @@ export default function ListingDrawer({
    * else.
    */
   async function share() {
-    const url = siteUrl(`/app?place=${encodeURIComponent(listing.id)}`);
+    // `via` is what lets the recipient see your footage — see the media
+    // routes. Without a known id the link still shares the listing itself.
+    const url = siteUrl(
+      `/app?place=${encodeURIComponent(listing.id)}${meId ? `&via=${encodeURIComponent(meId)}` : ""}`
+    );
     const title = `${listing.address}${listing.unit ? ` #${listing.unit}` : ""}`;
     const text = `${money(listing.price)}/mo · ${listing.neighborhood} · ${listing.rating}/100 on DamnLease`;
     if (navigator.share) {
@@ -2053,10 +2063,10 @@ export default function ListingDrawer({
 
           {/* --- what you saw with your own eyes -------------------------- */}
           <section className="dsec" data-sec="sec-footage">
-            <h3 className="dsec-label">Your tour footage</h3>
+            <h3 className="dsec-label">{via ? "Tour footage" : "Your tour footage"}</h3>
             {/* Keyed so the grid resets when the panel moves to another
                 apartment. */}
-            <TourMedia key={listing.id} listingId={listing.id} />
+            <TourMedia key={listing.id} listingId={listing.id} via={via} />
           </section>
 
           {/* --- the application ----------------------------------------- */}

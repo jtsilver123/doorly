@@ -171,7 +171,36 @@ async function verifiedUser(request, env) {
  * Authorization is the same shape as everywhere else: the metadata row is
  * fetched through PostgREST *as the viewer*, so row-level security decides
  * whether this is their file or their crew-mate's. No row, no bytes.
+ *
+ * One sessionless entrance: a URL carrying `exp` and `sig`, minted by the
+ * guest media list for share-link recipients. The signature is an HMAC over
+ * the path and its expiry, keyed by the service secret both runtimes hold
+ * (see lib/mediaSign.ts) — proof the app itself issued this exact URL,
+ * recently, for this exact object. Packet documents never get signed URLs;
+ * only listing footage is shareable.
  */
+async function sigAllows(env, key, url) {
+  const exp = Number(url.searchParams.get("exp") ?? NaN);
+  const sig = url.searchParams.get("sig") ?? "";
+  const secret = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret || !sig || !Number.isFinite(exp) || exp < Date.now()) return false;
+  if (!/^[0-9a-f]{64}$/.test(sig)) return false;
+  if (isPacket(key.split("/")[1] ?? "")) return false;
+  const enc = new TextEncoder();
+  const hmac = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  const bytes = new Uint8Array(sig.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(sig.slice(i * 2, i * 2 + 2), 16);
+  }
+  return crypto.subtle.verify("HMAC", hmac, bytes, enc.encode(`${key}|${exp}`));
+}
+
 export async function handleMediaGet(request, env) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/media/") || request.method !== "GET") return null;
@@ -184,26 +213,29 @@ export async function handleMediaGet(request, env) {
       .join("/");
     if (!key || key.includes("..")) return json({ error: "bad path" }, 400);
 
-    const user = await verifiedUser(request, env);
-    if (!user) return json({ error: "not signed in" }, 401);
+    const signed = await sigAllows(env, key, url);
+    if (!signed) {
+      const user = await verifiedUser(request, env);
+      if (!user) return json({ error: "not signed in" }, 401);
 
-    // RLS does the deciding: own rows and crew rows are visible, and a 404
-    // deliberately looks the same whether the file is missing or not theirs.
-    // Packet documents check their own table; everything else stays with
-    // listing media. Either way the read is as the viewer, and a miss is a
-    // 404 that looks the same whether the file is absent or someone else's.
-    const table = isPacket(key.split("/")[1] ?? "") ? "user_documents" : "user_listing_media";
-    const row = await fetch(
-      `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${table}?path=eq.${encodeURIComponent(key)}&select=id&limit=1`,
-      {
-        headers: {
-          apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          authorization: `Bearer ${user.token}`,
-        },
+      // RLS does the deciding: own rows and crew rows are visible, and a 404
+      // deliberately looks the same whether the file is missing or not theirs.
+      // Packet documents check their own table; everything else stays with
+      // listing media. Either way the read is as the viewer, and a miss is a
+      // 404 that looks the same whether the file is absent or someone else's.
+      const table = isPacket(key.split("/")[1] ?? "") ? "user_documents" : "user_listing_media";
+      const row = await fetch(
+        `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${table}?path=eq.${encodeURIComponent(key)}&select=id&limit=1`,
+        {
+          headers: {
+            apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+      if (!row.ok || (await row.json()).length === 0) {
+        return json({ error: "not found" }, 404);
       }
-    );
-    if (!row.ok || (await row.json()).length === 0) {
-      return json({ error: "not found" }, 404);
     }
 
     /*

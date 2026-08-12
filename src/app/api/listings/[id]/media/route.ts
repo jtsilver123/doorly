@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { db, currentUserId } from "@/lib/supabase";
+import { db, currentUserId, adminDb } from "@/lib/supabase";
+import { signMediaPath } from "@/lib/mediaSign";
 
 export const dynamic = "force-dynamic";
+
+const mediaUrl = (path: string) =>
+  `/api/media/${path.split("/").map(encodeURIComponent).join("/")}`;
 
 /**
  * The tour footage attached to one listing.
@@ -10,28 +14,58 @@ export const dynamic = "force-dynamic";
  * viewer is allowed to see — their own and their crew's, which the row-level
  * policy decides — and hands back URLs pointing at this app's own reader
  * rather than a signed third-party link that expires mid-scrub.
+ *
+ * A visitor with no session gets one narrower door: `?via=<user>` — the tail
+ * a share link carries — lists that user's footage only, with each URL
+ * carrying a short-lived signature the byte reader accepts in place of a
+ * cookie. Whoever was sent the page sees the walkthrough the sender meant to
+ * show; a stranger who merely knows the listing id sees nothing, because the
+ * `via` they'd have to name is the secret they don't have.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await currentUserId();
     const { id } = await params;
-    const supabase = await db();
-    const { data: rows, error } = await supabase
+    const signedIn = await currentUserId().then(
+      () => true,
+      () => false
+    );
+
+    if (signedIn) {
+      const supabase = await db();
+      const { data: rows, error } = await supabase
+        .from("user_listing_media")
+        .select("id, user_id, path, kind, caption, created_at")
+        .eq("listing_id", id)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({
+        media: (rows ?? []).map((row) => ({ ...row, url: mediaUrl(row.path as string) })),
+      });
+    }
+
+    const via = new URL(req.url).searchParams.get("via") ?? "";
+    if (!/^[0-9a-f-]{36}$/.test(via)) return NextResponse.json({ media: [] });
+    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!secret) return NextResponse.json({ media: [] });
+
+    const { data: rows, error } = await adminDb()
       .from("user_listing_media")
       .select("id, user_id, path, kind, caption, created_at")
       .eq("listing_id", id)
+      .eq("user_id", via)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    return NextResponse.json({
-      media: (rows ?? []).map((row) => ({
-        ...row,
-        url: `/api/media/${(row.path as string).split("/").map(encodeURIComponent).join("/")}`,
-      })),
-    });
+    const media = await Promise.all(
+      (rows ?? []).map(async (row) => {
+        const { exp, sig } = await signMediaPath(secret, row.path as string);
+        return { ...row, url: `${mediaUrl(row.path as string)}?exp=${exp}&sig=${sig}` };
+      })
+    );
+    return NextResponse.json({ media });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "media failed" },

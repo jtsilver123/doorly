@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadFeed, loadGuestFeed } from "@/lib/feed";
+import { loadFeed, loadGuestFeed, loadSharedListing } from "@/lib/feed";
 import { currentUserId } from "@/lib/supabase";
 import type { FeedFilterOptions, SortKey } from "@/lib/filters";
 import type { Source } from "@/types";
@@ -45,7 +45,20 @@ export async function GET(request: Request) {
       () => true,
       () => false
     );
-    const listings = signedIn ? await loadFeed(filters) : await loadGuestFeed(filters);
+    /*
+     * A shared link names one listing, and the feed it opens must contain
+     * it: for a guest it may sit outside the recency window; for a
+     * signed-in reader outside their own search entirely. Either way the
+     * named place rides along rather than bouncing the recipient.
+     */
+    const place = params.get("place");
+    const listings = signedIn
+      ? await loadFeed(filters)
+      : await loadGuestFeed(filters, place ?? undefined);
+    if (place && !listings.some((l) => l.id === place)) {
+      const shared = await loadSharedListing(place);
+      if (shared) listings.unshift(shared);
+    }
     return NextResponse.json({ listings, guest: !signedIn });
   } catch (err) {
     const message = err instanceof Error ? err.message : "feed failed";

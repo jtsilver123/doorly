@@ -503,6 +503,21 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
 }
 
 /**
+ * One corpus listing, dressed exactly the way the guest feed dresses them:
+ * rated against stock criteria, sources and events attached, no personal
+ * state. For the signed-in reader whose own feed doesn't reach a shared
+ * place — someone else's find, outside their search.
+ *
+ * The impossible price floor is doing the work: it empties the guest
+ * window, and ensureId puts the one listing back — so the whole mapping
+ * pipeline runs for exactly one row instead of being duplicated here.
+ */
+export async function loadSharedListing(id: string): Promise<FeedListing | null> {
+  const rows = await loadGuestFeed({ priceMin: Number.MAX_SAFE_INTEGER }, id);
+  return rows.find((l) => l.id === id) ?? null;
+}
+
+/**
  * The feed a visitor sees before they have an account.
  *
  * The whole pitch is "this is what hunting looks like in here", and an empty
@@ -513,7 +528,17 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
  * don't grant the anonymous role anything; the personal tables are never
  * touched at all, so there is nothing here RLS would have protected.
  */
-export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<FeedListing[]> {
+export async function loadGuestFeed(
+  filters: FeedFilterOptions = {},
+  /**
+   * A listing this feed must contain, whatever the window says. A shared
+   * link's whole job is opening the place it names, and "the 400 newest"
+   * is an implementation detail no recipient should be able to fall off
+   * of — including when the place has gone off market, which is itself
+   * information the recipient came for.
+   */
+  ensureId?: string
+): Promise<FeedListing[]> {
   const supabase = adminDb();
 
   let query = supabase.from("listings").select("*").eq("is_active", true);
@@ -529,6 +554,15 @@ export async function loadGuestFeed(filters: FeedFilterOptions = {}): Promise<Fe
     .limit(400);
   if (error) throw new Error(`loadGuestFeed: ${error.message}`);
   const listings = (rows ?? []) as ListingRow[];
+
+  if (ensureId && !listings.some((r) => r.id === ensureId)) {
+    const { data: one } = await supabase
+      .from("listings")
+      .select("*")
+      .eq("id", ensureId)
+      .maybeSingle();
+    if (one) listings.unshift(one as ListingRow);
+  }
   if (!listings.length) return [];
 
   const ids = listings.map((r) => r.id);

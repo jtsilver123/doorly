@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { FeedListing, SearchCriteria } from "@/types";
 import type { Stage } from "@/types";
 import { isFacebookUrl, parseFreePost, type FreePost } from "@/lib/freepost";
+import { supabaseBrowser } from "@/lib/supabase/client";
 import PasteIn from "@/components/PasteIn";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
 import { DEFAULT_PROFILE, type Profile } from "@/lib/outreach";
@@ -370,8 +371,15 @@ export default function Home() {
   const loadFeed = useCallback(async (): Promise<FeedListing[]> => {
     try {
       // "everything", not "all": the board's loss column holds no_go rows,
-      // which "all" hides. The browse grid re-filters client-side anyway.
-      const res = await fetch("/api/feed?stage=everything");
+      // which "all" hides. The drawer re-filters client-side anyway.
+      //
+      // A shared link's ?place= rides along so the server can guarantee the
+      // named listing is in the response — for a guest it may sit outside
+      // the recency window, for a signed-in reader outside their search.
+      const place = new URLSearchParams(window.location.search).get("place");
+      const res = await fetch(
+        `/api/feed?stage=everything${place ? `&place=${encodeURIComponent(place)}` : ""}`
+      );
       const body = await res.json();
       if (body.error) toast({ message: body.error, tone: "warn" });
       // The feed says whether this is a visitor looking through the shop
@@ -429,24 +437,43 @@ export default function Home() {
    * immediately reopen it.
    */
   const openedShared = useRef(false);
+  /**
+   * The sender's id, when this page was opened from a share link. It rides
+   * the URL as ?via= and is what lets a visitor see the footage the sender
+   * attached — their walkthrough, nobody else's. Held in state because the
+   * URL is scrubbed below and the drawer needs it for as long as it's open.
+   */
+  const [sharedVia, setSharedVia] = useState<string | null>(null);
   useEffect(() => {
     if (openedShared.current || !listings.length) return;
-    const id = new URLSearchParams(window.location.search).get("place");
+    const search = new URLSearchParams(window.location.search);
+    const id = search.get("place");
     if (!id) return;
     openedShared.current = true;
+    setSharedVia(search.get("via"));
     const hit = listings.find((l) => l.id === id);
     if (hit) {
       setOpen(hit);
       setTab("feed");
     } else {
-      toast({ message: "That place isn't in your search any more.", tone: "warn" });
+      toast({ message: "That place isn't tracked here any more.", tone: "warn" });
     }
-    // Drop the parameter once it's been used; a reload shouldn't fight you
+    // Drop the parameters once they're used; a reload shouldn't fight you
     // by reopening a drawer you closed.
     const url = new URL(window.location.href);
     url.searchParams.delete("place");
+    url.searchParams.delete("via");
     window.history.replaceState(null, "", url.toString());
   }, [listings, toast]);
+
+  /** Own id, for building share links that carry your footage with them. */
+  const [myId, setMyId] = useState<string | null>(null);
+  useEffect(() => {
+    supabaseBrowser()
+      .auth.getSession()
+      .then(({ data }) => setMyId(data.session?.user?.id ?? null))
+      .catch(() => {});
+  }, []);
 
 
   /** A pasted Facebook post (or any free-text tip) awaiting the form. */
@@ -1445,6 +1472,8 @@ export default function Home() {
           crew={crew}
           all={listings}
           onMark={markAmenity}
+          meId={myId}
+          via={sharedVia}
         />
       )}
 
