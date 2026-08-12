@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { BuildingRecords as Records, RecordEntry } from "@/lib/nycdata";
+import { mergeRecords, type BuildingRecords as Records, type RecordEntry } from "@/lib/nycdata";
 import Icon from "@/components/Icon";
 
 /**
@@ -69,6 +69,8 @@ export default function BuildingRecords({
   onClose: () => void;
 }) {
   const [records, setRecords] = useState<Records | null>(null);
+  /** How many of the two feeds are still in flight. */
+  const [pending, setPending] = useState(2);
   const [error, setError] = useState("");
   const [kind, setKind] = useState<RecordEntry["kind"] | "all">("all");
   /**
@@ -88,16 +90,42 @@ export default function BuildingRecords({
   const [query, setQuery] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Both halves at once, drawn as they land.
+   *
+   * The building's own file is about 25KB and comes back in a few hundred
+   * milliseconds; the 311 calls are five times that. Asked for together and
+   * rendered separately, the violations are readable while the bulky half is
+   * still in flight, rather than the whole page waiting on the slower query.
+   * Whichever arrives first is merged into whatever is already on screen.
+   */
   useEffect(() => {
     let alive = true;
-    fetch(`/api/listings/${encodeURIComponent(listingId)}/records`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (!alive) return;
-        if (body.records) setRecords(body.records);
-        else setError(body.error ?? "The city's records didn't answer.");
-      })
-      .catch(() => alive && setError("The city's records didn't answer."));
+    const take = (body: { records?: Records; error?: string }) => {
+      if (!alive) return;
+      if (!body.records) {
+        // Only the first failure speaks. A second would overwrite it with
+        // the same sentence.
+        setError((was) => was || body.error || "The city's records didn't answer.");
+        return;
+      }
+      const half = body.records;
+      setRecords((had) => (had ? mergeRecords(had, half) : half));
+    };
+
+    const get = (feed: string) =>
+      fetch(`/api/listings/${encodeURIComponent(listingId)}/records?feed=${feed}`)
+        .then((r) => r.json())
+        .then(take)
+        .catch(
+          () => alive && setError((was) => was || "The city's records didn't answer.")
+        )
+        .finally(() => {
+          if (alive) setPending((n) => n - 1);
+        });
+
+    setPending(2);
+    void Promise.all([get("hpd"), get("311")]);
     return () => {
       alive = false;
     };
@@ -175,6 +203,7 @@ export default function BuildingRecords({
                   {inScope.length === 1 ? "" : "s"}
                   {openCount > 0 && `, ${openCount} still open`}
                   {!withBlock && records.block > 0 && ` · ${records.block} more on the block`}
+                  {pending > 0 && " · still loading"}
                 </>
               )}
             </p>
@@ -244,7 +273,10 @@ export default function BuildingRecords({
               </div>
             )}
 
-            {records.block > 0 && (
+            {/* Rendered while the 311 half is still in flight too, so the
+                row doesn't shove the list down when it arrives. Its count
+                waits rather than the whole control. */}
+            {(records.block > 0 || pending > 0) && (
               <div className="records-group">
                 <span className="records-glabel" id="rec-area">
                   Where
@@ -270,7 +302,9 @@ export default function BuildingRecords({
                     title="Adds 311 calls from the surrounding street"
                   >
                     Plus the block{" "}
-                    <span className="records-n">{records.entries.length}</span>
+                    <span className="records-n">
+                      {pending > 0 ? "…" : records.entries.length}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -297,12 +331,20 @@ export default function BuildingRecords({
           ) : !records ? (
             <ul className="records-list" aria-busy="true">
               {Array.from({ length: 6 }, (_, i) => (
-                <li key={i} className="records-row">
+                // Its own class: a placeholder is not a report, and sharing
+                // the row class made them indistinguishable to anything
+                // counting what's on screen.
+                <li key={i} className="records-row records-skel">
                   <div className="skeleton skeleton-line" style={{ width: "22%" }} />
                   <div className="skeleton skeleton-line" style={{ width: "80%" }} />
                 </li>
               ))}
             </ul>
+          ) : records.entries.length === 0 && pending > 0 ? (
+            // One half is in and empty, the other is still coming. Saying
+            // "nothing on file" here would be a verdict the data hasn't
+            // reached yet.
+            <p className="muted records-note">Still reading the rest…</p>
           ) : records.entries.length === 0 ? (
             <p className="muted records-note">
               Nothing on file for this address. That is genuinely good news, and
@@ -327,7 +369,14 @@ export default function BuildingRecords({
               </button>
             </p>
           ) : (
-            <ul className="records-list">
+            <ul className="records-list" aria-busy={pending > 0 ? "true" : undefined}>
+              {/* The other half is still on its way. Said once, at the top,
+                  where a list that is about to grow should say so. */}
+              {pending > 0 && (
+                <li className="records-more" role="status">
+                  Still reading the rest of the record…
+                </li>
+              )}
               {shown.map((e, i) => (
                 <li
                   key={`${e.kind}-${e.date}-${i}`}

@@ -63,6 +63,9 @@ import {
   hpdAddress,
   stabilizedLikely,
   fetchBuildingRecords,
+  fetchHpdRecords,
+  fetch311Records,
+  mergeRecords,
   soql,
   streetVariants,
 } from "@/lib/nycdata";
@@ -3154,6 +3157,113 @@ test("a clean bedbug filing reads as good news, not as another entry on a rap sh
     // The alarming word came first, so a clean year read as a bedbug problem.
     assert.equal(bug.title, "No bedbugs reported");
     assert.equal(bug.tone, "good");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("the two halves merge into one history without losing a count", () => {
+  const hpd = {
+    matched: "330 EAST 35 STREET",
+    entries: [
+      { kind: "violation" as const, date: "2025-06-01", title: "Class C", detail: "", status: "Open", tone: "bad" as const, where: "", scope: "building" as const },
+      { kind: "bedbug" as const, date: "2024-01-05", title: "No bedbugs reported", detail: "", status: "", tone: "good" as const, where: "", scope: "building" as const },
+    ],
+    counts: { violation: 1, complaint: 0, bedbug: 1 },
+    block: 0,
+    truncated: false,
+    partial: false,
+  };
+  const calls = {
+    matched: "330 EAST 35 STREET",
+    entries: [
+      { kind: "complaint" as const, date: "2025-08-02", title: "Noise", detail: "", status: "Closed", tone: "info" as const, where: "", scope: "building" as const },
+      { kind: "complaint" as const, date: "2024-06-06", title: "Parking", detail: "", status: "Closed", tone: "info" as const, where: "", scope: "block" as const },
+    ],
+    counts: { violation: 0, complaint: 1, bedbug: 0 },
+    block: 1,
+    truncated: true,
+    partial: false,
+  };
+
+  const both = mergeRecords(hpd, calls);
+  // Interleaved by date, not concatenated by dataset.
+  assert.deepEqual(
+    both.entries.map((e) => e.date),
+    ["2025-08-02", "2025-06-01", "2024-06-06", "2024-01-05"]
+  );
+  assert.deepEqual(both.counts, { violation: 1, complaint: 1, bedbug: 1 });
+  assert.equal(both.block, 1);
+  // A cap or a failure in either half is a cap or a failure in the whole.
+  assert.equal(both.truncated, true);
+  assert.equal(mergeRecords(hpd, { ...calls, partial: true }).partial, true);
+});
+
+test("each half stands alone, so a slow feed never blocks the fast one", async () => {
+  const realFetch = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (url: string | URL) => {
+    const href = String(url);
+    asked.push(href.includes("wvxf") ? "violations" : href.includes("wz6d") ? "bedbugs" : "311");
+    if (href.includes("wvxf-dwi5")) {
+      return new Response(
+        JSON.stringify([
+          { violationstatus: "Open", class: "C", inspectiondate: "2025-03-03", novdescription: "NO HEAT" },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const hpd = await fetchHpdRecords("330 East 35th Street", "Manhattan");
+    // The building's own file asks two datasets and never touches 311.
+    assert.deepEqual([...new Set(asked)].sort(), ["bedbugs", "violations"]);
+    assert.equal(hpd.counts.violation, 1);
+    assert.equal(hpd.block, 0, "the fast half knows nothing about the block");
+
+    asked.length = 0;
+    const calls = await fetch311Records("330 East 35th Street", 40.7, -73.9);
+    assert.deepEqual([...new Set(asked)], ["311"], "and the slow half asks only 311");
+    assert.equal(calls.counts.violation, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+
+test("the city's un-re-encoded punctuation is repaired, not drawn as tofu", async () => {
+  const realFetch = globalThis.fetch;
+  // Exactly what the city ships: CP1252 curly quotes as raw C1 bytes, plus a
+  // stray control character that renders as a tofu box.
+  const raw = "AS DESCRIBED ON HPD\u0092S WEBSITE AND \u0093QUOTED\u0094\u0007";
+  globalThis.fetch = (async (url: string | URL) => {
+    if (String(url).includes("wvxf-dwi5")) {
+      return new Response(
+        JSON.stringify([
+          {
+            violationstatus: "Open",
+            class: "A",
+            inspectiondate: "2026-04-29",
+            novdescription: raw,
+          },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchHpdRecords("330 East 35th Street", "Manhattan");
+    const v = rec.entries[0];
+    assert.equal(v.detail, "AS DESCRIBED ON HPD'S WEBSITE AND \"QUOTED\"");
+    assert.ok(
+      // eslint-disable-next-line no-control-regex
+      !/[\u0000-\u001f\u007f-\u009f\ufffd]/.test(v.detail),
+      "nothing unprintable survives"
+    );
   } finally {
     globalThis.fetch = realFetch;
   }

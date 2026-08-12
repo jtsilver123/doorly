@@ -7103,6 +7103,15 @@ button.stagenote.is-live:hover {
 
 .records-note { margin: var(--s4) 0; font-size: var(--t-md); }
 
+/* The list is complete as far as it goes, and about to get longer. Says so
+   at the top rather than leaving the reader to wonder whether 64 reports is
+   the answer or the first instalment. */
+.records-more {
+  padding: var(--s2) 0 var(--s3);
+  font-size: var(--t-xs);
+  color: var(--text-muted);
+}
+
 .records-partial {
   margin: 0;
   padding: var(--s2) var(--s4);

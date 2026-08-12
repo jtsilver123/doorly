@@ -391,10 +391,33 @@ const VIOLATION_CLASS: Record<string, { label: string; tone: RecordEntry["tone"]
   I: { label: "Class I (informational)", tone: "info" },
 };
 
-/** Trims the city's shouty all-caps prose to something readable in a row. */
+/**
+ * Trims the city's shouty all-caps prose to something readable in a row.
+ *
+ * Some of it was typed into a Windows box decades ago and never re-encoded,
+ * so curly quotes arrive as raw C1 control bytes and render as a tofu box:
+ * "HPD□S WEBSITE". They are mapped back to the punctuation they were meant
+ * to be, and anything else unprintable is dropped rather than drawn.
+ */
+const CP1252: Record<string, string> = {
+  "\u0091": "'",
+  "\u0092": "'",
+  "\u0093": '"',
+  "\u0094": '"',
+  "\u0096": "-",
+  "\u0097": "-",
+  "\u0085": "\u2026",
+};
+
 function tidy(text: string, cap = 300): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  return clean.length > cap ? `${clean.slice(0, cap - 1)}…` : clean;
+  const clean = text
+    .replace(/[\u0085\u0091-\u0097]/g, (c) => CP1252[c] ?? "")
+    // Everything else in the control ranges, plus the replacement character
+    // a bad decode leaves behind.
+    .replace(/[\u0000-\u001f\u007f-\u009f\ufffd]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean.length > cap ? `${clean.slice(0, cap - 1)}\u2026` : clean;
 }
 
 /**
@@ -449,25 +472,19 @@ function sameBuilding(incident: string, houseNumber: string, street: string): bo
 }
 
 /**
- * Every report on the building, one row each.
+ * The building's own file: HPD violations and bedbug filings.
  *
- * Deliberately a separate call from fetchBuildingIntel: the summary is on the
- * critical path of opening a listing and has to stay small and fast, while
- * this is hundreds of rows nobody sees unless they ask. Four datasets, each
- * capped, each allowed to fail on its own — a 311 outage should cost you the
- * complaints, not the violations.
+ * Split from the 311 half because the two have completely different weights.
+ * This is roughly 25KB and comes back in a few hundred milliseconds; 311 is
+ * a hundred and twenty, and waiting for it before showing anything meant the
+ * reader stared at placeholders while the fast, most damning half sat ready.
  */
-export async function fetchBuildingRecords(
+export async function fetchHpdRecords(
   address: string,
-  borough: string,
-  lat: number | null,
-  lon: number | null
+  borough: string
 ): Promise<BuildingRecords> {
   const parsed = hpdAddress(address);
   const boroId = BORO_ID[borough.toLowerCase()] ?? "";
-  const since = new Date(Date.now() - RECORD_DAYS * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
 
   const violationsQ =
     parsed && boroId
@@ -478,21 +495,6 @@ export async function fetchBuildingRecords(
           RECORD_TIMEOUT_MS
         )
       : Promise.reject(new Error("no address"));
-
-  /*
-   * Every complaint type, not just noise. The summary cares about noise
-   * because that's what predicts your evenings; the full record is where
-   * someone reads "no heat, four winters running" and walks away.
-   */
-  const complaintsQ =
-    lat != null && lon != null
-      ? sodaTwice<Record<string, string>[]>(
-          `https://data.cityofnewyork.us/resource/erm2-nwe9.json?$select=created_date,complaint_type,descriptor,status,resolution_description,incident_address&$where=${encodeURIComponent(
-            `within_circle(location,${lat},${lon},120) AND created_date>'${since}'`
-          )}&$order=created_date DESC&$limit=${RECORD_LIMIT}`,
-          RECORD_TIMEOUT_MS
-        )
-      : Promise.reject(new Error("no coordinates"));
 
   const bedbugsQ =
     parsed && borough
@@ -507,12 +509,11 @@ export async function fetchBuildingRecords(
         )
       : Promise.reject(new Error("no address"));
 
-  const [v, c, b] = await Promise.allSettled([violationsQ, complaintsQ, bedbugsQ]);
+  const [v, b] = await Promise.allSettled([violationsQ, bedbugsQ]);
 
   const entries: RecordEntry[] = [];
   const counts = { violation: 0, complaint: 0, bedbug: 0 };
   let truncated = false;
-  let block = 0;
 
   if (v.status === "fulfilled") {
     if (v.value.length >= RECORD_LIMIT) truncated = true;
@@ -536,6 +537,77 @@ export async function fetchBuildingRecords(
       counts.violation++;
     }
   }
+
+  if (b.status === "fulfilled") {
+    for (const row of b.value) {
+      const infested = Number(row.infested_dwelling_unit_count) || 0;
+      const eradicated = Number(row.eradicated_unit_count) || 0;
+      const reinfested = Number(row.re_infested_dwelling_unit) || 0;
+      entries.push({
+        kind: "bedbug",
+        date: (row.filing_date ?? "").slice(0, 10),
+        // Leading with "Bedbug filing" on a clean year buried the good half
+        // of the sentence behind the alarming word.
+        title: infested > 0 ? "Bedbug filing" : "No bedbugs reported",
+        detail: infested
+          ? `${infested} unit${infested === 1 ? "" : "s"} infested${
+              eradicated ? `, ${eradicated} eradicated` : ""
+            }${reinfested ? `, ${reinfested} re-infested` : ""}.`
+          : "The landlord's annual filing to the city reported no infestations.",
+        status: "",
+        tone: infested > 0 ? "warn" : "good",
+        where: "",
+        scope: "building",
+      });
+      counts.bedbug++;
+    }
+  }
+
+  entries.sort((x, y) => (y.date || "").localeCompare(x.date || ""));
+
+  return {
+    matched: parsed ? `${parsed.houseNumber} ${parsed.street}` : address,
+    entries,
+    counts,
+    block: 0,
+    truncated,
+    partial: [v, b].some((r) => r.status === "rejected"),
+  };
+}
+
+/**
+ * The 311 half: every call within about a block, in both scopes.
+ *
+ * Every complaint type, not just noise. The summary cares about noise
+ * because that's what predicts your evenings; the full record is where
+ * someone reads "no heat, four winters running" and walks away.
+ */
+export async function fetch311Records(
+  address: string,
+  lat: number | null,
+  lon: number | null
+): Promise<BuildingRecords> {
+  const parsed = hpdAddress(address);
+  const since = new Date(Date.now() - RECORD_DAYS * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  const complaintsQ =
+    lat != null && lon != null
+      ? sodaTwice<Record<string, string>[]>(
+          `https://data.cityofnewyork.us/resource/erm2-nwe9.json?$select=created_date,complaint_type,descriptor,status,resolution_description,incident_address&$where=${encodeURIComponent(
+            `within_circle(location,${lat},${lon},120) AND created_date>'${since}'`
+          )}&$order=created_date DESC&$limit=${RECORD_LIMIT}`,
+          RECORD_TIMEOUT_MS
+        )
+      : Promise.reject(new Error("no coordinates"));
+
+  const [c] = await Promise.allSettled([complaintsQ]);
+
+  const entries: RecordEntry[] = [];
+  const counts = { violation: 0, complaint: 0, bedbug: 0 };
+  let truncated = false;
+  let block = 0;
 
   if (c.status === "fulfilled") {
     if (c.value.length >= RECORD_LIMIT) truncated = true;
@@ -565,33 +637,6 @@ export async function fetchBuildingRecords(
     }
   }
 
-  if (b.status === "fulfilled") {
-    for (const row of b.value) {
-      const infested = Number(row.infested_dwelling_unit_count) || 0;
-      const eradicated = Number(row.eradicated_unit_count) || 0;
-      const reinfested = Number(row.re_infested_dwelling_unit) || 0;
-      entries.push({
-        kind: "bedbug",
-        date: (row.filing_date ?? "").slice(0, 10),
-        // Leading with "Bedbug filing" on a clean year buried the good half
-        // of the sentence behind the alarming word.
-        title: infested > 0 ? "Bedbug filing" : "No bedbugs reported",
-        detail: infested
-          ? `${infested} unit${infested === 1 ? "" : "s"} infested${
-              eradicated ? `, ${eradicated} eradicated` : ""
-            }${reinfested ? `, ${reinfested} re-infested` : ""}.`
-          : "The landlord's annual filing to the city reported no infestations.",
-        status: "",
-        tone: infested > 0 ? "warn" : "good",
-        where: "",
-        scope: "building",
-      });
-      counts.bedbug++;
-    }
-  }
-
-  // One history, newest first. Undated rows sink rather than leading with a
-  // blank, which is where they would land sorting an empty string.
   entries.sort((x, y) => (y.date || "").localeCompare(x.date || ""));
 
   return {
@@ -600,6 +645,43 @@ export async function fetchBuildingRecords(
     counts,
     block,
     truncated,
-    partial: [v, c, b].some((r) => r.status === "rejected"),
+    partial: c.status === "rejected",
   };
+}
+
+/** The two halves as one history, newest first. */
+export function mergeRecords(a: BuildingRecords, b: BuildingRecords): BuildingRecords {
+  return {
+    matched: a.matched || b.matched,
+    entries: [...a.entries, ...b.entries].sort((x, y) =>
+      (y.date || "").localeCompare(x.date || "")
+    ),
+    counts: {
+      violation: a.counts.violation + b.counts.violation,
+      complaint: a.counts.complaint + b.counts.complaint,
+      bedbug: a.counts.bedbug + b.counts.bedbug,
+    },
+    block: a.block + b.block,
+    truncated: a.truncated || b.truncated,
+    partial: a.partial || b.partial,
+  };
+}
+
+/**
+ * Every report on the building, both halves, one call.
+ *
+ * The route serves the halves separately so the page can render the fast one
+ * first; this is the whole answer, for callers that want it in one piece.
+ */
+export async function fetchBuildingRecords(
+  address: string,
+  borough: string,
+  lat: number | null,
+  lon: number | null
+): Promise<BuildingRecords> {
+  const [hpd, calls] = await Promise.all([
+    fetchHpdRecords(address, borough),
+    fetch311Records(address, lat, lon),
+  ]);
+  return mergeRecords(hpd, calls);
 }
