@@ -6669,6 +6669,38 @@ button.stagenote.is-live:hover {
 .msgslot-preview { display: grid; gap: 4px; font-size: var(--t-xs); }
 .msgslot-preview .preview { margin: 0; }
 
+/* --- find's two lenses -----------------------------------------------------
+ *
+ * The tab row above Where to look / Browse listings. Same pill idiom as the
+ * account tabs; it scrolls off with the page, and each view's own frozen
+ * header takes over — one sticky element per view, no stacked-offset math.
+ */
+.findtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--s4);
+}
+
+/* On the directory the tabs line up with its centered column; the browse
+   grid runs full width, so there the tabs hug the left edge with it. */
+.findtabs[data-view="guide"] {
+  width: 100%;
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.findtabs .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+}
+
+/* The browse lens wraps the restored grid; the sticky filter band inside it
+   needs the page background it always had. */
+.browse { display: block; }
+
 /* --- where to look --------------------------------------------------------
  *
  * The listings tab as a directory: doors out to the sites that own the

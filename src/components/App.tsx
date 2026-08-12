@@ -8,9 +8,20 @@ import { isFacebookUrl, parseFreePost, type FreePost } from "@/lib/freepost";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import PasteIn from "@/components/PasteIn";
 import { ALL_SOURCES, DEFAULT_PREFERRED_SOURCE, SOURCE_LABEL } from "@/types";
-import { DEFAULT_PROFILE, type Profile } from "@/lib/outreach";
+import {
+  DEFAULT_PROFILE,
+  bestChannel,
+  draftTourMessage,
+  draftFollowUp,
+  mailtoLink,
+  smsLink,
+  tourSubject,
+  type Profile,
+} from "@/lib/outreach";
 import { daysUntil } from "@/lib/cost";
 import { findPasted } from "@/lib/filters";
+import { nextAction } from "@/lib/nextAction";
+import { brokerHistory } from "@/lib/leverage";
 import { burstConfetti } from "@/lib/confetti";
 import { runwayDays } from "@/lib/runway";
 import { useAutosave, saveLabel } from "@/lib/useAutosave";
@@ -30,6 +41,7 @@ import Timeline from "@/components/Timeline";
 import AccountMenu, { type ProfileSection } from "@/components/AccountMenu";
 import CrewPanel, { type CrewView } from "@/components/CrewPanel";
 import { phaseFor, funnelFor } from "@/lib/timeline";
+import { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
 import Changes, { type Change, type Notice } from "@/components/Changes";
@@ -41,6 +53,7 @@ import JoinGate from "@/components/JoinGate";
 import Tour from "@/components/Tour";
 import GuestWall from "@/components/GuestWall";
 import WhereToLook from "@/components/WhereToLook";
+import BrowseListings from "@/components/BrowseListings";
 import Insights from "@/components/Insights";
 // Client-only: Leaflet reads `window` the moment its module loads, which
 // detonates the server prerender. The planner has no server-renderable form.
@@ -170,6 +183,12 @@ export default function Home() {
   const [section, setSection] = useState<ProfileSection>("details");
   /** The Activity list, folded into Listings as a panel rather than a tab. */
   const [activityOpen, setActivityOpen] = useState(false);
+  /**
+   * Which of Find's two lenses is up: the directory out to the sites, or
+   * the browse grid over everything already tracked. The directory is the
+   * front door — it's where a new hunt starts — so it's the default.
+   */
+  const [findView, setFindView] = useState<"guide" | "browse">("guide");
   /** Section the drawer should open scrolled to, from a board next-action. */
   const [drawerJump, setDrawerJump] = useState<string | null>(null);
 
@@ -256,6 +275,13 @@ export default function Home() {
     window.scrollTo({ top: 0 });
     document.querySelector(".main")?.scrollTo?.({ top: 0 });
   }, [tab, section]);
+
+  // Find's two lenses share a scroller; switching between them mid-scroll
+  // would land the other view at a depth it never chose.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    document.querySelector(".main")?.scrollTo?.({ top: 0 });
+  }, [findView]);
   const [listings, setListings] = useState<FeedListing[]>([]);
   /*
    * A visitor with no account, browsing the live corpus through the shop
@@ -642,6 +668,24 @@ export default function Home() {
   );
 
   /**
+   * Star updates the list immediately and reconciles in the background.
+   * Waiting on a round trip for a keystroke is what made triage feel heavy —
+   * at one card per second, a 300ms refetch is most of the interaction.
+   */
+  const star = useCallback(
+    (listing: FeedListing) => {
+      const next = !listing.starred;
+      setListings((list) =>
+        list.map((l) => (l.id === listing.id ? { ...l, starred: next } : l))
+      );
+      patch(listing.id, { action: "star", starred: next }, false).catch(() =>
+        loadFeed()
+      );
+    },
+    [patch, loadFeed]
+  );
+
+  /**
    * The post-tour thumb. Optimistic like star: a gut reaction recorded with
    * a round-trip spinner stops being a gut reaction.
    */
@@ -884,6 +928,34 @@ export default function Home() {
     }
   }, []);
 
+  const pass = useCallback(
+    (listing: FeedListing) => {
+      optimisticPass(listing);
+      patch(listing.id, { action: "feedback", value: "pass" }, false).catch(() =>
+        loadFeed()
+      );
+      /*
+       * The quick dismiss stays one tap. Clearing a feed of forty places can't
+       * cost forty dialogs, so the reason is offered rather than demanded —
+       * and a pass with no reason still counts, just against everything.
+       */
+      toast({
+        message: sawIt(listing)
+          ? `${listing.address} filed under "Not applying"`
+          : `Passed on ${listing.address}`,
+        actionLabel: "Say why",
+        onAction: () => setPassing(listing),
+        secondaryLabel: "Undo",
+        onSecondary: () => {
+          patch(listing.id, { action: "unpass" }, false)
+            .then(loadFeed)
+            .catch(() => loadFeed());
+        },
+      });
+    },
+    [patch, loadFeed, toast, optimisticPass]
+  );
+
   /**
    * Passing with a reason attached, from the dialog.
    *
@@ -937,6 +1009,107 @@ export default function Home() {
       ).catch(() => loadFeed());
     },
     [patch, loadFeed]
+  );
+
+  /**
+   * Shift-select: the panel and the listing's own site together. Triage
+   * often ends at "looks right, now show me the full listing" — one gesture
+   * covers both instead of open-panel-then-hunt-for-the-link.
+   */
+  const openCard = useCallback(
+    (listing: FeedListing, visitSource?: boolean) => {
+      if (visitSource) {
+        const target =
+          orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
+        if (target) window.open(target, "_blank", "noopener");
+      }
+      setOpen(listing);
+    },
+    [profile.preferredSource]
+  );
+
+  /**
+   * One "reach out" action whose behaviour depends on what the listing has.
+   * Whatever the channel, the CRM is written first — an sms:/mailto: handoff
+   * can unload the page before a later request lands.
+   */
+  const reachOut = useCallback(
+    async (listing: FeedListing) => {
+      // Texting an agent from the app is the product; doing it needs a you.
+      if (requireAccount()) return;
+      // Anything that isn't "send them a message" belongs in the panel, where
+      // the control for it lives.
+      const action = nextAction(listing);
+      if (action.kind !== "reach" && action.kind !== "chase") {
+        if (action.becomes) {
+          patch(listing.id, { action: "stage", stage: action.becomes }, false).catch(() =>
+            loadFeed()
+          );
+          setListings((list) =>
+            list.map((l) => (l.id === listing.id ? { ...l, stage: action.becomes! } : l))
+          );
+          return;
+        }
+        setOpen(listing);
+        return;
+      }
+      const { channel } = bestChannel(listing);
+      /*
+       * Which draft rides the button. Once you've contacted, every later
+       * message from a card is a nudge, never the opening pitch resent —
+       * getting the original again is what makes people look like bots.
+       */
+      const chasing = listing.stage === "contacted";
+      // Repeat interest is leverage; the draft has to actually use the
+      // prior thread for the broker-memory panel's promise to hold.
+      const prior = brokerHistory(listings, listing)?.others[0] ?? null;
+      const message = chasing
+        ? draftFollowUp(listing, profile, prior)
+        : draftTourMessage(listing, profile, prior);
+
+      await patch(
+        listing.id,
+        {
+          action: "contact",
+          channel,
+          direction: "out",
+          who: listing.contactName,
+          note: chasing ? "Follow-up" : "Tour request",
+        },
+        false
+      );
+      if (listing.stage === "inbox" || listing.stage === "interested") {
+        await patch(listing.id, { action: "stage", stage: "contacted" }, false);
+      }
+      await loadFeed();
+
+      if (channel === "text") {
+        window.location.href = smsLink(listing.contactPhone, message);
+      } else if (channel === "email") {
+        window.location.href = mailtoLink(
+          listing.contactEmail,
+          tourSubject(listing),
+          message
+        );
+      } else {
+        // No published contact: put the draft on the clipboard and open the
+        // listing, where the site's own enquiry form lives.
+        try {
+          await navigator.clipboard.writeText(message);
+          toast({
+            message: "Message copied. Paste it into their contact form",
+            tone: "good",
+          });
+        } catch {
+          toast({ message: "Opened the listing. Copy the message from the detail panel" });
+        }
+        const target = orderedSources(listing, profile.preferredSource)[0]?.url ?? listing.url;
+        if (target) window.open(target, "_blank", "noopener");
+      }
+    },
+    // listings rides along for broker memory — a stale closure would draft
+    // from last render's threads.
+    [patch, profile, listings, loadFeed, requireAccount, toast]
   );
 
   /** The .ics for a booked tour, shared by the board and the drawer. */
@@ -1055,6 +1228,28 @@ export default function Home() {
       body: JSON.stringify({ profile: next }),
     });
   }
+
+  /** The Activity toggle, shared by both of Find's views so it never moves. */
+  const activityPill = (
+    <button
+      className={activityOpen ? "pill activity-pill is-on" : "pill activity-pill"}
+      aria-expanded={activityOpen}
+      onClick={() => setActivityOpen((v) => !v)}
+    >
+      <Icon name="bell" size={14} />
+      Activity
+      {unread > 0 && <span className="chip">{unread}</span>}
+    </button>
+  );
+
+  /** The paste-anything intake, shared by both of Find's views. */
+  const findPaste = (q: string) => {
+    const pastable =
+      /^https?:\/\//i.test(q.trim()) || isFacebookUrl(q) || q.trim().length > 60;
+    if (!pastable) return false;
+    quickAdd(q.trim());
+    return true;
+  };
 
   return (
     <div className="shell" data-guest={guest ? "yes" : undefined}>
@@ -1322,37 +1517,68 @@ export default function Home() {
           after the search.
         */}
         {tab === "feed" && !activityOpen && (
-          <WhereToLook
-            criteria={searchCriteria}
-            /* While the feed loads we assume a hunt in progress — the recap
-               popping in for a first-timer beats it flashing at everyone. */
-            hasPlaces={
-              loading ||
-              listings.some((l) => l.starred || !["inbox", "passed"].includes(l.stage))
-            }
-            onEditSearch={() => {
-              setSection("search");
-              setTab("profile");
-            }}
-            onFind={(q) => {
-              const pastable =
-                /^https?:\/\//i.test(q.trim()) || isFacebookUrl(q) || q.trim().length > 60;
-              if (!pastable) return false;
-              quickAdd(q.trim());
-              return true;
-            }}
-            activityPill={
+          <>
+            {/* Two lenses on the same job. The directory is where a hunt
+                starts; Browse is everything already on the radar, mapped
+                and filterable. A row of tabs, not a buried toggle, because
+                which lens you're in should never be a mystery. */}
+            <div className="findtabs" role="tablist" aria-label="Find views" data-view={findView}>
               <button
-                className={activityOpen ? "pill activity-pill is-on" : "pill activity-pill"}
-                aria-expanded={activityOpen}
-                onClick={() => setActivityOpen((v) => !v)}
+                role="tab"
+                aria-selected={findView === "guide"}
+                className={findView === "guide" ? "pill is-on" : "pill"}
+                onClick={() => setFindView("guide")}
               >
-                <Icon name="bell" size={14} />
-                Activity
-                {unread > 0 && <span className="chip">{unread}</span>}
+                <Icon name="search" size={14} />
+                Where to look
               </button>
-            }
-          />
+              <button
+                role="tab"
+                aria-selected={findView === "browse"}
+                className={findView === "browse" ? "pill is-on" : "pill"}
+                onClick={() => setFindView("browse")}
+              >
+                <Icon name="pin" size={14} />
+                Browse listings
+              </button>
+            </div>
+
+            {findView === "guide" ? (
+              <WhereToLook
+                criteria={searchCriteria}
+                /* While the feed loads we assume a hunt in progress — the
+                   recap popping in for a first-timer beats it flashing at
+                   everyone. */
+                hasPlaces={
+                  loading ||
+                  listings.some((l) => l.starred || !["inbox", "passed"].includes(l.stage))
+                }
+                onEditSearch={() => {
+                  setSection("search");
+                  setTab("profile");
+                }}
+                onFind={findPaste}
+                activityPill={activityPill}
+              />
+            ) : (
+              <BrowseListings
+                listings={listings}
+                loading={loading}
+                active={tab === "feed" && !activityOpen && findView === "browse" && !open}
+                profile={profile}
+                criteria={searchCriteria}
+                lastCheckedAt={api?.lastCheckedAt ?? null}
+                via={via}
+                onOpen={openCard}
+                onStar={star}
+                onPass={pass}
+                onReach={reachOut}
+                onPaste={findPaste}
+                onGuide={() => setFindView("guide")}
+                trailing={activityPill}
+              />
+            )}
+          </>
         )}
 
         {/* Diligence on your places: price cuts, relists, delistings. */}
