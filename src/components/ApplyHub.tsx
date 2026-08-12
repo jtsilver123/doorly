@@ -70,7 +70,12 @@ function rowStamp(l: FeedListing): string {
     return at ? `toured ${at}` : "";
   }
   if (l.stage === "tour") {
-    return l.tourAt ? `viewing ${tourWhen(l.tourAt)}` : "no time set";
+    if (!l.tourAt) return "no time set";
+    // A tour date behind you is a different sentence: the window for
+    // "bring the packet" closed with it.
+    return new Date(l.tourAt).getTime() < Date.now()
+      ? `toured ${tourWhen(l.tourAt)} — file it now`
+      : `viewing ${tourWhen(l.tourAt)}`;
   }
   return "";
 }

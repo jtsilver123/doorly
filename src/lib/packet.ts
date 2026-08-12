@@ -259,11 +259,30 @@ export function buildPacket(profile: Profile, documentsHeld: string[]): PacketSe
     );
   }
   terms.push("Prepared to sign a 12-month lease and pay on standard terms.");
-  terms.push("Documents below can be sent within the hour.");
+
+  /*
+   * "Ready" is one question with two sources of truth: the checklist slots
+   * (uploads and satisfied items) and the proofs the person has attested to
+   * in their outreach settings. The chips upstairs read the second; this
+   * text used to read only the first, so one screen said "ready to share"
+   * and "(none marked ready yet)" about the same person. Merge them — and
+   * only promise the within-the-hour turnaround when it's true.
+   */
+  const attested = (profile.proofs ?? []).filter(Boolean);
+  const held = [
+    ...DOCUMENT_CHECKLIST.filter((doc) => documentsHeld.includes(doc)),
+    ...attested.filter(
+      (doc) => !DOCUMENT_CHECKLIST.some((c) => c.toLowerCase() === doc.toLowerCase() && documentsHeld.includes(c))
+    ),
+  ];
+  if (held.length) terms.push("Documents below can be sent within the hour.");
   sections.push({ heading: "Terms", lines: terms });
 
-  const held = DOCUMENT_CHECKLIST.filter((doc) => documentsHeld.includes(doc));
-  const missing = DOCUMENT_CHECKLIST.filter((doc) => !documentsHeld.includes(doc));
+  const missing = DOCUMENT_CHECKLIST.filter(
+    (doc) =>
+      !documentsHeld.includes(doc) &&
+      !attested.some((a) => a.toLowerCase() === doc.toLowerCase())
+  );
   sections.push({
     heading: "Documents ready",
     lines: held.length ? held.map((d) => `✓ ${d}`) : ["(none marked ready yet)"],

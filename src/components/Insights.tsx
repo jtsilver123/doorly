@@ -84,7 +84,11 @@ export default function Insights({
                 <span className="insights-bar">
                   <i
                     data-zero={row.count === 0 ? "true" : undefined}
-                    style={{ width: `${Math.max((row.count / max) * 100, 2)}%` }}
+                    // Percent of the track, not of the flex row: the count label used
+                    // to eat into long bars via flex-shrink, so a 70% stage
+                    // could render at 79% of the 100% bar. The track is the
+                    // row minus the label's reserved width.
+                    style={{ width: `calc((100% - 36px) * ${Math.max(row.count / max, 0.02).toFixed(3)})` }}
                   />
                   <b>{row.count}</b>
                 </span>

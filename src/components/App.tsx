@@ -116,7 +116,9 @@ const TOUR_STOPS: { tab: Tab; target?: string; title: string; body: string }[] =
     tab: "pipeline",
     target: ".refresh",
     title: "We watch what you're chasing",
-    body: "Every place on your board gets re-checked on a schedule: price drops, relists, quiet delistings. Check now runs one on the spot. That's the tour. Go find your place.",
+    // No button named here: the on-the-spot check lives in the desktop
+    // rail, and a phone's tour must not describe a control it can't show.
+    body: "Every place on your board gets re-checked on a schedule: price drops, relists, quiet delistings land in Activity and find you. That's the tour. Go find your place.",
   },
 ];
 
@@ -1005,7 +1007,7 @@ export default function Home() {
   }
 
   return (
-    <div className="shell">
+    <div className="shell" data-guest={guest ? "yes" : undefined}>
       <a className="skiplink" href="#results">
         Skip to listings
       </a>
@@ -1731,7 +1733,9 @@ function ApiSettings({
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span>
-              {status.usage.used} of {status.usage.limit} requests used
+              {status.usage.exhausted
+                ? "Spent, by the API's own count"
+                : `${status.usage.used} of ${status.usage.limit} requests used`}
             </span>
             <span className="muted">key {status.keyHint}</span>
           </div>
@@ -1777,7 +1781,9 @@ function ApiSettings({
           cuts, relists, and delistings land in Activity and your
           notifications. Pressing &ldquo;Check my places&rdquo; always works
           on top of the schedule.{" "}
-          {days == null
+          {status?.usage.exhausted
+            ? "Checks are paused until a fresh key lands below."
+            : days == null
             ? "Nothing runs on its own. The key only spends when you press the button, so it never expires on a schedule."
             : days <= 3
               ? `⚠ At this pace you'd need a fresh key by ${replaceBy}, ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}. Consider checking less often.`

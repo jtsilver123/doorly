@@ -191,7 +191,7 @@ export default async function Home({
         </div>
 
         {/* The claim, performed. See HuntEstimator. */}
-        <HuntEstimator cta={go} ctaLabel={user ? "Back to the hunt" : "Secure a place"} />
+        <HuntEstimator cta={go} ctaLabel={goLabel} />
         </div>
 
         {counts ? (

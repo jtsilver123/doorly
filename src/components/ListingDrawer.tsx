@@ -934,6 +934,13 @@ export default function ListingDrawer({
             <div className="drawer-head-addr">
               {listing.address}
               {listing.unit ? ` #${listing.unit}` : ""}
+              {/* The one fact that changes everything else on this panel.
+                  It lived only in the timeline, six sections down, while the
+                  header went on selling the place — exactly the person a
+                  share link brings in would draft a message to a dead ad. */}
+              {!listing.isActive && (
+                <b className="tag tag-warn drawer-gone">Off market</b>
+              )}
             </div>
             <div className="muted">
               {listing.neighborhood || listing.borough} ·{" "}
@@ -1220,8 +1227,13 @@ export default function ListingDrawer({
             <div>
               <dt>Available</dt>
               <dd className="is-text">
-                {friendlyAvailable(listing.availableText) ||
-                  (listing.timing === "ready" ? "In time" : "Not stated")}
+                {/* A move-in date on a delisted ad is a promise nobody is
+                    keeping. The chip up top says off market; this cell must
+                    not argue with it. */}
+                {!listing.isActive
+                  ? "Off market"
+                  : friendlyAvailable(listing.availableText) ||
+                    (listing.timing === "ready" ? "In time" : "Not stated")}
               </dd>
             </div>
           </dl>
@@ -2086,7 +2098,7 @@ export default function ListingDrawer({
                 type="url"
                 inputMode="url"
                 value={appUrl}
-                placeholder="Paste the application link. RentSpree, portal, form…"
+                placeholder="Paste the application link"
                 aria-label="Application link"
                 onChange={(e) => setAppUrl(e.target.value)}
                 onBlur={() => {
@@ -2244,8 +2256,10 @@ export default function ListingDrawer({
             {/* The site buttons moved to the top of the panel; what stays down
                 here is the provenance fine print, which is end-matter. */}
             <p className="muted drawer-fineprint">
-              Details come from the listing sites, not from us. Last confirmed
-              live {when(listing.lastSeenAt)}; first seen {when(listing.firstSeenAt)}.
+              Details come from the listing sites, not from us.{" "}
+              {listing.isActive
+                ? `Last confirmed live ${when(listing.lastSeenAt)}; first seen ${when(listing.firstSeenAt)}.`
+                : `No longer listed at its sources; it was live from ${when(listing.firstSeenAt)} to ${when(listing.lastSeenAt)}.`}{" "}
               Prices and availability can change without the listing being
               updated. Confirm both before you travel.
             </p>

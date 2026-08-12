@@ -203,6 +203,12 @@ export default function SearchEditor({ onSaved }: { onSaved: () => void }) {
           <button className="btn btn-primary" onClick={save} disabled={busy}>
             {busy ? "Saving…" : "Save search"}
           </button>
+          {/* The costs card below saves as you type; this one doesn't. Two
+              save models on one tab need the difference said, or edits here
+              get abandoned in the belief they already stuck. */}
+          <span className="muted" style={{ fontSize: 12 }}>
+            Edits here apply when you press Save search.
+          </span>
         </>
       )}
 

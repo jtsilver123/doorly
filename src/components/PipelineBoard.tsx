@@ -386,7 +386,7 @@ export default function PipelineBoard({
         <input
           className="field"
           value={quick}
-          placeholder="Search your board, or paste a link to pull one in"
+          placeholder="Search, or paste a link to pull one in"
           aria-label="Search your pipeline, or paste an address or link"
           onChange={(e) => setQuick(e.target.value)}
         />
@@ -909,6 +909,14 @@ export default function PipelineBoard({
               {column.length === 0 && (
                 <div className="board-empty">
                   {dragging ? `Drop here to mark ${STAGE_LABEL[stage].toLowerCase()}` : STAGE_HINT[stage]}
+                  {/* An empty first column tells you what to do; the door
+                      to actually do it should be one tap, not a hunt for
+                      the right tab. */}
+                  {!dragging && stage === "interested" && (
+                    <a className="btn board-empty-go" href="/listings">
+                      Go find places
+                    </a>
+                  )}
                 </div>
               )}
             </div>

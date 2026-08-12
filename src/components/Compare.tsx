@@ -208,7 +208,16 @@ function HeaderPhotos({ listing, siteUrl }: { listing: FeedListing; siteUrl: str
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photos[0]} alt="" loading="lazy" />
+        <img
+          src={photos[0]}
+          alt=""
+          loading="lazy"
+          // A dead URL leaves the tile's own ground, not the browser's
+          // broken-image glyph — same manners as the drawer's hero.
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
         {photos.length > 1 && <span className="compare-photo-count">{photos.length}</span>}
       </button>
       {viewing && (

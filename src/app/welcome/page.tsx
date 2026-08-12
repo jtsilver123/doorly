@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AreaPicker from "@/components/AreaPicker";
 import { ALL_SOURCES } from "@/types";
+import { searchKey } from "@/lib/criteria";
 import BedBathPicker from "@/components/BedBathPicker";
 import { siteUrl } from "@/lib/site";
 
@@ -66,6 +67,16 @@ export default function Welcome() {
   async function saveSearch(): Promise<boolean> {
     setBusy(true);
     setError("");
+    /*
+     * Setup owns the account's one search. Anything already saved — a
+     * previous run through this flow, an abandoned half-setup — would
+     * otherwise stay active beside the new one, and two live searches make
+     * the criteria editor show whichever it loads first. Replace, not add.
+     */
+    const existing = await fetch("/api/searches")
+      .then((r) => r.json())
+      .then((b) => (b.searches ?? []) as { searchKey: string }[])
+      .catch(() => []);
     const res = await fetch("/api/searches", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -91,6 +102,27 @@ export default function Welcome() {
       setBusy(false);
       setError(body.error);
       return false;
+    }
+
+    // The new search saved; retire every earlier one. Keys are
+    // content-derived, so an identical re-save deletes nothing.
+    const keptKey = searchKey({
+      areas,
+      bedMin: Number(bedMin),
+      bedMax: bedMax === "any" ? null : Number(bedMax),
+      bathMin: Number(bathMin),
+      priceMin: 0,
+      priceMax: Number(priceMax) || 4000,
+      sources: [...ALL_SOURCES],
+      noFeeOnly: false,
+    });
+    for (const prior of existing) {
+      if (prior.searchKey === keptKey) continue;
+      await fetch("/api/searches", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ searchKey: prior.searchKey }),
+      }).catch(() => {});
     }
 
     if (apiKey.trim()) {
@@ -371,7 +403,7 @@ export default function Welcome() {
                 : step === 1
                   ? apiKey.trim()
                     ? "Save and continue"
-                    : "Skip for now"
+                    : "Save, skip the key"
                   : "Continue"}
             </button>
           ) : (

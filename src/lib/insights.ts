@@ -197,7 +197,7 @@ export function readHunt(listings: FeedListing[], now = new Date()): HuntInsight
     insights.push({
       key: "sightseeing",
       tone: "push",
-      title: "Touring a lot, applying to little",
+      title: "Touring a lot, applying too little",
       body: `${steps.toured} tours have produced ${steps.applied} application${steps.applied === 1 ? "" : "s"}. A tour costs an evening, and most of what kills a place in person was already in the posting. Read the cons and the building's record before booking, and ask for a video walkthrough first: a place that fails on camera costs you nothing.`,
     });
   }

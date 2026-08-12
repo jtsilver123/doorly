@@ -73,7 +73,16 @@ export default function Tour({
 
     const remeasure = () => {
       const el = stop.target ? document.querySelector(stop.target) : null;
-      if (el) setRect(el.getBoundingClientRect());
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      /*
+       * Same guard as the initial poll. A target hidden at this width (the
+       * rail's refresh block on a phone) measures 0×0, and writing that
+       * rect painted a stray 16px cutout in the corner instead of letting
+       * the card center. Zero-size means "no spotlight", full stop.
+       */
+      if (r.width > 0 && r.height > 0) setRect(r);
+      else setRect(null);
     };
     window.addEventListener("resize", remeasure);
     window.addEventListener("scroll", remeasure, true);

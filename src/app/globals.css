@@ -49,7 +49,8 @@
   --border: #dbd5c6;
   --border-strong: #c3bba6;
   --text: #14141a;
-  --text-muted: #6b6960;
+  /* Dark enough for AA at 12px on the card surface (#e8e4d8). */
+  --text-muted: #625f56;
   --accent: #14141a;
   --accent-soft: #e4e0d2;
   --action: #d6f84b;
@@ -1361,6 +1362,19 @@ kbd {
 }
 
 .site-cta { font-weight: 600; }
+
+/* Quiet next to the CTA — present for the returning hunter, invisible in
+   the pitch. Padded to a real tap target on phones. */
+.site-login {
+  padding: 8px 10px;
+  font-size: var(--t-sm);
+  font-weight: 550;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.site-login:hover { color: var(--text); }
+.site[data-hero="true"] .site-login { color: rgba(244, 242, 234, 0.75); }
+.site[data-hero="true"] .site-login:hover { color: #f4f2ea; }
 .site[data-hero="true"] .site-cta {
   background: transparent;
   border-color: rgba(244, 242, 234, 0.3);

@@ -35,6 +35,12 @@ export default function SiteChrome({
           <Link href="/#about">About</Link>
           <span className="site-free">Free</span>
         </nav>
+        {/* The returning hunter's door. The whole page sells the start of a
+            hunt; without this, someone mid-hunt on a new phone had no way
+            back into theirs from the front page at all. */}
+        <Link className="site-login" href="/login">
+          Log in
+        </Link>
         <Link className="btn site-cta" href={cta}>
           {ctaLabel}
         </Link>

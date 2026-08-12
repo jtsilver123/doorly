@@ -151,9 +151,23 @@ export default function Changes({
 
   /** Grouped by day, newest first, each day keeping the incoming order. */
   const days = useMemo(() => {
+    /*
+     * One apartment, one row. The same unit tracked from two sites ("122
+     * Allen Street #9" and "122 Allen St") produces two identical change
+     * events, and a feed that repeats itself both pads its unread badge and
+     * reads as broken. Same day + same kind + same value + same street
+     * (numbers and first word, which survives St/Street spelling) is the
+     * same news.
+     */
+    const streetish = (address: string) =>
+      (address.toLowerCase().match(/^\d+\s+\w+/)?.[0] ?? address.toLowerCase()).trim();
+    const seen = new Set<string>();
     const map = new Map<string, { label: string; items: Change[] }>();
     for (const c of shown) {
       const key = dayKey(c.occurredAt);
+      const dupe = `${key}|${c.kind}|${c.newValue ?? c.detail}|${streetish(c.address)}`;
+      if (seen.has(dupe)) continue;
+      seen.add(dupe);
       if (!map.has(key)) map.set(key, { label: dayLabel(c.occurredAt), items: [] });
       map.get(key)!.items.push(c);
     }
