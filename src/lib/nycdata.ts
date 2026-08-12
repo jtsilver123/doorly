@@ -150,8 +150,16 @@ export interface RecordEntry {
   detail: string;
   /** "Open" / "Closed" / "" when the dataset has no such notion. */
   status: string;
-  /** How loudly to draw it. */
-  tone: "bad" | "warn" | "info";
+  /**
+   * How to draw it.
+   *
+   * `good` is not decoration. A landlord's annual bedbug filing that reports
+   * no infestations is the building passing a check, and rendered in the
+   * same grey as everything else it read as another entry on a rap sheet:
+   * people saw the word "bedbug" and stopped. Good news has to look like
+   * good news or it is misinformation.
+   */
+  tone: "good" | "bad" | "warn" | "info";
   /** Apartment or incident address, when the row names one. */
   where: string;
   /**
@@ -565,14 +573,16 @@ export async function fetchBuildingRecords(
       entries.push({
         kind: "bedbug",
         date: (row.filing_date ?? "").slice(0, 10),
-        title: infested > 0 ? "Bedbug filing" : "Bedbug filing, none reported",
+        // Leading with "Bedbug filing" on a clean year buried the good half
+        // of the sentence behind the alarming word.
+        title: infested > 0 ? "Bedbug filing" : "No bedbugs reported",
         detail: infested
           ? `${infested} unit${infested === 1 ? "" : "s"} infested${
               eradicated ? `, ${eradicated} eradicated` : ""
             }${reinfested ? `, ${reinfested} re-infested` : ""}.`
-          : "The landlord's annual filing reported no infestations.",
+          : "The landlord's annual filing to the city reported no infestations.",
         status: "",
-        tone: infested > 0 ? "warn" : "info",
+        tone: infested > 0 ? "warn" : "good",
         where: "",
         scope: "building",
       });

@@ -1610,7 +1610,17 @@ export default function ListingDrawer({
                   </li>
                 )}
                 {intel.noise && (
-                  <li className={intel.noise.count >= 20 ? "is-warn" : undefined}>
+                  // A quiet block is a finding, not an absence: it earns the
+                  // same green the other clean lines get.
+                  <li
+                    className={
+                      intel.noise.count >= 20
+                        ? "is-warn"
+                        : intel.noise.count === 0
+                          ? "is-ok"
+                          : undefined
+                    }
+                  >
                     {intel.noise.count === 0
                       ? "No 311 noise complaints on this block in six months."
                       : `${intel.noise.count} noise complaint${intel.noise.count === 1 ? "" : "s"} to 311 on this block in six months${intel.noise.top.length ? `, mostly ${intel.noise.top.join(" and ").toLowerCase()}` : ""}.`}

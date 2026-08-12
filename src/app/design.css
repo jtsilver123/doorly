@@ -6994,10 +6994,34 @@ button.stagenote.is-live:hover {
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
 }
-.records-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
-.records-kinds .pill { display: inline-flex; align-items: center; gap: 5px; }
+/*
+ * One labelled row per question. Which dataset it came from, whether anyone
+ * is still dealing with it, and whether it happened here or next door are
+ * three different filters, and run together as one strip of nine chips they
+ * read as a wall rather than as three choices.
+ */
+.records-group {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: start;
+  gap: var(--s3);
+}
+
+.records-glabel {
+  padding-top: 8px;
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.records-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.records-controls .pill { display: inline-flex; align-items: center; gap: 5px; }
 /* The count rides inside the chip, dimmed, so the labels stay readable as
-   labels rather than becoming "Violations (128)". */
+   labels rather than becoming "Violations (128)". Every option carries the
+   number it would leave you looking at, so the choice is made before the
+   click. */
 .records-n { opacity: 0.6; font-variant-numeric: tabular-nums; }
 .records-search { width: 100%; }
 
@@ -7065,6 +7089,18 @@ button.stagenote.is-live:hover {
 .records-row[data-tone="warn"] .records-when { border-left: 2px solid var(--accent); padding-left: var(--s2); margin-left: -2px; }
 .records-row[data-tone="bad"] .records-headline b { color: var(--warn); }
 
+/*
+ * Good news, in the colour good news wears everywhere else in the app.
+ * A clean bedbug filing is the building passing a check; drawn in the same
+ * grey as a violation, readers saw the word "bedbug" and filed it under bad.
+ */
+.records-row[data-tone="good"] .records-when {
+  border-left: 2px solid var(--good);
+  padding-left: var(--s2);
+  margin-left: -2px;
+}
+.records-row[data-tone="good"] .records-headline b { color: var(--good); }
+
 .records-note { margin: var(--s4) 0; font-size: var(--t-md); }
 
 .records-partial {
@@ -7104,6 +7140,11 @@ button.stagenote.is-live:hover {
     border: none;
     border-radius: 0;
   }
+  /* The label sits above its controls: a 52px column plus wrapping chips is
+     a 200px alley on a phone. */
+  .records-group { grid-template-columns: 1fr; gap: var(--s1); }
+  .records-glabel { padding-top: 0; }
+
   /* The date moves above the report rather than holding a 132px column
      against a 240px screen. */
   .records-row { grid-template-columns: 1fr; gap: var(--s1); }
@@ -7116,6 +7157,8 @@ button.stagenote.is-live:hover {
   }
   .records-row[data-tone="bad"] { border-left: 2px solid var(--warn); padding-left: var(--s2); }
   .records-row[data-tone="warn"] { border-left: 2px solid var(--accent); padding-left: var(--s2); }
+  .records-row[data-tone="good"] { border-left: 2px solid var(--good); padding-left: var(--s2); }
+  .records-row[data-tone="good"] .records-when { border-left: none; padding-left: 0; margin-left: 0; }
   .records-foot { padding-bottom: max(var(--s3), env(safe-area-inset-bottom, 0px)); }
 }
 

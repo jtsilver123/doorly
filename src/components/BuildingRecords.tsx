@@ -30,6 +30,22 @@ const KINDS: { key: RecordEntry["kind"] | "all"; label: string }[] = [
   { key: "bedbug", label: "Bedbugs" },
 ];
 
+/**
+ * Is this report still live?
+ *
+ * The three feeds disagree about how to say so. HPD writes "Open" or
+ * "Close"; 311 writes "Closed", but also "In Progress", "Assigned",
+ * "Pending" and "Started", all of which mean nobody has finished with it;
+ * the bedbug registry has no notion of status at all, because a filing is
+ * an event rather than a case. Anything that is not explicitly closed and
+ * has a status at all is still open, which is the reading the row's own
+ * colour already used.
+ */
+function liveness(status: string): "open" | "closed" | "none" {
+  if (!status) return "none";
+  return status.toLowerCase() === "closed" ? "closed" : "open";
+}
+
 /** "2024-03-08" as a human date, and honest about a missing one. */
 function stamp(iso: string): string {
   if (!iso) return "no date";
@@ -55,7 +71,13 @@ export default function BuildingRecords({
   const [records, setRecords] = useState<Records | null>(null);
   const [error, setError] = useState("");
   const [kind, setKind] = useState<RecordEntry["kind"] | "all">("all");
-  const [openOnly, setOpenOnly] = useState(false);
+  /**
+   * Still open, done with, or don't care. Its own dimension rather than a
+   * fourth kind chip: "is anyone still dealing with this" is the question
+   * that decides whether a violation is a warning or a piece of history,
+   * and it cuts across all three datasets.
+   */
+  const [status, setStatus] = useState<"any" | "open" | "closed">("any");
   /**
    * Off by default. 311's radius query returns the whole corner, and on a
    * busy block that is four hundred parking and taxi complaints in front of
@@ -105,16 +127,19 @@ export default function BuildingRecords({
     const needle = query.trim().toLowerCase();
     return inScope.filter((e) => {
       if (kind !== "all" && e.kind !== kind) return false;
-      if (openOnly && e.status.toLowerCase() !== "open") return false;
+      if (status !== "any" && liveness(e.status) !== status) return false;
       if (!needle) return true;
       return `${e.title} ${e.detail} ${e.where}`.toLowerCase().includes(needle);
     });
-  }, [inScope, kind, openOnly, query]);
+  }, [inScope, kind, status, query]);
 
-  const openCount = useMemo(
-    () => inScope.filter((e) => e.status.toLowerCase() === "open").length,
-    [inScope]
-  );
+  /** How many of each state are in scope, so the menu can show its work. */
+  const stateCounts = useMemo(() => {
+    const n = { open: 0, closed: 0, none: 0 };
+    for (const e of inScope) n[liveness(e.status)]++;
+    return n;
+  }, [inScope]);
+  const openCount = stateCounts.open;
   /** Per-kind counts of what's in scope, so the chips never overstate. */
   const kindCounts = useMemo(() => {
     const n = { violation: 0, complaint: 0, bedbug: 0 };
@@ -160,50 +185,109 @@ export default function BuildingRecords({
         </header>
 
         {records && records.entries.length > 0 && (
+          /*
+            Three named questions, not a run of chips.
+
+            This started as one flex row of everything, and at nine controls
+            it stopped reading as "kind, status, area" and started reading as
+            a wall you had to decode. Each row now says what it filters, and
+            every option carries the count it would leave you with, so the
+            choice is made before the click rather than after it.
+          */
           <div className="records-tools">
-            <div className="records-kinds" role="tablist" aria-label="Filter by kind">
-              {KINDS.map((k) => {
-                const n = k.key === "all" ? inScope.length : kindCounts[k.key];
-                if (k.key !== "all" && n === 0) return null;
-                return (
-                  <button
-                    key={k.key}
-                    role="tab"
-                    aria-selected={kind === k.key}
-                    className={kind === k.key ? "pill is-on" : "pill"}
-                    onClick={() => setKind(k.key)}
-                  >
-                    {k.label} <span className="records-n">{n}</span>
-                  </button>
-                );
-              })}
-              {openCount > 0 && (
-                <button
-                  className={openOnly ? "pill is-on" : "pill"}
-                  aria-pressed={openOnly}
-                  onClick={() => setOpenOnly((v) => !v)}
-                >
-                  Open only
-                </button>
-              )}
-              {records.block > 0 && (
-                <button
-                  className={withBlock ? "pill is-on" : "pill"}
-                  aria-pressed={withBlock}
-                  onClick={() => setWithBlock((v) => !v)}
-                  title="311 calls from the surrounding street, not this address"
-                >
-                  Include the block <span className="records-n">{records.block}</span>
-                </button>
-              )}
+            <div className="records-group">
+              <span className="records-glabel" id="rec-kind">
+                Show
+              </span>
+              <div className="records-controls" role="tablist" aria-labelledby="rec-kind">
+                {KINDS.map((k) => {
+                  const n = k.key === "all" ? inScope.length : kindCounts[k.key];
+                  if (k.key !== "all" && n === 0) return null;
+                  return (
+                    <button
+                      key={k.key}
+                      role="tab"
+                      aria-selected={kind === k.key}
+                      className={kind === k.key ? "pill is-on" : "pill"}
+                      onClick={() => setKind(k.key)}
+                    >
+                      {k.label} <span className="records-n">{n}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <input
-              className="field records-search"
-              value={query}
-              placeholder="Search these reports"
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search the building's reports"
-            />
+
+            {stateCounts.open + stateCounts.closed > 0 && (
+              <div className="records-group">
+                <span className="records-glabel" id="rec-status">
+                  Status
+                </span>
+                <div className="records-controls" role="group" aria-labelledby="rec-status">
+                  {(
+                    [
+                      ["any", "Any", stateCounts.open + stateCounts.closed + stateCounts.none],
+                      ["open", "Still open", stateCounts.open],
+                      ["closed", "Closed", stateCounts.closed],
+                    ] as const
+                  ).map(([key, label, n]) => (
+                    <button
+                      key={key}
+                      className={status === key ? "pill is-on" : "pill"}
+                      aria-pressed={status === key}
+                      onClick={() => setStatus(key)}
+                    >
+                      {label} <span className="records-n">{n}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {records.block > 0 && (
+              <div className="records-group">
+                <span className="records-glabel" id="rec-area">
+                  Where
+                </span>
+                <div className="records-controls" role="group" aria-labelledby="rec-area">
+                  {/* Two named choices rather than one toggle whose count
+                      was the number it would add, not the number you would
+                      then be looking at. */}
+                  <button
+                    className={withBlock ? "pill" : "pill is-on"}
+                    aria-pressed={!withBlock}
+                    onClick={() => setWithBlock(false)}
+                  >
+                    This building{" "}
+                    <span className="records-n">
+                      {records.entries.length - records.block}
+                    </span>
+                  </button>
+                  <button
+                    className={withBlock ? "pill is-on" : "pill"}
+                    aria-pressed={withBlock}
+                    onClick={() => setWithBlock(true)}
+                    title="Adds 311 calls from the surrounding street"
+                  >
+                    Plus the block{" "}
+                    <span className="records-n">{records.entries.length}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="records-group">
+              <span className="records-glabel" id="rec-find">
+                Find
+              </span>
+              <input
+                className="field records-search"
+                value={query}
+                placeholder="Search these reports"
+                onChange={(e) => setQuery(e.target.value)}
+                aria-labelledby="rec-find"
+              />
+            </div>
           </div>
         )}
 
@@ -235,7 +319,7 @@ export default function BuildingRecords({
                 onClick={() => {
                   setQuery("");
                   setKind("all");
-                  setOpenOnly(false);
+                  setStatus("any");
                   setWithBlock(true);
                 }}
               >

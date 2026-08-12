@@ -2928,6 +2928,8 @@ test("the full record flattens three city feeds into one history", async () => {
 
     const bug = rec.entries.find((e) => e.kind === "bedbug")!;
     assert.match(bug.detail, /2 units infested, 2 eradicated/);
+    assert.equal(bug.title, "Bedbug filing");
+    assert.equal(bug.tone, "warn", "an actual infestation is a warning");
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -3122,6 +3124,36 @@ test("the apostrophe address actually reaches the city", async () => {
     await fetchBuildingRecords("109 Saint Mark's Place", "Manhattan", 40.7, -73.9);
     assert.match(asked, /streetname in\('SAINT MARKS PLACE','ST MARKS PLACE'\)/);
     assert.ok(!asked.includes("'S PLACE"), "no stray apostrophe reaches the query");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a clean bedbug filing reads as good news, not as another entry on a rap sheet", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    if (String(url).includes("wz6d-d3jb")) {
+      return new Response(
+        JSON.stringify([
+          {
+            filing_date: "2025-04-30T00:00:00",
+            infested_dwelling_unit_count: "0",
+            eradicated_unit_count: "0",
+            re_infested_dwelling_unit: "0",
+          },
+        ]),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const rec = await fetchBuildingRecords("330 East 35th Street", "Manhattan", 40.7, -73.9);
+    const bug = rec.entries.find((e) => e.kind === "bedbug")!;
+    // The alarming word came first, so a clean year read as a bedbug problem.
+    assert.equal(bug.title, "No bedbugs reported");
+    assert.equal(bug.tone, "good");
   } finally {
     globalThis.fetch = realFetch;
   }
