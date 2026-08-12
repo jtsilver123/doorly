@@ -30,7 +30,7 @@ const EDGE: { label: string; title: string; body: string }[] = [
   {
     label: "The price",
     title: "What this place should really cost",
-    body: "Every listing gets checked against apartments just like it: same building, same layout, same bedrooms. You see how much too high the rent is, and get a polite script that says so.",
+    body: "Every place you paste gets checked against apartments just like it: same building, same layout, same bedrooms. You see how much too high the rent is, and get a polite script that says so.",
   },
   {
     label: "The building",
@@ -50,7 +50,7 @@ const EDGE: { label: string; title: string; body: string }[] = [
   {
     label: "The move",
     title: "The message, already written",
-    body: "Named, specific, human, and sent from your own phone. The first reply usually gets the tour, and most people take four hours to write theirs.",
+    body: "Named, specific, human, and sent from your own phone. The first reply usually gets the tour, and writing one from scratch is what puts you behind.",
   },
   {
     label: "The crew",
@@ -185,7 +185,7 @@ export default async function Home({
             <span className="landing-cta-sub">
               {user
                 ? "Your pipeline is where you left it"
-                : "Completely free · look around first, sign up when you act"}
+                : "Completely free · try the whole thing before you sign up"}
             </span>
           </div>
         </div>
@@ -196,8 +196,15 @@ export default async function Home({
 
         {counts ? (
           <dl className="landing-proof">
+            {/*
+              What the corpus is actually for, said accurately. This used to
+              read "Listings tracked", which sold a search index the honesty
+              list two sections down then disclaims. These rows are what
+              every price check is measured against, which is the true and
+              more interesting claim.
+            */}
             <div>
-              <dt>Listings tracked</dt>
+              <dt>Rents behind the price check</dt>
               <dd>
                 <CountUp to={counts.tracked} />
               </dd>
@@ -207,7 +214,9 @@ export default async function Home({
               <dd>17</dd>
             </div>
             <div>
-              <dt>Your places re-checked</dt>
+              {/* Not "re-checked": at this size and letterspacing it breaks
+                  after the hyphen and reads as a typo. */}
+              <dt>Watch on your places</dt>
               <dd>Daily</dd>
             </div>
             <div>
@@ -316,7 +325,7 @@ export default async function Home({
             [
               [
                 "Every site, one hunt",
-                "StreetEasy, Zillow, the sublet boards, the Facebook groups — each a click away with your search carried, and everything you find lands on one board with the copies merged.",
+                "StreetEasy, Zillow, the sublet boards, the Facebook groups: each a click away with your search carried, and everything you find lands on one board with the copies merged.",
                 "One site's slice of the market",
               ],
               [
@@ -325,8 +334,8 @@ export default async function Home({
                 "The asking rent",
               ],
               [
-                "A price check with teeth",
-                "Every listing checked against places just like it, with a bargaining script ready to send, or a warning to move fast instead.",
+                "A price check that argues back",
+                "Every place you paste checked against apartments just like it, with a bargaining script ready to send, or a warning to move fast instead.",
                 "“Contact agent”",
               ],
               [
@@ -336,7 +345,7 @@ export default async function Home({
               ],
               [
                 "A pipeline that chases",
-                "Every place you chase, tracked from first text to signed lease, and re-checked while you sleep: price cuts, relists, and quiet delistings come to you. Silence gets flagged, and follow-ups write themselves.",
+                "Every place you chase, tracked from first text to signed lease, and re-checked every day: price cuts, relists, and quiet delistings come to you. Two days of silence gets flagged, with the nudge already drafted.",
                 "Browser tabs and memory",
               ],
               [

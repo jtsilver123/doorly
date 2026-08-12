@@ -1361,11 +1361,17 @@ kbd {
   text-transform: uppercase;
 }
 
-.site-cta { font-weight: 600; }
+/* One line, always. "Start the hunt" was wrapping to three lines on a phone
+   and taking the fixed bar from 61px to 102px, which is a tenth of the
+   screen spent on a button that had gone square. */
+.site-cta { font-weight: 600; white-space: nowrap; }
 
 /* Quiet next to the CTA — present for the returning hunter, invisible in
    the pitch. Padded to a real tap target on phones. */
 .site-login {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   padding: 8px 10px;
   font-size: var(--t-sm);
   font-weight: 550;
@@ -1412,6 +1418,9 @@ kbd {
    height. Inline links inside a paragraph deliberately do not: expanding
    those would overlap the words either side of them. */
 .site-foot-top a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--text-muted);
   text-decoration: none;
   padding: 8px 10px;
@@ -1503,7 +1512,16 @@ kbd {
   font-weight: 650;
   color: var(--text);
 }
-.landing-maker-sign a { color: var(--text-muted); text-underline-offset: 3px; }
+/* "email me and I will actually fix it" is the section's whole promise, so
+   the address has to be tappable, not a 15px line of text. */
+.landing-maker-sign a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -12px 0;
+  color: var(--text-muted);
+  text-underline-offset: 3px;
+}
 
 /*
  * The limits, stated plainly.
@@ -1635,7 +1653,8 @@ kbd {
 .estimator .overline { color: rgba(244, 242, 234, 0.55); }
 
 .estimator-field { display: grid; gap: var(--s2); min-width: 0; }
-.estimator-field label {
+.estimator-field label,
+.estimator-label {
   font-size: var(--t-xs);
   font-weight: 650;
   color: rgba(244, 242, 234, 0.6);
@@ -1665,6 +1684,19 @@ kbd {
   color: var(--on-action);
   font-weight: 650;
 }
+/* A selected chip is still a toggle, and it had no hover state at all: the
+   active background out-specified the hover rule, so the one control that
+   needed to say "you can turn this off" said nothing. */
+.estimator .pill[data-on="true"]:hover {
+  background: color-mix(in srgb, var(--action) 82%, var(--ink));
+  border-color: color-mix(in srgb, var(--action) 82%, var(--ink));
+}
+
+/* Thumb-sized on touch. 38px chips are the whole interaction in this widget
+   and they sit 6px apart, which is where mis-taps come from. */
+@media (pointer: coarse) {
+  .estimator .pill { min-height: 44px; padding: 5px 14px; }
+}
 
 .estimator-date {
   background: rgba(244, 242, 234, 0.08);
@@ -1691,7 +1723,15 @@ kbd {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s3) var(--s4);
 }
-.estimator-nums div { display: grid; gap: 1px; min-width: 0; }
+/* Three fixed rows so the four figures share a baseline even when one label
+   wraps to two lines and its neighbour doesn't. */
+.estimator-nums div {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 1px;
+  min-width: 0;
+}
+.estimator-nums dt { align-self: end; }
 /* The sublabel is what makes each figure legible on its own — "28" means
    nothing; "28, to book 7 viewings" is the whole argument in four words. */
 .estimator-nums span {
@@ -1773,6 +1813,8 @@ kbd {
   font-size: clamp(var(--t-lg), 1.5vw, 19px);
   line-height: 1.55;
   color: rgba(244, 242, 234, 0.72);
+  /* Keeps the paragraph from ending on a single orphaned word. */
+  text-wrap: pretty;
 }
 
 .landing-cta { display: grid; gap: var(--s3); justify-items: start; }
@@ -1810,6 +1852,13 @@ kbd {
    no form in between. A text link on purpose, not a second button — the
    acid stays on the one real call to action above it. */
 .landing-try {
+  /* It is the signup entry point, so it gets a thumb-sized target rather
+     than the 20px a bare line of text gives you. Negative margin keeps the
+     padding from opening a gap the design never had. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -10px 0;
   font-size: var(--t-md);
   font-weight: 600;
   color: rgba(244, 242, 234, 0.85);
@@ -1834,7 +1883,19 @@ kbd {
   border-top: 1px solid rgba(244, 242, 234, 0.16);
 }
 
-.landing-proof div { display: grid; gap: 2px; }
+/*
+ * Label above, figure below, and the figures line up across the row even
+ * when one label wraps to two lines and its neighbour doesn't. Without the
+ * fixed label row the numbers sat at four different heights on a phone,
+ * which is exactly the sort of thing that reads as sloppy without anyone
+ * being able to say why.
+ */
+.landing-proof div {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 2px;
+}
+.landing-proof dt { align-self: end; }
 
 .landing-proof dt {
   font-size: var(--t-2xs);
@@ -1863,8 +1924,19 @@ kbd {
   gap: var(--s6);
 }
 
-.landing-edge > h2,
-.landing-vs > h2,
+/*
+ * Section headings, at section-heading size.
+ *
+ * This was a direct-child selector, and two of the four headings sit inside
+ * a <Reveal> wrapper. Those two were falling through to the body default of
+ * 16px, which put "What you walk in knowing." and "Made by a frustrated
+ * renter." *smaller* than the h3s underneath them. `.display` deliberately
+ * sets no size, so nothing else was going to catch it. Matching any depth
+ * fixes both, and survives the next component that wraps a heading.
+ */
+.landing-edge h2,
+.landing-vs h2,
+.landing-maker h2,
 .landing-team h2 {
   margin: 0;
   font-size: clamp(1.8rem, 4.2vw, 2.9rem);
@@ -1917,6 +1989,7 @@ kbd {
   line-height: 1.6;
   color: var(--text-muted);
   max-width: 58ch;
+  text-wrap: pretty;
 }
 
 @media (max-width: 720px) {
@@ -1952,19 +2025,29 @@ kbd {
   gap: var(--s5);
 }
 
+/*
+ * The card's own three-part shape: title, argument, and the listing-site
+ * comparison as a footer rule. `align-content: start` packed all three at
+ * the top, so in a row of cards of different lengths the dashed rule floated
+ * at three different heights and read as a mistake rather than a footer.
+ * Auto rows with the comparison pushed to the bottom lines them up.
+ */
 .landing-vs-rows li {
   display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: var(--s2);
-  align-content: start;
   padding: var(--s4);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface);
 }
 
+/* A card title has to outrank the paragraph under it. This was 15px/400
+   against a 13.5px/400 body, which is not a hierarchy, it's a coincidence. */
 .landing-vs-rows h3 {
   margin: 0;
-  font-size: var(--t-lg);
+  font-size: var(--t-xl);
+  font-weight: 700;
   font-stretch: 106%;
   letter-spacing: -0.01em;
 }
@@ -1976,10 +2059,14 @@ kbd {
   color: var(--text-muted);
 }
 
+/* The comparison line, at the bottom of every card. The 0.75 opacity took
+   it to 3.6:1 against the card, under the 4.5:1 floor for body text, on the
+   one line carrying the whole Zillow argument. */
 .landing-vs-them {
+  align-self: end;
+  margin-top: var(--s2);
   font-size: var(--t-sm);
   color: var(--text-muted);
-  opacity: 0.75;
   border-top: 1px dashed var(--border);
   padding-top: var(--s2);
 }

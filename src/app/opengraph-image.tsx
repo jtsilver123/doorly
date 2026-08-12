@@ -16,7 +16,7 @@ const INK = "#14141a";
 const BONE = "#f4f2ea";
 const ACID = "#d6f84b";
 
-export const alt = "DamnLease — be first, not lucky";
+export const alt = "DamnLease · be first, not lucky";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

@@ -30,7 +30,9 @@ export default function SiteChrome({
           DamnLease
         </Link>
         <nav className="site-nav">
-          <Link href="/#what-you-know">What you get</Link>
+          {/* Named for the heading it lands on, so the scroll doesn't feel
+              like it went somewhere else. */}
+          <Link href="/#what-you-know">What you know</Link>
           <Link href="/#why">Why not Zillow</Link>
           <Link href="/#about">About</Link>
           <span className="site-free">Free</span>

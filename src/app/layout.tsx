@@ -57,7 +57,7 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: "https://damnlease.com" },
   openGraph: {
-    title: "DamnLease — Be first, not lucky.",
+    title: "DamnLease · Be first, not lucky.",
     description:
       "A good NYC apartment is gone in a day, and it goes to whoever replied first. Paste any place you find: priced against its own comps, the building's record from city data, and your message already written.",
     url: "https://damnlease.com",
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "DamnLease — Be first, not lucky.",
+    title: "DamnLease · Be first, not lucky.",
     description:
       "Gone in a day, to whoever replied first. Paste any place: priced against real comps, message already written, watched for price cuts.",
   },

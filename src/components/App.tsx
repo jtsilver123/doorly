@@ -54,6 +54,7 @@ import Tour from "@/components/Tour";
 import GuestWall from "@/components/GuestWall";
 import WhereToLook from "@/components/WhereToLook";
 import BrowseListings from "@/components/BrowseListings";
+import SecuredFinale from "@/components/SecuredFinale";
 import Insights from "@/components/Insights";
 // Client-only: Leaflet reads `window` the moment its module loads, which
 // detonates the server prerender. The planner has no server-renderable form.
@@ -379,6 +380,12 @@ export default function Home() {
   const [reviewing, setReviewing] = useState(false);
   /** The insights read: funnel rates and what they suggest changing. */
   const [insightsOpen, setInsightsOpen] = useState(false);
+  /**
+   * The place that ended the hunt, while its closing screen is up. Set only
+   * by the act of marking one secured, never by loading a board that already
+   * has one: an ending that replays on every visit is not an ending.
+   */
+  const [finale, setFinale] = useState<FeedListing | null>(null);
 
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
@@ -790,7 +797,13 @@ export default function Home() {
         list.map((l) => (l.id === listing.id ? { ...l, secured } : l))
       );
       patch(listing.id, { action: "secured", secured }, false).catch(() => loadFeed());
-      if (secured) burstConfetti();
+      // The end of the hunt gets an ending. Confetti fires under the closing
+      // screen rather than instead of it.
+      if (secured) {
+        burstConfetti();
+        setOpen(null);
+        setFinale({ ...listing, secured: true });
+      }
     },
     [patch, loadFeed]
   );
@@ -1522,7 +1535,7 @@ export default function Home() {
                 starts; Browse is everything already on the radar, mapped
                 and filterable. A row of tabs, not a buried toggle, because
                 which lens you're in should never be a mystery. */}
-            <div className="findtabs" role="tablist" aria-label="Find views" data-view={findView}>
+            <div className="findtabs" role="tablist" aria-label="Find views">
               <button
                 role="tab"
                 aria-selected={findView === "guide"}
@@ -1791,6 +1804,7 @@ export default function Home() {
           crew={crew}
           all={listings}
           onMark={markAmenity}
+          onSecured={setSecured}
           meId={myId}
           via={sharedVia}
         />
@@ -1851,6 +1865,20 @@ export default function Home() {
 
       {insightsOpen && (
         <Insights listings={listings} onClose={() => setInsightsOpen(false)} />
+      )}
+
+      {/* The last screen of the hunt: the apartment, and every number the
+          app kept on the way to it. */}
+      {finale && (
+        <SecuredFinale
+          listing={finale}
+          listings={listings}
+          onClose={() => setFinale(null)}
+          onInsights={() => {
+            setFinale(null);
+            setInsightsOpen(true);
+          }}
+        />
       )}
 
       {tourAt != null && (

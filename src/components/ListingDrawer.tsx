@@ -90,6 +90,12 @@ interface Props {
    * a check made here shows there and vice versa.
    */
   onMark?: (l: FeedListing, key: AmenityKey, fact: "yes" | "no" | null) => void;
+  /**
+   * Taking the place. Handed up rather than written here because signing is
+   * the end of the hunt, and the app answers it with a closing screen the
+   * drawer has no business owning.
+   */
+  onSecured?: (l: FeedListing, secured: boolean) => void;
   /** Own user id, so a share link can carry your footage with it. */
   meId?: string | null;
   /** The sender's id when this page was opened from a share link. */
@@ -366,6 +372,7 @@ export default function ListingDrawer({
   all,
   jumpTo,
   onMark,
+  onSecured,
   meId,
   via,
 }: Props) {
@@ -2320,7 +2327,8 @@ export default function ListingDrawer({
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    patch({ action: "secured", secured: true }).catch(() => {});
+                    if (onSecured) onSecured(listing, true);
+                    else patch({ action: "secured", secured: true }).catch(() => {});
                   }}
                 >
                   I&rsquo;m taking it

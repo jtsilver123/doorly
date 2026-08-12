@@ -91,7 +91,15 @@
 .mark {
   background: var(--action);
   color: var(--on-action);
+  /*
+   * Asymmetric on purpose. Equal padding pushed the swipe past the final
+   * glyph, so a mark ending a sentence left the full stop stranded a few
+   * pixels out on its own: "completely free ." A negative right margin pulls
+   * the next character back against the ink, the way a real highlighter
+   * would leave it.
+   */
   padding: 0.04em 0.22em;
+  margin-right: -0.1em;
   border-radius: 2px;
   /* Wrapped lines each get their own swipe, rather than one box behind both. */
   box-decoration-break: clone;
@@ -126,6 +134,14 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
+  /*
+   * Tailwind ships a utility named `overline` that draws a rule above the
+   * text, and it has been landing on every label in the app and on the
+   * marketing site: a stray hairline over "THE PRICE", "THE BUILDING" and a
+   * dozen others. The name collision is a coincidence, the stroke was never
+   * the design, and nothing else in the file wanted it.
+   */
+  text-decoration: none;
 }
 
 .tag {
@@ -6674,20 +6690,17 @@ button.stagenote.is-live:hover {
  * The tab row above Where to look / Browse listings. Same pill idiom as the
  * account tabs; it scrolls off with the page, and each view's own frozen
  * header takes over — one sticky element per view, no stacked-offset math.
+ *
+ * It sits in exactly one place regardless of which view is up. An earlier
+ * version centered it over the directory's 980px column and left-aligned it
+ * over the full-width grid, which meant the control you just pressed slid
+ * 49px sideways under your cursor every time you pressed it. A toggle that
+ * moves when toggled is the one thing a toggle must never do.
  */
 .findtabs {
   display: flex;
   gap: 6px;
   margin-bottom: var(--s4);
-}
-
-/* On the directory the tabs line up with its centered column; the browse
-   grid runs full width, so there the tabs hug the left edge with it. */
-.findtabs[data-view="guide"] {
-  width: 100%;
-  max-width: 980px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .findtabs .pill {
@@ -6928,6 +6941,215 @@ button.stagenote.is-live:hover {
   }
   .wtl[data-scrolled="yes"] .wtl-head { padding: var(--s3) var(--s4); gap: var(--s2); }
   .wtl[data-scrolled="yes"] .wtl-head h2 { font-size: var(--t-lg); }
+}
+
+/* --- the ending -----------------------------------------------------------
+ *
+ * The screen after a place is marked secured. It is the only full-bleed
+ * moment in the app: everything else here is a working surface with five
+ * things competing on it, and this one has a single subject. The ink ground
+ * is deliberate — the app is warm paper all day, so going dark reads as the
+ * lights coming up rather than as another panel.
+ */
+.finale {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  /* Under the confetti layer, over everything else. */
+  animation: finale-in 0.5s var(--ease) both;
+}
+
+@keyframes finale-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.finale-panel {
+  width: 100%;
+  height: 100%;
+  max-width: 720px;
+  display: grid;
+  align-items: center;
+  outline: none;
+}
+
+.finale-scroll {
+  display: grid;
+  gap: var(--s5);
+  padding: var(--s6) var(--s5);
+  max-height: 100dvh;
+  overflow: auto;
+  /* The ink ground carries its own text colour: the panel is not on paper,
+     so the page tokens would put dark type on a dark field. */
+  color: #edebe3;
+}
+
+/* Each block arrives on its own beat. data-in flips from the reveal timer. */
+.finale-head,
+.finale-place,
+.finale-stats,
+.finale-funnel,
+.finale-actions {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+}
+.finale-head[data-in],
+.finale-place[data-in],
+.finale-stats[data-in],
+.finale-funnel[data-in],
+.finale-actions[data-in] {
+  opacity: 1;
+  transform: none;
+}
+
+.finale-head { display: grid; gap: var(--s2); justify-items: center; text-align: center; }
+.finale-over { color: var(--action); }
+.finale-title {
+  margin: 0;
+  font-size: clamp(34px, 8vw, 52px);
+  color: #fbfaf6;
+}
+
+/* The apartment, at the size it earned. */
+.finale-place {
+  display: grid;
+  gap: var(--s4);
+  align-items: center;
+  padding: var(--s4);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(237, 235, 227, 0.16);
+  background: rgba(237, 235, 227, 0.05);
+}
+/* The photo column exists only when there is a photo. */
+.finale-place[data-shot] { grid-template-columns: 128px 1fr; }
+
+.finale-shot {
+  width: 128px;
+  height: 112px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  background: rgba(237, 235, 227, 0.08);
+}
+
+.finale-place-body { display: grid; gap: 3px; min-width: 0; }
+.finale-address { font-size: var(--t-xl); line-height: var(--lh-snug); }
+.finale-where { color: rgba(237, 235, 227, 0.62); font-size: var(--t-sm); }
+.finale-rent {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-3xl);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.finale-rent small { font-size: var(--t-md); font-weight: 550; opacity: 0.6; }
+.finale-when { color: rgba(237, 235, 227, 0.62); font-size: var(--t-sm); }
+
+/* The counters. Big numerals, quiet labels: the figures are the sentence. */
+.finale-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--s3);
+}
+.finale-stat {
+  display: grid;
+  gap: 2px;
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: rgba(237, 235, 227, 0.05);
+  text-align: center;
+}
+.finale-stat b {
+  font-family: var(--font-display);
+  font-size: var(--t-3xl);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--action);
+}
+.finale-stat span {
+  font-size: var(--t-xs);
+  color: rgba(237, 235, 227, 0.62);
+  text-transform: lowercase;
+}
+
+.finale-funnel { display: grid; gap: var(--s3); }
+.finale-funnel .overline { color: rgba(237, 235, 227, 0.5); }
+.finale-bars { display: grid; gap: 7px; }
+
+.finale-bar {
+  display: grid;
+  grid-template-columns: 74px 1fr 26px;
+  align-items: center;
+  gap: var(--s3);
+  font-size: var(--t-sm);
+}
+.finale-bar-label { color: rgba(237, 235, 227, 0.62); }
+.finale-bar-track {
+  height: 9px;
+  border-radius: var(--r-full);
+  background: rgba(237, 235, 227, 0.08);
+  overflow: hidden;
+}
+.finale-bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--action);
+  /* Grows in place once the section has arrived. */
+  animation: finale-bar 0.7s var(--ease) both;
+}
+@keyframes finale-bar {
+  from { transform: scaleX(0); transform-origin: left; }
+  to { transform: scaleX(1); transform-origin: left; }
+}
+.finale-bar-n { text-align: right; font-variant-numeric: tabular-nums; }
+
+.finale-line {
+  margin: 0;
+  font-size: var(--t-md);
+  line-height: var(--lh-body);
+  color: rgba(237, 235, 227, 0.72);
+  max-width: 54ch;
+}
+
+.finale-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+}
+.finale-done { min-width: 150px; min-height: 44px; justify-content: center; }
+.finale-actions .linkish { color: rgba(237, 235, 227, 0.62); }
+.finale-actions .linkish:hover { color: #fbfaf6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .finale,
+  .finale-head,
+  .finale-place,
+  .finale-stats,
+  .finale-funnel,
+  .finale-actions,
+  .finale-bar-track i {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .finale-scroll { padding: var(--s5) var(--s4) var(--s6); gap: var(--s4); }
+  /* The photo goes full width above the facts: a 128px thumbnail beside two
+     lines of text is a list row, and this is not a list. */
+  .finale-place[data-shot] { grid-template-columns: 1fr; }
+  .finale-shot { width: 100%; height: 168px; }
+  .finale-stats { grid-template-columns: repeat(2, 1fr); }
+  .finale-bar { grid-template-columns: 66px 1fr 24px; gap: var(--s2); }
+  .finale-actions { flex-direction: column; align-items: stretch; }
+  .finale-done { width: 100%; }
+  .finale-actions .linkish { min-height: 44px; }
 }
 
 /* --- the wall -------------------------------------------------------------

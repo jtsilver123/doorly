@@ -115,9 +115,14 @@ export default function HuntEstimator({ cta, ctaLabel }: { cta: string; ctaLabel
     <aside className="estimator" aria-label="Estimate your hunt">
       <p className="overline">Your hunt, in numbers</p>
 
+      {/* Chip groups, not form controls: `label` with no control to point at
+          is a dangling label to a screen reader, so each group names itself
+          with a span the group is labelled by. */}
       <div className="estimator-field">
-        <label>Where</label>
-        <div className="estimator-chips">
+        <span className="estimator-label" id="est-where">
+          Where
+        </span>
+        <div className="estimator-chips" role="group" aria-labelledby="est-where">
           {AREAS.map((area) => (
             <button
               key={area}
@@ -135,8 +140,10 @@ export default function HuntEstimator({ cta, ctaLabel }: { cta: string; ctaLabel
 
       <div className="estimator-row">
         <div className="estimator-field">
-          <label htmlFor="est-beds">Size</label>
-          <div className="estimator-chips">
+          <span className="estimator-label" id="est-beds">
+            Size
+          </span>
+          <div className="estimator-chips" role="group" aria-labelledby="est-beds">
             {BEDS.map((b) => (
               <button
                 key={b.value}
@@ -209,13 +216,13 @@ export default function HuntEstimator({ cta, ctaLabel }: { cta: string; ctaLabel
               {result.tight ? (
                 <>
                   Your move-in is <b>{daysAway} days</b> away and this usually takes about{" "}
-                  <b>{Math.round(result.weeks * 7)}</b>. You&apos;d be starting{" "}
+                  <b>{Math.round(result.weeks * 7)} days</b>. You&apos;d be starting{" "}
                   <span className="mark">{Math.abs(result.slackDays)} days behind</span>.
                 </>
               ) : (
                 <>
                   Your move-in is <b>{daysAway} days</b> away and this usually takes about{" "}
-                  <b>{Math.round(result.weeks * 7)}</b>. That leaves about{" "}
+                  <b>{Math.round(result.weeks * 7)} days</b>. That leaves about{" "}
                   <span className="mark">{result.slackDays} days of room</span> to walk away
                   from a bad one.
                 </>

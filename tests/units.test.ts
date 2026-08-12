@@ -32,6 +32,7 @@ import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { dayWord } from "@/lib/nextAction";
 import { fuzzyScore, fuzzyBest } from "@/lib/fuzzy";
 import { readHunt } from "@/lib/insights";
+import { huntStory } from "@/lib/finale";
 import { readRentPast, rentCycles } from "@/lib/rentHistory";
 import { statsFor, buildCompIndex, readDeal, flagsFor } from "@/lib/market";
 import { runwayDays } from "@/lib/runway";
@@ -2779,4 +2780,68 @@ test("an expired signature is dead however valid it once was", async () => {
     !(await verifyMediaSig(secret, path, minted.exp, minted.sig, minted.exp + 1)),
     "dead just after"
   );
+});
+
+/* --- the closing screen's arithmetic -------------------------------------- */
+
+test("the hunt story counts only what the rows actually support", () => {
+  const now = new Date("2026-03-01T12:00:00Z");
+  const won = feed({
+    id: "won",
+    stage: "closed",
+    secured: true,
+    appResult: 1,
+    price: 3000,
+    neighborhood: "East Village",
+    contactCount: 3,
+    stageChangedAt: "2026-02-20T12:00:00Z",
+  });
+  const listings = [
+    won,
+    feed({
+      id: "a",
+      stage: "toured",
+      price: 3600,
+      neighborhood: "East Village",
+      contactCount: 2,
+      stageChangedAt: "2026-02-01T12:00:00Z",
+    }),
+    feed({
+      id: "b",
+      stage: "toured",
+      price: 3400,
+      neighborhood: "Bushwick",
+      contactCount: 1,
+      stageChangedAt: "2026-02-05T12:00:00Z",
+    }),
+    feed({ id: "c", stage: "passed", passedAt: "2026-02-10T12:00:00Z" }),
+    feed({ id: "d", stage: "no_go", stageChangedAt: "2026-02-12T12:00:00Z" }),
+  ];
+
+  const story = huntStory(listings, won, now);
+  // Earliest deliberate move was Feb 1; the hunt is 28 days old.
+  assert.equal(story.days, 28);
+  assert.equal(story.messages, 6);
+  // Most-common neighborhood leads.
+  assert.equal(story.areas[0], "East Village");
+  // 3000 against the 3500 average of the two other toured places.
+  assert.equal(story.vsToured, -500);
+  // Both a bare pass and a post-tour no count as places turned down.
+  assert.equal(story.passed, 2);
+  assert.equal(story.steps.won, 1);
+});
+
+test("the story withholds a comparison it cannot honestly make", () => {
+  const won = feed({ id: "won", stage: "closed", secured: true, price: 2800 });
+  // One other tour is not an average worth quoting.
+  const story = huntStory([won, feed({ id: "a", stage: "toured", price: 4000 })], won);
+  assert.equal(story.vsToured, null);
+
+  // An unknown deal verdict never becomes a percentage.
+  const blind = huntStory([{ ...won, dealVerdict: "unknown" as const, dealDelta: -12 }], {
+    ...won,
+    dealVerdict: "unknown" as const,
+    dealDelta: -12,
+  });
+  assert.equal(blind.vsMarket, null);
 });
