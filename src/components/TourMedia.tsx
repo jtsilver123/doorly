@@ -127,7 +127,7 @@ export default function TourMedia({ listingId }: { listingId: string }) {
         {items.length === 0 && pending === 0 && (
           <span className="muted tourmedia-hint">
             What you film at the viewing lives here, or drop files anywhere
-            in this box. Up to 200MB each; uploads keep going if you close the
+            in this box. Up to 400MB each; uploads keep going if you close the
             panel.
           </span>
         )}

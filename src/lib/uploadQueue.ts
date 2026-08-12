@@ -109,7 +109,7 @@ function guard(e: BeforeUnloadEvent) {
  * one. Duplicated as plain numbers rather than imported because that module
  * reaches for the Cloudflare context, which does not exist in a browser.
  */
-const MAX_BYTES = 200 * 1024 * 1024;
+const MAX_BYTES = 400 * 1024 * 1024;
 
 /*
  * The edge accepts at most 100MB per request, measured empirically: a 105MB
@@ -269,7 +269,7 @@ let current: XMLHttpRequest | null = null;
 async function doUpload(job: UploadJob): Promise<void> {
   if (job.file.size > MAX_BYTES) {
     throw new Error(
-      `too big (${Math.round(job.file.size / 1048576)}MB). 200MB is the ceiling`
+      `too big (${Math.round(job.file.size / 1048576)}MB). 400MB is the ceiling`
     );
   }
   const type = sniffType(job.file) || "application/octet-stream";

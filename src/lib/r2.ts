@@ -40,16 +40,17 @@ export function mediaKey(userId: string, listingId: string, filename: string): s
 /**
  * The upload ceiling.
  *
- * 200MB is a full walkthrough of a real apartment at phone quality — every
- * room, the closets, the street noise out the window — rather than the
- * ninety-second clip a smaller limit forces people to shoot.
+ * 400MB is a long walkthrough of a real apartment at modern phone quality —
+ * every room, the closets, the street noise out the window, shot in the 4K
+ * a recent phone defaults to — rather than the ninety-second clip a smaller
+ * limit forces people to shoot.
  *
  * Nothing that large is ever held in memory. The upload is answered by the
- * Worker itself (see upload-handler.js), where the request body is still the
+ * Worker itself (see upload-handler.js), where each part is still the
  * runtime's own stream and goes into the bucket without being assembled —
  * which is what makes a number this size a product decision rather than an
  * engineering one.
  */
-export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 400 * 1024 * 1024;
 
 
