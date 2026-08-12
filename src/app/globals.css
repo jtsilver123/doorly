@@ -2468,3 +2468,184 @@ kbd {
 }
 
 .auth-email-toggle:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); background: none; }
+
+/* --- neighborhood guides ---------------------------------------------------
+ *
+ * Long-form reading, so the measure is narrow and the type is set for prose
+ * rather than for a dashboard. The one departure from the legal pages is the
+ * rent figures at the top: they are the reason most people arrive, and they
+ * get the treatment the proof strip gets on the home page.
+ */
+
+.guide {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: clamp(var(--s6), 7vw, var(--s8)) clamp(var(--s5), 6vw, var(--s7));
+}
+
+.guide-head { margin-bottom: var(--s6); }
+/* The breadcrumb back to the index. Padded to a real target: at 10px it was
+   an 11px tall tap area, which on a phone is a coin toss. */
+.guide-head .overline a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin: -14px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.guide-head .overline a:hover { text-decoration: underline; }
+.guide h1 { margin: var(--s2) 0 var(--s4); font-size: clamp(2rem, 5vw, 3rem); }
+
+.guide-standfirst {
+  margin: 0;
+  font-size: var(--t-lg);
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* The numbers, up top where they are wanted. */
+.guide-rents {
+  margin: 0 0 var(--s6);
+  padding: var(--s4) var(--s5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.guide-rents .overline { display: block; margin-bottom: var(--s3); }
+
+.guide-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--s4);
+  margin: 0 0 var(--s3);
+}
+.guide-figures div { display: grid; gap: 1px; }
+.guide-figures dt {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.guide-figures dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.guide-figures span { font-size: var(--t-2xs); }
+
+.guide-fine { margin: 0; font-size: var(--t-xs); line-height: 1.5; }
+
+.guide-body h2,
+.guide-where h2,
+.guide-group h2 {
+  margin: var(--s6) 0 var(--s3);
+  font-size: var(--t-xl);
+  font-stretch: 108%;
+  letter-spacing: -0.02em;
+}
+.guide-body p { margin: 0 0 var(--s3); line-height: 1.7; color: var(--text-muted); text-wrap: pretty; }
+
+.guide-checks {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: var(--s3);
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* The doors out, at the end of the reading. */
+.guide-lane { margin-bottom: var(--s4); }
+.guide-lane h3 {
+  margin: 0 0 var(--s2);
+  font-size: var(--t-md);
+  color: var(--text-muted);
+}
+.guide-sites { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.guide-site {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  padding: 6px var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+.guide-site:hover { border-color: var(--accent); }
+.guide-site span { display: inline-flex; align-items: center; gap: 5px; }
+.guide-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.guide-cta {
+  margin: var(--s7) 0 0;
+  padding: var(--s5);
+  border-radius: var(--r-lg);
+  display: grid;
+  justify-items: start;
+  gap: var(--s3);
+}
+.guide-cta h2 { margin: 0; font-size: var(--t-xl); }
+.guide-cta p { margin: 0; line-height: 1.65; color: var(--text-muted); }
+
+.guide-nearby { margin-top: var(--s7); }
+.guide-nearby ul { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.guide-nearby a {
+  display: grid;
+  gap: 2px;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: inherit;
+}
+.guide-nearby a:hover { border-color: var(--accent); }
+.guide-nearby span { font-size: var(--t-sm); line-height: 1.45; }
+
+/* The index. Wider than a guide, because it is a list rather than prose. */
+.guide-index { max-width: 62rem; }
+.guide-group { margin-bottom: var(--s5); }
+.guide-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s3);
+}
+.guide-card {
+  display: grid;
+  gap: 3px;
+  height: 100%;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.guide-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.guide-card b { font-size: var(--t-lg); }
+.guide-card span { font-size: var(--t-sm); line-height: 1.45; }
+
+@media (max-width: 640px) {
+  .guide-rents { padding: var(--s4); }
+  .guide-figures { grid-template-columns: repeat(2, 1fr); gap: var(--s3); }
+  .guide-cta { padding: var(--s4); justify-items: stretch; }
+  .guide-cta .landing-go { text-align: center; justify-content: center; }
+  .guide-cards { grid-template-columns: 1fr; }
+}

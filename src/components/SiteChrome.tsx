@@ -33,7 +33,7 @@ export default function SiteChrome({
           {/* Named for the heading it lands on, so the scroll doesn't feel
               like it went somewhere else. */}
           <Link href="/#what-you-know">What you know</Link>
-          <Link href="/#why">Why not Zillow</Link>
+          <Link href="/guides">Neighborhoods</Link>
           <Link href="/#about">About</Link>
           <span className="site-free">Free</span>
         </nav>
@@ -57,6 +57,7 @@ export default function SiteChrome({
             DamnLease
           </span>
           <nav>
+            <Link href="/guides">Neighborhoods</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <a href="mailto:jtsilver123@gmail.com?subject=DamnLease%20feedback">Contact</a>

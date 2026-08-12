@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GUIDES } from "@/lib/guides";
 
 export const dynamic = "force-static";
 
@@ -18,10 +19,18 @@ const BASE = "https://damnlease.com";
 
 const PAGES: { path: string; priority: number; changefreq: string }[] = [
   { path: "/", priority: 1.0, changefreq: "weekly" },
+  { path: "/guides", priority: 0.9, changefreq: "weekly" },
   { path: "/signup", priority: 0.8, changefreq: "monthly" },
   { path: "/login", priority: 0.5, changefreq: "monthly" },
   { path: "/privacy", priority: 0.3, changefreq: "yearly" },
   { path: "/terms", priority: 0.3, changefreq: "yearly" },
+  // Every neighborhood guide. They carry live rents off the corpus, so they
+  // genuinely change week to week rather than being declared to.
+  ...GUIDES.map((g) => ({
+    path: `/guides/${g.slug}`,
+    priority: 0.8,
+    changefreq: "weekly",
+  })),
 ];
 
 export function GET() {

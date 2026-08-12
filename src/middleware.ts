@@ -218,6 +218,11 @@ export async function middleware(request: NextRequest) {
     // useless.
     path === "/privacy" ||
     path === "/terms" ||
+    // The neighborhood guides are the marketing site's reason to exist in a
+    // search result. A guide that redirects a logged-out stranger to /login
+    // is a guide no crawler will ever read and no reader will ever find.
+    path === "/guides" ||
+    path.startsWith("/guides/") ||
     (path === "/" && !onApp);
 
   /*
