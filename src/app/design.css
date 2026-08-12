@@ -2104,6 +2104,9 @@ button.fact:hover .fact-label { color: var(--accent); }
 }
 
 .welcome-steps {
+  /* Explicit: the base reset strips ol markers, and steps without their
+     numbers read as three unrelated sentences. */
+  list-style: decimal outside;
   margin: 0;
   padding-left: 1.15rem;
   display: grid;
@@ -2113,7 +2116,8 @@ button.fact:hover .fact-label { color: var(--accent); }
   color: var(--text-muted);
 }
 
-.welcome-steps li::marker { font-weight: 700; color: var(--accent); }
+/* Ink, not accent: the lime marker was invisible on the panel. */
+.welcome-steps li::marker { font-weight: 700; color: var(--text); }
 .welcome-steps a { color: var(--accent); font-weight: 600; }
 
 .welcome-steps code {
@@ -3571,6 +3575,14 @@ button.fact:hover .fact-label { color: var(--accent); }
 /* --- the visitor's account modal ----------------------------------------- */
 
 .rail-join { width: 100%; }
+
+.rail-joinwrap {
+  display: grid;
+  gap: var(--s2);
+  justify-items: center;
+  width: 100%;
+}
+.rail-login { font-size: var(--t-xs); }
 
 /* A heavier scrim than other modals: the app behind it is the pitch, and
    the blur says "still there, one close away". */
@@ -6613,6 +6625,8 @@ button.stagenote.is-live:hover {
 
 /* The plan, held in one hand. Numbered because a stressed person counts. */
 .wtl-steps {
+  /* Explicit for the same reason as .welcome-steps: the reset eats markers. */
+  list-style: decimal outside;
   display: grid;
   gap: var(--s2);
   margin: 0;
@@ -6774,4 +6788,18 @@ button.stagenote.is-live:hover {
   /* When the box takes the row, the button takes the next one whole —
      a stranded pill bottom-left reads as a leftover, not a step. */
   .wtl-paste .btn { flex: 1 1 100%; justify-content: center; }
+
+  /*
+   * Scrolled on a phone, the pinned header condenses to its controls: the
+   * lede, the plan and the criteria line fold away and only the title row
+   * and the paste box stay frozen. In full it took half the screen and the
+   * directory showed through a slot. Back at the top, everything returns.
+   */
+  .wtl[data-scrolled="yes"] .wtl-lede,
+  .wtl[data-scrolled="yes"] .wtl-steps,
+  .wtl[data-scrolled="yes"] .wtl-criteria {
+    display: none;
+  }
+  .wtl[data-scrolled="yes"] .wtl-head { padding: var(--s3) var(--s4); gap: var(--s2); }
+  .wtl[data-scrolled="yes"] .wtl-head h2 { font-size: var(--t-lg); }
 }

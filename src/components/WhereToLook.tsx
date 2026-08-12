@@ -73,6 +73,25 @@ export default function WhereToLook({
     return () => ro.disconnect();
   }, []);
 
+  /*
+   * Whether the page is scrolled at all, read off a sentinel that sits just
+   * above the header. Phones use it to condense the pinned header down to
+   * its controls: frozen in full, the lede, the steps and the criteria line
+   * take half a phone screen and the directory shows through a slot.
+   * Scrolled back to the top, everything returns.
+   */
+  const [scrolled, setScrolled] = useState(false);
+  const topRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const top = topRef.current;
+    if (!top) return;
+    const io = new IntersectionObserver(([entry]) =>
+      setScrolled(!entry.isIntersecting)
+    );
+    io.observe(top);
+    return () => io.disconnect();
+  }, []);
+
   const areaLabels = criteria
     ? criteria.areas
         .map((slug) => AREAS.find((a) => a.slug === slug)?.label)
@@ -88,7 +107,8 @@ export default function WhereToLook({
   }
 
   return (
-    <div className="wtl" ref={wrapRef}>
+    <div className="wtl" ref={wrapRef} data-scrolled={scrolled ? "yes" : undefined}>
+      <div ref={topRef} aria-hidden="true" />
       <header className="wtl-head surface" ref={headRef}>
         <div className="wtl-head-top">
           <div>

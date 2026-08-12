@@ -1219,13 +1219,20 @@ export default function Home() {
 
           {guest ? (
             // The shop window's one honest ask, where the account chip
-            // would sit. Everything above it works without one.
-            <button
-              className="btn btn-primary rail-join"
-              onClick={() => setJoinOpen(true)}
-            >
-              Create your free account
-            </button>
+            // would sit. Everything above it works without one. The sign-in
+            // line is for the person who already has a hunt here and landed
+            // logged out — a shared link, a new phone, a cleared browser.
+            <div className="rail-joinwrap">
+              <button
+                className="btn btn-primary rail-join"
+                onClick={() => setJoinOpen(true)}
+              >
+                Create your free account
+              </button>
+              <a className="linkish rail-login" href="/login">
+                Already hunting here? Log in
+              </a>
+            </div>
           ) : (
             <AccountMenu
               email={email}
