@@ -387,6 +387,9 @@ export default function Home() {
    * has one: an ending that replays on every visit is not an ending.
    */
   const [finale, setFinale] = useState<FeedListing | null>(null);
+  /** The confirm sheet for starting over, which empties the board. */
+  const [startingOver, setStartingOver] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const [api, setApi] = useState<ApiStatus | null>(null);
   const [crew, setCrew] = useState<CrewView | null>(null);
@@ -573,6 +576,27 @@ export default function Home() {
     }
   }, []);
 
+  /**
+   * What the map and the browse view are filtered to.
+   *
+   * The active one, not the oldest one. Searches come back in the order they
+   * were made, and a hunt that starts over retires its predecessor rather
+   * than deleting it — so "the first row" is last year's search now.
+   */
+  const loadSearchCriteria = useCallback(async () => {
+    try {
+      const body = await fetch("/api/searches").then((r) => r.json());
+      const list = (body.searches ?? []) as {
+        active?: boolean;
+        criteria?: SearchCriteria;
+      }[];
+      const live = list.find((s) => s.active) ?? list[0];
+      if (live?.criteria) setSearchCriteria(live.criteria);
+    } catch {
+      /* the unfiltered view is the fallback the feed already applies */
+    }
+  }, []);
+
   /*
    * The desktop frame must never scroll as a document — `.main` owns the
    * scrolling. CSS clips overflow on html and body already, but a clipped
@@ -603,13 +627,7 @@ export default function Home() {
     loadChanges();
     loadApi();
     loadCrew();
-    fetch("/api/searches")
-      .then((r) => r.json())
-      .then((b) => {
-        const first = (b.searches ?? [])[0];
-        if (first?.criteria) setSearchCriteria(first.criteria);
-      })
-      .catch(() => {});
+    loadSearchCriteria();
     fetch("/api/profile")
       .then((r) => r.json())
       .then((b) => {
@@ -1274,6 +1292,49 @@ export default function Home() {
     [profile, requireAccount, toast]
   );
 
+  /**
+   * Begin again.
+   *
+   * The board empties, which is the point and also the risk, so it happens
+   * behind a confirmation that names what survives. Nothing is deleted: the
+   * old board is stamped with the hunt that just closed and stays readable.
+   */
+  const startNewHunt = useCallback(async () => {
+    setStarting(true);
+    try {
+      const body = await fetch("/api/hunts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }).then((r) => r.json());
+      if (body.error) throw new Error(body.error);
+      setStartingOver(false);
+      // Everything on screen belongs to the hunt that just ended.
+      await Promise.all([
+        loadFeed(),
+        loadChanges().catch(() => {}),
+        loadSearchCriteria(),
+      ]);
+      setProfile((was) => ({ ...was, moveInDate: "", huntSettledAt: null }));
+      setOpen(null);
+      // Straight to the search, because the one it starts with is a stock
+      // one and the first useful thing to do is say what you want this time.
+      setTab("profile");
+      setSection("search");
+      toast({
+        message: "New hunt started. Tell us what you're looking for this time",
+        tone: "good",
+      });
+    } catch (err) {
+      toast({
+        message: err instanceof Error ? err.message : "Could not start a new hunt",
+        tone: "warn",
+      });
+    } finally {
+      setStarting(false);
+    }
+  }, [loadFeed, loadChanges, loadSearchCriteria, toast]);
+
   // No toast: the forms save themselves as you type now, and a "Saved" pop
   // for every debounced keystroke would be a metronome. Each form shows its
   // own quiet status line instead.
@@ -1709,9 +1770,19 @@ export default function Home() {
                     See the numbers
                   </button>
                   {settled ? (
-                    <button className="btn" onClick={() => settleHunt(false)}>
-                      Reopen this hunt
-                    </button>
+                    <>
+                      <button className="btn" onClick={() => settleHunt(false)}>
+                        Reopen this hunt
+                      </button>
+                      {/* Only once it is closed. Offering a fresh start beside
+                          a live board would be an invitation to lose one. */}
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setStartingOver(true)}
+                      >
+                        Start a new hunt
+                      </button>
+                    </>
                   ) : (
                     <button className="btn" onClick={() => settleHunt(true)}>
                       Put this hunt to bed
@@ -1947,6 +2018,65 @@ export default function Home() {
       {/* The moment a visitor tried to act like a user: offer the account
           right here, on top of the thing they were doing. */}
       {joinOpen && <JoinGate onClose={() => setJoinOpen(false)} />}
+
+      {/*
+        Starting over empties the board, so it says what it keeps before it
+        does it. The list is the actual answer to "do I have to set all this
+        up again", which is the only question anyone has here.
+      */}
+      {startingOver && (
+        <div
+          className="compare-modal"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setStartingOver(false);
+          }}
+        >
+          <div
+            className="compare-modal-panel startover"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Start a new hunt"
+          >
+            <h2>Start a new hunt</h2>
+            <p className="muted">
+              Moving again. This board becomes a record you can still read,
+              and you get an empty one.
+            </p>
+            <div className="startover-cols">
+              <div>
+                <span className="overline">Kept</span>
+                <ul>
+                  <li>Your details, income and guarantor</li>
+                  <li>Every document in your packet</li>
+                  <li>Your message templates</li>
+                  <li>Your crew</li>
+                </ul>
+              </div>
+              <div>
+                <span className="overline">Cleared</span>
+                <ul>
+                  <li>The board, kept as a record</li>
+                  <li>What you were looking for</li>
+                  <li>Your move-in date</li>
+                </ul>
+              </div>
+            </div>
+            <div className="startover-acts">
+              <button className="btn" onClick={() => setStartingOver(false)}>
+                Not yet
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={startNewHunt}
+                disabled={starting}
+              >
+                {starting ? "Starting…" : "Start a new hunt"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {insightsOpen && (
         <Insights listings={listings} onClose={() => setInsightsOpen(false)} />

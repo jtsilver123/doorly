@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { adminDb } from "@/lib/supabase";
 import { appUrl } from "@/lib/site";
+import { FIRST_HUNT } from "@/lib/hunts";
 import type { Profile } from "@/lib/outreach";
 
 /**
@@ -164,24 +165,44 @@ export async function noticesForEvents(
   const db = adminDb();
   const ids = [...new Set(interesting.map((e) => e.listing_id))];
 
-  const [{ data: states }, { data: listings }, { data: hunters }] = await Promise.all([
-    db
-      .from("user_listing_state")
-      .select("user_id, listing_id, stage, starred")
-      .in("listing_id", ids),
-    db.from("listings").select("id, address, unit, neighborhood, price").in("id", ids),
-    // Everyone with an active hunt, for good drops.
-    db.from("user_listing_state").select("user_id"),
-  ]);
+  const [{ data: states }, { data: listings }, { data: hunters }, { data: openHunts }] =
+    await Promise.all([
+      db
+        .from("user_listing_state")
+        .select("user_id, listing_id, stage, starred, hunt_id")
+        .in("listing_id", ids),
+      db.from("listings").select("id, address, unit, neighborhood, price").in("id", ids),
+      // Everyone with an active hunt, for good drops.
+      db.from("user_listing_state").select("user_id, hunt_id"),
+      db.from("hunts").select("id, owner_id").is("ended_at", null),
+    ]);
+
+  /*
+   * A row on a hunt somebody has closed is a record, and pinging them about
+   * a price move on it would be the app chasing a search that is over. The
+   * live hunt is the one open row, or the nil UUID for anyone who has never
+   * started a second — see lib/hunts.
+   */
+  const openBy = new Map(
+    ((openHunts ?? []) as Record<string, unknown>[]).map((h) => [
+      h.owner_id as string,
+      h.id as string,
+    ])
+  );
+  const live = (row: { user_id: unknown; hunt_id?: unknown }) =>
+    (row.hunt_id as string) === (openBy.get(row.user_id as string) ?? FIRST_HUNT);
 
   const listingBy = new Map((listings ?? []).map((l) => [l.id as string, l]));
-  const everyone = [...new Set((hunters ?? []).map((h) => h.user_id as string))];
+  const everyone = [
+    ...new Set((hunters ?? []).filter(live).map((h) => h.user_id as string)),
+  ];
 
   const watchers = new Map<string, string[]>();
   for (const s of states ?? []) {
     const pursuing =
-      (s.starred as boolean) ||
-      !["inbox", "passed", "no_go"].includes(s.stage as string);
+      live(s) &&
+      ((s.starred as boolean) ||
+        !["inbox", "passed", "no_go"].includes(s.stage as string));
     if (!pursuing) continue;
     const list = watchers.get(s.listing_id as string) ?? [];
     list.push(s.user_id as string);

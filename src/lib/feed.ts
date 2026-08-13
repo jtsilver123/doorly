@@ -12,6 +12,7 @@ import type {
 import { PIPELINE_STAGES } from "@/types";
 import { db, adminDb, currentUserId } from "@/lib/supabase";
 import { pipelineOwnerId, crewOf } from "@/lib/crew";
+import { currentHuntId } from "@/lib/hunts";
 import { DEFAULT_CRITERIA, searchKey, normalizeCriteria, inBounds } from "@/lib/criteria";
 import { train, score, stageImpliesLike, type Signal } from "@/lib/rank";
 import { addressSansUnit } from "@/lib/parse";
@@ -195,6 +196,11 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   // (feedback) stays yours: what to look for is an opinion, the pipeline is
   // the shared work.
   const ownerId = await pipelineOwnerId();
+  /*
+   * The board is this hunt's board. Rows stamped with a closed hunt are the
+   * record of a search that already ended and must not come back as work.
+   */
+  const huntId = await currentHuntId(ownerId);
 
   let query = supabase.from("listings").select("*");
 
@@ -224,7 +230,8 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
     const { data: trackedRows } = await supabase
       .from("user_listing_state")
       .select("listing_id, stage, starred")
-      .eq("user_id", ownerId);
+      .eq("user_id", ownerId)
+      .eq("hunt_id", huntId);
     const trackedIds = (trackedRows ?? [])
       .filter((t) => t.starred || !["inbox", "passed"].includes(t.stage as string))
       .map((t) => t.listing_id as string)
@@ -243,7 +250,11 @@ export async function loadFeed(filters: FeedFilterOptions = {}): Promise<FeedLis
   const ids = listings.map((r) => r.id);
 
   const [states, sourceRows, eventRows, contacts, feedbackRows] = await Promise.all([
-    supabase.from("user_listing_state").select("*").eq("user_id", ownerId),
+    supabase
+      .from("user_listing_state")
+      .select("*")
+      .eq("user_id", ownerId)
+      .eq("hunt_id", huntId),
     forListings<{ listing_id: string; source: string; url: string; is_active: boolean }>(ids, (batch) =>
       supabase
         .from("listing_sources")
@@ -864,18 +875,20 @@ export async function setStage(listingId: string, stage: Stage): Promise<void> {
     .select("added_by, stage")
     .eq("user_id", owner)
     .eq("listing_id", listingId)
+    .eq("hunt_id", await currentHuntId())
     .maybeSingle();
 
   await supabase.from("user_listing_state").upsert(
     {
       user_id: owner,
       listing_id: listingId,
+      hunt_id: await currentHuntId(owner),
       stage,
       stage_changed_at: now,
       updated_at: now,
       added_by: existing?.added_by ?? me,
     },
-    { onConflict: "user_id,listing_id" }
+    { onConflict: "user_id,listing_id,hunt_id" }
   );
 
   /*
@@ -964,10 +977,11 @@ export async function setListingFields(
     {
       user_id: await pipelineOwnerId(),
       listing_id: listingId,
+      hunt_id: await currentHuntId(),
       ...fields,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "user_id,listing_id" }
+    { onConflict: "user_id,listing_id,hunt_id" }
   );
 }
 
@@ -1002,6 +1016,7 @@ export async function recordFeedback(
       .select("stage")
       .eq("user_id", owner)
       .eq("listing_id", listingId)
+      .eq("hunt_id", await currentHuntId())
       .maybeSingle();
     const stage = state?.stage ?? "inbox";
     if (stage === "inbox" || stage === "passed") {
@@ -1049,19 +1064,21 @@ export async function passListing(
     .select("stage")
     .eq("user_id", owner)
     .eq("listing_id", listingId)
+    .eq("hunt_id", await currentHuntId())
     .maybeSingle();
   const seenIt = ["toured", "applied", "no_go"].includes(state?.stage ?? "inbox");
   await supabase.from("user_listing_state").upsert(
     {
       user_id: owner,
       listing_id: listingId,
+      hunt_id: await currentHuntId(owner),
       stage: seenIt ? "no_go" : "passed",
       stage_changed_at: now,
       pass_reason: reason.slice(0, 500),
       passed_at: now,
       updated_at: now,
     },
-    { onConflict: "user_id,listing_id" }
+    { onConflict: "user_id,listing_id,hunt_id" }
   );
 
   /*
@@ -1096,11 +1113,13 @@ export async function undoPass(listingId: string): Promise<void> {
     .select("stage")
     .eq("user_id", owner)
     .eq("listing_id", listingId)
+    .eq("hunt_id", await currentHuntId())
     .maybeSingle();
   await supabase.from("user_listing_state").upsert(
     {
       user_id: owner,
       listing_id: listingId,
+      hunt_id: await currentHuntId(owner),
       stage: state?.stage === "no_go" ? "toured" : "inbox",
       stage_changed_at: new Date().toISOString(),
       // Back in the running means the reason no longer applies.
@@ -1108,7 +1127,7 @@ export async function undoPass(listingId: string): Promise<void> {
       passed_at: null,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "user_id,listing_id" }
+    { onConflict: "user_id,listing_id,hunt_id" }
   );
 }
 
@@ -1233,6 +1252,7 @@ export async function setAmenityMark(
     .select("amenity_marks")
     .eq("user_id", ownerId)
     .eq("listing_id", listingId)
+    .eq("hunt_id", await currentHuntId())
     .maybeSingle();
   const marks = { ...((data?.amenity_marks as Record<string, string>) ?? {}) };
   if (fact) marks[key] = fact;
@@ -1241,10 +1261,11 @@ export async function setAmenityMark(
     {
       user_id: ownerId,
       listing_id: listingId,
+      hunt_id: await currentHuntId(ownerId),
       amenity_marks: marks,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "user_id,listing_id" }
+    { onConflict: "user_id,listing_id,hunt_id" }
   );
 }
 

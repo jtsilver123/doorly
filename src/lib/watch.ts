@@ -1,5 +1,6 @@
 import type { Listing } from "@/types";
 import { adminDb } from "@/lib/supabase";
+import { currentHuntId } from "@/lib/hunts";
 import { fetchZillowOne } from "@/lib/sources/zillow";
 import { streetKey, extractUnit } from "@/lib/dedupe";
 import { limitPollRequests, endPollRequests, BudgetExhaustedError } from "@/lib/realtyapi";
@@ -163,6 +164,11 @@ export async function recheckWatch(userId: string): Promise<WatchResult> {
   const supabase = adminDb();
   const nowIso = new Date().toISOString();
   const errors: string[] = [];
+  /*
+   * Only the hunt in progress. A closed hunt's board is a record, and
+   * re-checking its prices would spend requests to update history.
+   */
+  const huntId = await currentHuntId(userId);
 
   const result: WatchResult = {
     checked: 0,
@@ -187,6 +193,7 @@ export async function recheckWatch(userId: string): Promise<WatchResult> {
     .from("user_listing_state")
     .select("listing_id")
     .eq("user_id", userId)
+    .eq("hunt_id", huntId)
     .eq("secured", true)
     .limit(1);
   if (wonErr) throw new Error(`watch: ${wonErr.message}`);
@@ -199,6 +206,7 @@ export async function recheckWatch(userId: string): Promise<WatchResult> {
     .from("user_listing_state")
     .select("listing_id")
     .eq("user_id", userId)
+    .eq("hunt_id", huntId)
     .in("stage", WATCH_STAGES);
   if (stateErr) throw new Error(`watch: ${stateErr.message}`);
   const ids = (stateRows ?? []).map((r) => r.listing_id as string);

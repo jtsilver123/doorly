@@ -7436,11 +7436,78 @@ button.stagenote.is-live:hover {
 }
 .finale-note[data-in] { opacity: 1; transform: none; }
 
+/*
+ * Starting over.
+ *
+ * The one button in the app that empties the board, so the sheet spends its
+ * space on the only question anyone actually has: what do I lose? Two
+ * columns, named plainly, kept side by side so the answer is one glance
+ * rather than a paragraph to read.
+ */
+.startover { width: min(540px, 94vw); }
+.startover h2 { font-size: var(--t-lg); margin: 0; }
+.startover > .muted { font-size: var(--t-sm); line-height: 1.5; margin: 0; }
+
+.startover-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+}
+.startover-cols > div {
+  display: grid;
+  gap: var(--s2);
+  align-content: start;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+/* Kept is the reassuring half, so it gets the colour. */
+.startover-cols > div:first-child {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+.startover-cols ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--s1);
+}
+.startover-cols li {
+  font-size: var(--t-sm);
+  line-height: 1.4;
+  padding-left: 14px;
+  position: relative;
+}
+.startover-cols li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.startover-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
 @media (max-width: 640px) {
   .settled { flex-direction: column; align-items: stretch; }
   .settled-acts { justify-content: space-between; }
   .settled-acts .btn { min-height: 44px; }
   .settled-acts .linkish { min-height: 44px; display: inline-flex; align-items: center; }
+
+  /* One column on a phone: two columns of four-word lines is unreadable,
+     and the sheet has room to scroll. */
+  .startover-cols { grid-template-columns: 1fr; }
+  .startover-acts .btn { flex: 1; min-height: 44px; }
 }
 
 /* --- the wall -------------------------------------------------------------
