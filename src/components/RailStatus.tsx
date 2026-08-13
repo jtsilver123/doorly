@@ -22,6 +22,7 @@ export default function RailStatus({
   live,
   changed,
   onInsights,
+  won,
 }: {
   info: PhaseInfo;
   funnel: Funnel;
@@ -29,6 +30,13 @@ export default function RailStatus({
   live: number;
   changed: number;
   onInsights?: () => void;
+  /**
+   * The address that ended the hunt, if one has. A countdown and a pace
+   * meter are advice, and advice about how fast you are hunting is nonsense
+   * once you have signed: the instrument stops measuring and starts
+   * reporting.
+   */
+  won?: string | null;
 }) {
   const date = moveInDate
     ? new Date(`${moveInDate}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -38,6 +46,21 @@ export default function RailStatus({
       })
     : "";
   const showPace = info.phase !== "early" && info.phase !== "past";
+
+  if (won) {
+    return (
+      <div className="railstatus railstatus-won">
+        <span className="railstatus-label">You&apos;re in</span>
+        <b className="railstatus-address">{won}</b>
+        {date && <span className="muted">Yours from {date}</span>}
+        {onInsights && (
+          <button className="railstatus-insights" onClick={onInsights}>
+            How it went →
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="railstatus" title={info.advice}>

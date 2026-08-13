@@ -33,6 +33,12 @@ export interface Profile {
   documents: string[];
   /** Someone signs with you. Their papers join the checklist when true. */
   hasGuarantor?: boolean;
+  /**
+   * When this hunt was put to bed, if it has been. See lib/hunt: it quiets
+   * the board and turns it into a record. Reversible on purpose, because
+   * signed is not the same as moved in and deals fall through.
+   */
+  huntSettledAt?: string | null;
   /** How the guarantor earns, which shapes which of their papers are needed. */
   guarantorEmployment?: Employment;
   /** Foreign national: landlords ask for passport and visa pages too. */

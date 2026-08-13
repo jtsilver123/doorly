@@ -142,6 +142,11 @@ export interface WatchResult {
   priceDrops: number;
   gone: number;
   errors: string[];
+  /**
+   * The hunt is won, so nothing was checked. Not an error and not an empty
+   * board: the caller needs to tell those three apart to say anything true.
+   */
+  settled?: boolean;
 }
 
 /**
@@ -167,6 +172,28 @@ export async function recheckWatch(userId: string): Promise<WatchResult> {
     gone: 0,
     errors,
   };
+
+  /*
+   * A won hunt is not watched.
+   *
+   * Securing a place does not move anything out of WATCH_STAGES, so without
+   * this the hourly run kept re-pricing every apartment on a finished board:
+   * the ones toured and turned down, the ones that never answered. It spent
+   * a metered API budget to do it and turned the result into notifications
+   * about a hunt that was over. Checked before anything else because it is
+   * the cheapest question here and it settles the whole run.
+   */
+  const { data: wonRows, error: wonErr } = await supabase
+    .from("user_listing_state")
+    .select("listing_id")
+    .eq("user_id", userId)
+    .eq("secured", true)
+    .limit(1);
+  if (wonErr) throw new Error(`watch: ${wonErr.message}`);
+  if ((wonRows ?? []).length > 0) {
+    result.settled = true;
+    return result;
+  }
 
   const { data: stateRows, error: stateErr } = await supabase
     .from("user_listing_state")

@@ -32,6 +32,7 @@ import { phaseFor, phaseBands, funnelFor, todaysActions } from "@/lib/timeline";
 import { dayWord } from "@/lib/nextAction";
 import { fuzzyScore, fuzzyBest } from "@/lib/fuzzy";
 import { readHunt } from "@/lib/insights";
+import { wonListing, isSettled, stillHunting } from "@/lib/hunt";
 import { huntStory } from "@/lib/finale";
 import { readRentPast, rentCycles } from "@/lib/rentHistory";
 import { statsFor, buildCompIndex, readDeal, flagsFor } from "@/lib/market";
@@ -3268,3 +3269,33 @@ test("the city's un-re-encoded punctuation is repaired, not drawn as tofu", asyn
     globalThis.fetch = realFetch;
   }
 });
+
+/* --- the hunt, after it is won -------------------------------------------- */
+
+test("a won hunt stops being a hunt", () => {
+  const open = [feed({ id: "a", stage: "toured" }), feed({ id: "b", stage: "applied" })];
+  assert.equal(wonListing(open), null);
+  assert.equal(stillHunting(open), true);
+
+  const done = [...open, feed({ id: "c", stage: "closed", secured: true, address: "12 Bank St" })];
+  assert.equal(wonListing(done)?.address, "12 Bank St");
+  assert.equal(stillHunting(done), false, "the watch and the pace meter go quiet on the win");
+});
+
+test("settled needs both a decision and a win", () => {
+  const board = [feed({ id: "c", stage: "closed", secured: true })];
+  const bare = { ...DEFAULT_PROFILE };
+  const closed = { ...DEFAULT_PROFILE, huntSettledAt: "2026-08-13T10:00:00Z" };
+
+  assert.equal(isSettled(bare, board), false, "a win alone does not close the board");
+  assert.equal(isSettled(closed, board), true);
+  // The escape hatch: unsecuring reopens the hunt even if the flag lingers,
+  // so a collapsed deal can never leave someone staring at a closed record.
+  assert.equal(
+    isSettled(closed, [feed({ id: "c", stage: "applied", secured: false })]),
+    false,
+    "a hunt with nothing secured is not closed, whatever the profile says"
+  );
+  assert.equal(isSettled(closed, []), false);
+});
+

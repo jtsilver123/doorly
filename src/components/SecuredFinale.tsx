@@ -27,12 +27,22 @@ const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 export default function SecuredFinale({
   listing,
   listings,
+  settled,
   onClose,
+  onSettle,
   onInsights,
 }: {
   listing: FeedListing;
   listings: FeedListing[];
+  /** Already put away, so the offer to do it would be a dead button. */
+  settled?: boolean;
   onClose: () => void;
+  /**
+   * Close the hunt: the board becomes a record and stops behaving like a
+   * job. Offered here rather than done automatically, because a signed
+   * lease and a set of keys are not the same week.
+   */
+  onSettle?: () => void;
   /** The full funnel read, for whoever wants the rest of the numbers. */
   onInsights: () => void;
 }) {
@@ -195,10 +205,24 @@ export default function SecuredFinale({
             <button className="btn btn-primary finale-done" onClick={onClose}>
               Done
             </button>
+            {/* The board has already stopped chasing; this closes it. Offered
+                rather than assumed, because the week between a handshake and
+                a set of keys is when people keep a backup warm. */}
+            {onSettle && !settled && (
+              <button className="linkish" onClick={onSettle}>
+                Put this hunt to bed
+              </button>
+            )}
             <button className="linkish" onClick={onInsights}>
               See the full read
             </button>
           </div>
+          {onSettle && !settled && (
+            <p className="finale-note" data-in={shown >= 4 ? "yes" : undefined}>
+              Nothing is being watched any more. Closing the hunt keeps
+              everything as a record and you can reopen it if the deal moves.
+            </p>
+          )}
         </div>
       </div>
     </div>

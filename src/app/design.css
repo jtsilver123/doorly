@@ -7380,6 +7380,69 @@ button.stagenote.is-live:hover {
   .finale-actions .linkish { min-height: 44px; }
 }
 
+/* --- the hunt, after it is won --------------------------------------------
+ *
+ * The board stops being a job and becomes a record. Stated in a band above
+ * it rather than by removing anything: people keep working a backup between
+ * a handshake and a signed lease, and hiding their board mid-week would be
+ * the app deciding something it does not know.
+ */
+.settled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--good);
+  border-radius: var(--r-md);
+  background: var(--good-soft);
+}
+/* Closed reads as filed rather than as a celebration; the green belongs to
+   the moment, not to the archive. */
+.settled[data-archived] {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.settled-said { display: grid; gap: 2px; min-width: 0; }
+.settled-said b { font-size: var(--t-md); }
+.settled-said span { font-size: var(--t-sm); line-height: 1.45; }
+
+.settled-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-shrink: 0;
+}
+
+/* The rail, once there is nothing left to measure. */
+.railstatus-won { gap: var(--s1); }
+.railstatus-address {
+  font-size: var(--t-lg);
+  line-height: var(--lh-snug);
+}
+
+.finale-note {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: rgba(237, 235, 227, 0.5);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+}
+.finale-note[data-in] { opacity: 1; transform: none; }
+
+@media (max-width: 640px) {
+  .settled { flex-direction: column; align-items: stretch; }
+  .settled-acts { justify-content: space-between; }
+  .settled-acts .btn { min-height: 44px; }
+  .settled-acts .linkish { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
 /* --- the wall -------------------------------------------------------------
  *
  * Shown where the shop window stops: a visitor's own file. See GuestWall —

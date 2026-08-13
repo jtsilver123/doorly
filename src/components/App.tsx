@@ -41,6 +41,7 @@ import Timeline from "@/components/Timeline";
 import AccountMenu, { type ProfileSection } from "@/components/AccountMenu";
 import CrewPanel, { type CrewView } from "@/components/CrewPanel";
 import { phaseFor, funnelFor } from "@/lib/timeline";
+import { wonListing, isSettled } from "@/lib/hunt";
 import { orderedSources } from "@/components/ListingCard";
 import ListingDrawer from "@/components/ListingDrawer";
 import PipelineBoard from "@/components/PipelineBoard";
@@ -640,6 +641,11 @@ export default function Home() {
           message: [drops, gone].filter(Boolean).join(" · ") || `${body.events} changes`,
           tone: "good",
         });
+      } else if (body.settled) {
+        // Nothing was checked because there is nothing left to check. Saying
+        // "save a place first" to somebody who just signed a lease would be
+        // the app failing to notice it had won.
+        toast({ message: "You're in. Nothing left to watch" });
       } else if (body.checked === 0 && body.watched === 0) {
         toast({ message: "Nothing on your board to watch yet. Save a place first" });
       } else {
@@ -1223,12 +1229,51 @@ export default function Home() {
     [listings]
   );
 
+  /*
+   * The place that ended the hunt, and whether it has been put away. Both
+   * derived from what is on the board rather than stored beside it, so they
+   * cannot disagree with it. See lib/hunt.
+   */
+  const won = useMemo(() => wonListing(listings), [listings]);
+  const settled = useMemo(() => isSettled(profile, listings), [profile, listings]);
+
   const daysToMove = daysUntil(profile.moveInDate);
   const phase = useMemo(() => phaseFor(daysToMove), [daysToMove]);
   const funnel = useMemo(
     () => funnelFor(listings, daysToMove),
     [listings, daysToMove]
   );
+  /**
+   * Put the hunt to bed, or take it back out.
+   *
+   * Deliberately not a consequence of winning. Signed is not moved in, and
+   * a deal that collapses in week two needs the board it collapsed onto,
+   * so this is a button somebody presses and a button they can press back.
+   */
+  const settleHunt = useCallback(
+    async (done: boolean) => {
+      if (requireAccount()) return;
+      const next = {
+        ...profile,
+        huntSettledAt: done ? new Date().toISOString() : null,
+      };
+      setProfile(next);
+      setFinale(null);
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profile: next }),
+      }).catch(() => {});
+      toast({
+        message: done
+          ? "Hunt closed. It's kept as a record whenever you want it"
+          : "Hunt reopened. Watching starts again on your next check",
+        tone: "good",
+      });
+    },
+    [profile, requireAccount, toast]
+  );
+
   // No toast: the forms save themselves as you type now, and a "Saved" pop
   // for every debounced keystroke would be a metronome. Each form shows its
   // own quiet status line instead.
@@ -1311,6 +1356,7 @@ export default function Home() {
               moveInDate={profile.moveInDate}
               live={counts.active}
               changed={counts.changed}
+              won={won?.address ?? null}
               onInsights={() => setInsightsOpen(true)}
             />
           )}
@@ -1627,13 +1673,52 @@ export default function Home() {
             {/* Phones only: the rail that carries this status on desktop is
                 a bottom tab bar down there, so the strip covers for it. */}
             {/* Same reasoning as the rail: pace advice presumes a hunt. */}
-            {!guest && (
+            {!guest && !won && (
               <Timeline
                 info={phase}
                 funnel={funnel}
                 moveInDate={profile.moveInDate}
                 onInsights={() => setInsightsOpen(true)}
               />
+            )}
+
+            {/*
+              The board after the hunt is won.
+
+              Two states, and the difference is whether somebody has said
+              they are done. Won-but-open still lets the board work, because
+              the week between a handshake and a signed lease is exactly when
+              people keep a backup warm. Settled says the record is closed,
+              and offers the way back for the deal that collapses in week two.
+            */}
+            {won && (
+              <div className="settled" data-archived={settled ? "yes" : undefined}>
+                <div className="settled-said">
+                  <b>
+                    {settled ? "This hunt is closed." : "You got it."}{" "}
+                    {won.address}
+                  </b>
+                  <span className="muted">
+                    {settled
+                      ? "Kept as a record: the places, the notes, the footage, the numbers. Nothing is being watched."
+                      : "Watching has stopped, and nothing here is chasing you any more. Put it away when you're sure."}
+                  </span>
+                </div>
+                <div className="settled-acts">
+                  <button className="linkish" onClick={() => setFinale(won)}>
+                    See the numbers
+                  </button>
+                  {settled ? (
+                    <button className="btn" onClick={() => settleHunt(false)}>
+                      Reopen this hunt
+                    </button>
+                  ) : (
+                    <button className="btn" onClick={() => settleHunt(true)}>
+                      Put this hunt to bed
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
 
             <PipelineBoard
@@ -1873,7 +1958,9 @@ export default function Home() {
         <SecuredFinale
           listing={finale}
           listings={listings}
+          settled={settled}
           onClose={() => setFinale(null)}
+          onSettle={() => settleHunt(true)}
           onInsights={() => {
             setFinale(null);
             setInsightsOpen(true);
