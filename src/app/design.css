@@ -7354,6 +7354,40 @@ button.stagenote.is-live:hover {
 .finale-actions .linkish { color: rgba(237, 235, 227, 0.62); }
 .finale-actions .linkish:hover { color: #fbfaf6; }
 
+/* Telling people is a real action, so it gets a button rather than a link.
+   Ghosted against the ink: a white surface button here would be the second
+   loudest thing on the screen, and Done is the way out.
+
+   Scoped to .finale-actions rather than styled on its own class, because
+   globals.css imports this file before declaring .btn — so a bare
+   .finale-share ties on specificity and loses on order, and the button
+   renders as a white slab on a black panel. Anything here that repaints a
+   .btn needs the extra class. */
+.finale-actions .finale-share {
+  min-height: 44px;
+  padding-inline: 14px;
+  background: transparent;
+  border-color: rgba(237, 235, 227, 0.28);
+  color: #edebe3;
+}
+.finale-actions .finale-share:hover:not(:disabled) {
+  background: rgba(237, 235, 227, 0.08);
+  border-color: rgba(237, 235, 227, 0.5);
+  color: #fbfaf6;
+}
+/* Confirmation the clipboard took it, on the machines with no share sheet.
+   The green is spelled out rather than var(--good), which is a dark green
+   for light backgrounds: this panel is ink whatever the system theme says. */
+.finale-actions .finale-share.is-done,
+/* The hover rule above outranks a bare .is-done, and the pointer is still on
+   the button the instant after you click it: without this the confirmation
+   never shows on a mouse. */
+.finale-actions .finale-share.is-done:hover:not(:disabled) {
+  border-color: #45d68a;
+  color: #45d68a;
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .finale,
   .finale-head,
@@ -7377,6 +7411,7 @@ button.stagenote.is-live:hover {
   .finale-bar { grid-template-columns: 66px 1fr 24px; gap: var(--s2); }
   .finale-actions { flex-direction: column; align-items: stretch; }
   .finale-done { width: 100%; }
+  .finale-actions .finale-share { width: 100%; }
   .finale-actions .linkish { min-height: 44px; }
 }
 

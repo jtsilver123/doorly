@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FeedListing } from "@/types";
 import { huntStory } from "@/lib/finale";
+import { siteUrl } from "@/lib/site";
+import Icon from "@/components/Icon";
 
 /**
  * The last screen of the hunt.
@@ -28,6 +30,7 @@ export default function SecuredFinale({
   listing,
   listings,
   settled,
+  meId,
   onClose,
   onSettle,
   onInsights,
@@ -36,6 +39,8 @@ export default function SecuredFinale({
   listings: FeedListing[];
   /** Already put away, so the offer to do it would be a dead button. */
   settled?: boolean;
+  /** Whose footage rides along on the shared link. */
+  meId?: string | null;
   onClose: () => void;
   /**
    * Close the hunt: the board becomes a record and stops behaving like a
@@ -113,6 +118,55 @@ export default function SecuredFinale({
   }
   if (steps.toured > 0) {
     stats.push({ value: String(steps.toured), label: steps.toured === 1 ? "place seen" : "places seen" });
+  }
+
+  /**
+   * Telling people.
+   *
+   * This is the one screen in the app anybody actually wants to forward, and
+   * without a button the only way to do it is a screenshot. It shares the
+   * app's own view of the apartment rather than the listing site's: that link
+   * works signed out and carries your own tour footage, so whoever opens it
+   * sees the place the way you saw it.
+   *
+   * The message is built from the same story as the screen, so the two can't
+   * disagree, and it leaves out anything the data doesn't support. The native
+   * sheet where there is one, since forwarding happens on a phone; the
+   * clipboard everywhere else.
+   */
+  const [shared, setShared] = useState(false);
+  async function share() {
+    const url = siteUrl(
+      `/app?place=${encodeURIComponent(listing.id)}${
+        meId ? `&via=${encodeURIComponent(meId)}` : ""
+      }`
+    );
+    const where = listing.neighborhood ? ` in ${listing.neighborhood}` : "";
+    const effort = [
+      story.days != null ? `${story.days} ${story.days === 1 ? "day" : "days"}` : null,
+      steps.saved > 1 ? `${steps.saved} places` : null,
+    ]
+      .filter(Boolean)
+      .join(" and ");
+    const text = `${listing.address}. ${money(listing.price)}/mo${where}.${
+      effort ? ` Took ${effort} to get here.` : ""
+    }`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "I got the place", text, url });
+        return;
+      } catch {
+        // Cancelled, or the sheet refused. The clipboard still works.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    } catch {
+      setShared(false);
+    }
   }
 
   return (
@@ -204,6 +258,14 @@ export default function SecuredFinale({
           <div className="finale-actions" data-in={shown >= 4 ? "yes" : undefined}>
             <button className="btn btn-primary finale-done" onClick={onClose}>
               Done
+            </button>
+            <button
+              className={shared ? "btn finale-share is-done" : "btn finale-share"}
+              onClick={share}
+              aria-label={`Share that you got ${listing.address}`}
+            >
+              <Icon name={shared ? "check" : "share"} size={15} />
+              <span>{shared ? "Link copied" : "Share the news"}</span>
             </button>
             {/* The board has already stopped chasing; this closes it. Offered
                 rather than assumed, because the week between a handshake and

@@ -2089,6 +2089,7 @@ export default function Home() {
           listing={finale}
           listings={listings}
           settled={settled}
+          meId={myId}
           onClose={() => setFinale(null)}
           onSettle={() => settleHunt(true)}
           onInsights={() => {
