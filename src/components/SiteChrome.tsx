@@ -16,11 +16,19 @@ export default function SiteChrome({
   ctaLabel,
   /** The pitch paints its own dark hero behind a transparent bar. */
   transparentBar = false,
+  /**
+   * Whether there is a session. The bar was offering "Log in" beside "Back
+   * to the hunt" to people who were plainly already logged in, which is
+   * nonsense on its own and on a phone pushed the button that matters off
+   * the side of the screen.
+   */
+  signedIn = false,
 }: {
   children: React.ReactNode;
   cta: string;
   ctaLabel: string;
   transparentBar?: boolean;
+  signedIn?: boolean;
 }) {
   return (
     <div className="site" data-hero={transparentBar ? "true" : undefined}>
@@ -39,10 +47,13 @@ export default function SiteChrome({
         </nav>
         {/* The returning hunter's door. The whole page sells the start of a
             hunt; without this, someone mid-hunt on a new phone had no way
-            back into theirs from the front page at all. */}
-        <Link className="site-login" href="/login">
-          Log in
-        </Link>
+            back into theirs from the front page at all. Pointless once
+            they have a session, and on a phone it costs the CTA its room. */}
+        {!signedIn && (
+          <Link className="site-login" href="/login">
+            Log in
+          </Link>
+        )}
         <Link className="btn site-cta" href={cta}>
           {ctaLabel}
         </Link>

@@ -24,7 +24,11 @@ const UPDATED = "August 2026";
 export default async function Terms() {
   const user = await currentUser();
   return (
-    <SiteChrome cta={user ? appUrl("/app") : "/signup"} ctaLabel={user ? "Back to the hunt" : "Start the hunt"}>
+    <SiteChrome
+      cta={user ? appUrl("/app") : "/signup"}
+      ctaLabel={user ? "Back to the hunt" : "Start the hunt"}
+      signedIn={Boolean(user)}
+    >
       <article className="legal">
         <p className="overline">Terms of use</p>
         <h1 className="display">The short version.</h1>

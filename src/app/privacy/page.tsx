@@ -25,7 +25,11 @@ const UPDATED = "August 2026";
 export default async function Privacy() {
   const user = await currentUser();
   return (
-    <SiteChrome cta={user ? appUrl("/app") : "/signup"} ctaLabel={user ? "Back to the hunt" : "Start the hunt"}>
+    <SiteChrome
+      cta={user ? appUrl("/app") : "/signup"}
+      ctaLabel={user ? "Back to the hunt" : "Start the hunt"}
+      signedIn={Boolean(user)}
+    >
       <article className="legal">
         <p className="overline">Privacy</p>
         <h1 className="display">What we keep, and why.</h1>

@@ -37,7 +37,7 @@ export default async function Guides() {
   const goLabel = user ? "Back to the hunt" : "Start the hunt";
 
   return (
-    <SiteChrome cta={go} ctaLabel={goLabel}>
+    <SiteChrome cta={go} ctaLabel={goLabel} signedIn={Boolean(user)}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

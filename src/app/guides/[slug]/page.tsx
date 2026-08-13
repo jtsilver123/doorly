@@ -98,7 +98,7 @@ export default async function Guide({
   const priced = stats?.byBeds.filter((b) => b.median != null) ?? [];
 
   return (
-    <SiteChrome cta={go} ctaLabel={goLabel}>
+    <SiteChrome cta={go} ctaLabel={goLabel} signedIn={Boolean(user)}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

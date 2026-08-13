@@ -1395,6 +1395,37 @@ kbd {
   .site-nav { margin-left: auto; gap: var(--s2); }
 }
 
+/*
+ * The bar has to fit, and it was not fitting.
+ *
+ * Stopping the CTA wrapping to three lines fixed the height and moved the
+ * problem sideways: with nothing allowed to shrink, the button simply ran
+ * off the right edge and the bar clipped it. Nothing showed up in a
+ * document-overflow check, which is exactly why it survived one.
+ *
+ * So the bar is told what it may give up, in order. The brand shrinks and
+ * the free badge goes before the button loses a single character, because
+ * the button is the only thing on this bar anyone came to press.
+ */
+@media (max-width: 560px) {
+  .site-bar { gap: var(--s3); }
+  .site-brand {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-lg);
+  }
+  .site-cta { flex-shrink: 0; padding-left: var(--s3); padding-right: var(--s3); }
+  .site-login { flex-shrink: 0; padding-left: 4px; padding-right: 4px; }
+}
+
+@media (max-width: 430px) {
+  /* "Free, forever" is the first line of the page underneath. The badge is
+     a repeat, and it is the cheapest thing here to lose. */
+  .site-free { display: none; }
+}
+
 .site-foot {
   display: grid;
   gap: var(--s3);

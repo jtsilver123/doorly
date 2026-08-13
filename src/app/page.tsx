@@ -120,6 +120,7 @@ export default async function Home({
       cta={go}
       ctaLabel={goLabel}
       transparentBar
+      signedIn={Boolean(user)}
     >
     <main className="landing">
       {/* Old bookmarks look like /#pipeline — the app lived on the root
